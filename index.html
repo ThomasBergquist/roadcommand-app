@@ -43,12 +43,42 @@
   </div>
 </div>
 
+
+<!-- PROFILE SETUP SCREEN — shown after first signup -->
+<div class="auth-screen" id="profile-setup-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-text">RoadCommand</div>
+      <div class="auth-logo-sub">Set up your profile</div>
+    </div>
+    <div class="auth-title">Tell us about your rig</div>
+    <div style="margin-bottom:1.2rem;">
+      <div class="form-label">Your First Name *</div>
+      <input class="auth-input" id="profile-firstname" type="text" placeholder="Levi" autocomplete="given-name">
+    </div>
+    <div style="margin-bottom:1.2rem;">
+      <div class="form-label">Co-Driver Name (optional)</div>
+      <input class="auth-input" id="profile-codriver" type="text" placeholder="Dylan">
+    </div>
+    <div style="margin-bottom:1.2rem;">
+      <div class="form-label">Truck Year</div>
+      <input class="auth-input" id="profile-year" type="text" placeholder="2018">
+    </div>
+    <div style="margin-bottom:1.2rem;">
+      <div class="form-label">Truck Make & Model</div>
+      <input class="auth-input" id="profile-model" type="text" placeholder="Peterbilt 579">
+    </div>
+    <button class="auth-btn" id="profile-save-btn" onclick="saveProfile()">Save and Enter RoadCommand</button>
+    <div style="text-align:center;font-size:.75rem;color:#b8c8b8;">You can update this anytime in Settings</div>
+  </div>
+</div>
+
 <!-- MAIN APP — hidden until auth -->
 <div id="main-app" style="display:none;">
 <div class="app-header" style="display:none;">
   <div class="app-logo">RoadCommand <span>Personal Dispatcher</span></div>
   <button onclick="goToSettings()" style="background:none;border:none;color:#ffd04d;font-size:1.3rem;cursor:pointer;padding:.2rem .4rem;" title="Settings">⚙️</button>
-  <div class="header-truck"><strong>2018 Peterbilt 579</strong>Levi & Dylan</div>
+  <div class="header-truck" id="header-truck"><strong id="header-truck-model">RoadCommand</strong><span id="header-truck-name"></span></div>
 </div>
 
 <div class="main">
@@ -939,21 +969,21 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Driver Name</label>
-            <input class="form-input" id="set-name" placeholder="Levi" value="Levi">
+            <input class="form-input" id="set-name" placeholder="Your name" value="">
           </div>
           <div class="form-group">
             <label class="form-label">Co-Driver</label>
-            <input class="form-input" id="set-codriver" placeholder="Dylan" value="Dylan">
+            <input class="form-input" id="set-codriver" placeholder="Co-driver name" value="">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Truck Year</label>
-            <input class="form-input" id="set-year" placeholder="2018" value="2018">
+            <input class="form-input" id="set-year" placeholder="2018" value="">
           </div>
           <div class="form-group">
             <label class="form-label">Truck Model</label>
-            <input class="form-input" id="set-model" placeholder="Peterbilt 579" value="Peterbilt 579">
+            <input class="form-input" id="set-model" placeholder="Peterbilt 579" value="">
           </div>
         </div>
         <button class="btn btn-green" onclick="saveTruckInfo()">Save Truck Info</button>

@@ -13,18 +13,29 @@ function onAuthReady(firstName, userId, email) {
   window._rcUserId        = userId;
   window._rcUserEmail     = email;
 
-  // Update header truck name if settings not yet saved
-  var nameEl = document.getElementById('set-name');
-  if (nameEl && !nameEl.value) nameEl.value = firstName;
+  // Populate header from profile globals set by auth.js
+  var truckModel = window._rcTruckYear && window._rcTruckModel
+    ? window._rcTruckYear + ' ' + window._rcTruckModel
+    : 'RoadCommand';
+  var driverName = window._rcUserFirstName || '';
+  if (window._rcUserCodriver) driverName += ' & ' + window._rcUserCodriver;
 
-  // Hide auth screen, show app
-  var authScreen = document.getElementById('auth-screen');
-  if (authScreen) authScreen.classList.remove('active');
-  document.querySelector('.app-header').style.display = '';
-  document.getElementById('main-app').style.display = '';
-  document.getElementById('bottom-nav').style.display = '';
+  var headerModel = document.getElementById('header-truck-model');
+  var headerName  = document.getElementById('header-truck-name');
+  if (headerModel) headerModel.textContent = truckModel;
+  if (headerName)  headerName.textContent  = driverName;
 
-  // Re-init so tutorial greets by name
+  // Populate settings fields from profile
+  var nameEl     = document.getElementById('set-name');
+  var codriverEl = document.getElementById('set-codriver');
+  var yearEl     = document.getElementById('set-year');
+  var modelEl    = document.getElementById('set-model');
+  if (nameEl     && !nameEl.value)     nameEl.value     = window._rcUserFirstName || '';
+  if (codriverEl && !codriverEl.value) codriverEl.value = window._rcUserCodriver  || '';
+  if (yearEl     && !yearEl.value)     yearEl.value     = window._rcTruckYear     || '';
+  if (modelEl    && !modelEl.value)    modelEl.value    = window._rcTruckModel    || '';
+
+  // Re-init app
   renderStates(stateData);
   injectProfitBars();
   loadSavedPreferences();

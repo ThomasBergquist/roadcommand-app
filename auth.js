@@ -1,19 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════
    RoadCommand — auth.js
-   Supabase authentication: login, signup, session restore
-   Replace SUPABASE_URL and SUPABASE_ANON_KEY with your project values
-   from: https://app.supabase.com → Project Settings → API
+   Supabase authentication + profile management
    ═══════════════════════════════════════════════════════════════ */
 
-const SUPABASE_URL      = 'https://kaxspubuhzpqgbomvcmo.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtheHNwdWJ1aHpwcWdib212Y21vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5ODU4NzgsImV4cCI6MjA5MjU2MTg3OH0._5mvIKv2ZhtDRzT2yLf8NeDH8VseqKy47g9nXczXndM';
+const SUPABASE_URL      = 'https://YOUR_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
-// Init Supabase client
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let _authMode = 'signin'; // 'signin' or 'signup'
+let _authMode    = 'signin';
+let _currentUser = null;
 
-// ── Toggle between Sign In / Sign Up ────────────────────────────
+// ── Toggle Sign In / Sign Up ─────────────────────────────────────
 function toggleAuthMode() {
   _authMode = _authMode === 'signin' ? 'signup' : 'signin';
   const title  = document.getElementById('auth-title');
@@ -21,53 +19,48 @@ function toggleAuthMode() {
   const toggle = document.getElementById('auth-toggle');
   const badge  = document.getElementById('auth-badge');
   if (_authMode === 'signup') {
-    title.textContent  = 'Create Your Account';
-    btn.textContent    = 'Start Free 30-Day Beta';
-    toggle.innerHTML   = 'Already have an account? <a onclick="toggleAuthMode()">Sign in</a>';
+    title.textContent   = 'Create Your Account';
+    btn.textContent     = 'Sign Up Free';
+    toggle.innerHTML    = 'Already have an account? <a onclick="toggleAuthMode()">Sign in</a>';
     badge.style.display = 'block';
   } else {
-    title.textContent  = 'Sign In';
-    btn.textContent    = 'Sign In';
-    toggle.innerHTML   = 'No account? <a onclick="toggleAuthMode()">Sign up free</a>';
+    title.textContent   = 'Sign In';
+    btn.textContent     = 'Sign In';
+    toggle.innerHTML    = 'No account? <a onclick="toggleAuthMode()">Sign up free</a>';
     badge.style.display = 'none';
   }
   clearAuthError();
 }
 
-// ── Show / Clear Error ───────────────────────────────────────────
+// ── Error helpers ────────────────────────────────────────────────
 function showAuthError(msg) {
   const el = document.getElementById('auth-error');
   el.textContent = msg;
   el.classList.add('show');
 }
-
 function clearAuthError() {
   const el = document.getElementById('auth-error');
   el.textContent = '';
   el.classList.remove('show');
 }
 
-// ── Handle Submit ────────────────────────────────────────────────
+// ── Auth Submit ──────────────────────────────────────────────────
 async function authSubmit() {
   clearAuthError();
   const email    = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   const btn      = document.getElementById('auth-submit-btn');
-
   if (!email || !password) { showAuthError('Email and password are required.'); return; }
-
   btn.textContent = 'Please wait...';
   btn.disabled    = true;
-
   try {
     let result;
     if (_authMode === 'signup') {
       result = await _supabase.auth.signUp({ email, password });
       if (result.error) throw result.error;
-      // After signup Supabase may require email confirm depending on your settings
       if (result.data.session) {
-        // Auto-confirmed — go straight to app
-        handleSession(result.data.session);
+        _currentUser = result.data.session.user;
+        showProfileSetup();
       } else {
         showAuthError('Check your email to confirm your account, then sign in.');
         btn.textContent = 'Sign Up Free';
@@ -76,11 +69,12 @@ async function authSubmit() {
     } else {
       result = await _supabase.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
-      handleSession(result.data.session);
+      _currentUser = result.data.session.user;
+      await loadProfileAndEnter();
     }
   } catch (err) {
     let msg = err.message || 'Something went wrong. Try again.';
-    if (msg.toLowerCase().includes('invalid login')) msg = 'Incorrect email or password.';
+    if (msg.toLowerCase().includes('invalid login'))      msg = 'Incorrect email or password.';
     if (msg.toLowerCase().includes('already registered')) msg = 'That email is already registered. Sign in instead.';
     showAuthError(msg);
     btn.textContent = _authMode === 'signup' ? 'Sign Up Free' : 'Sign In';
@@ -88,44 +82,107 @@ async function authSubmit() {
   }
 }
 
-// ── Handle Session ───────────────────────────────────────────────
-function handleSession(session) {
-  if (!session) return;
-  const user      = session.user;
-  const firstName = extractFirstName(user);
-  // Call into app.js
-  onAuthReady(firstName, user.id, user.email);
+// ── Profile Setup Screen ─────────────────────────────────────────
+function showProfileSetup() {
+  document.getElementById('auth-screen').classList.remove('active');
+  document.getElementById('profile-setup-screen').classList.add('active');
 }
 
-function extractFirstName(user) {
-  // Try full_name from metadata first, fall back to email prefix
-  const meta = user.user_metadata || {};
-  if (meta.full_name) return meta.full_name.split(' ')[0];
-  if (meta.first_name) return meta.first_name;
-  if (user.email) return user.email.split('@')[0];
-  return 'Driver';
+async function saveProfile() {
+  const firstName   = document.getElementById('profile-firstname').value.trim();
+  const codriver    = document.getElementById('profile-codriver').value.trim();
+  const truckYear   = document.getElementById('profile-year').value.trim();
+  const truckModel  = document.getElementById('profile-model').value.trim();
+  const btn         = document.getElementById('profile-save-btn');
+
+  if (!firstName) { alert('First name is required.'); return; }
+
+  btn.textContent = 'Saving...';
+  btn.disabled    = true;
+
+  try {
+    const { error } = await _supabase.from('profiles').insert({
+      user_id:     _currentUser.id,
+      first_name:  firstName,
+      codriver:    codriver,
+      truck_year:  truckYear,
+      truck_model: truckModel
+    });
+    if (error) throw error;
+    enterApp({ first_name: firstName, codriver, truck_year: truckYear, truck_model: truckModel });
+  } catch (err) {
+    alert('Error saving profile. Please try again.');
+    btn.textContent = 'Save and Enter RoadCommand';
+    btn.disabled    = false;
+  }
+}
+
+// ── Load Profile Then Enter App ──────────────────────────────────
+async function loadProfileAndEnter() {
+  try {
+    const { data, error } = await _supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', _currentUser.id)
+      .single();
+
+    if (error || !data) {
+      // No profile yet — show setup screen
+      showProfileSetup();
+      return;
+    }
+    enterApp(data);
+  } catch (err) {
+    // If anything fails just enter with email prefix
+    enterApp({ first_name: _currentUser.email.split('@')[0] });
+  }
+}
+
+// ── Enter App ────────────────────────────────────────────────────
+function enterApp(profile) {
+  // Store globally for app.js to use
+  window._rcUserFirstName = profile.first_name || 'Driver';
+  window._rcUserCodriver  = profile.codriver   || '';
+  window._rcTruckYear     = profile.truck_year  || '';
+  window._rcTruckModel    = profile.truck_model || '';
+  window._rcUserId        = _currentUser.id;
+  window._rcUserEmail     = _currentUser.email;
+
+  // Hide auth/profile screens
+  document.getElementById('auth-screen').classList.remove('active');
+  document.getElementById('profile-setup-screen').classList.remove('active');
+
+  // Show app
+  document.querySelector('.app-header').style.display = '';
+  document.getElementById('main-app').style.display   = '';
+  document.getElementById('bottom-nav').style.display = '';
+
+  // Call app.js init
+  onAuthReady(profile.first_name, _currentUser.id, _currentUser.email);
 }
 
 // ── Sign Out ─────────────────────────────────────────────────────
 async function signOut() {
   await _supabase.auth.signOut();
-  // Reload the page to go back to auth screen
   window.location.reload();
 }
 
-// ── Restore Session on Page Load ─────────────────────────────────
+// ── Restore Session ──────────────────────────────────────────────
 (async function restoreSession() {
   const { data } = await _supabase.auth.getSession();
   if (data.session) {
-    handleSession(data.session);
+    _currentUser = data.session.user;
+    await loadProfileAndEnter();
   }
-  // Also listen for auth state changes (token refresh etc.)
-  _supabase.auth.onAuthStateChange((_event, session) => {
-    if (session) handleSession(session);
+  _supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (session && !_currentUser) {
+      _currentUser = session.user;
+      await loadProfileAndEnter();
+    }
   });
 })();
 
-// ── Enter key on auth inputs ──────────────────────────────────────
+// ── Enter key support ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   ['auth-email', 'auth-password'].forEach(function(id) {
     const el = document.getElementById(id);
