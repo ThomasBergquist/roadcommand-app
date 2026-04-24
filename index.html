@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RoadCommand">
+  <meta name="application-name" content="RoadCommand">
+  <meta name="theme-color" content="#111312">
+  <meta name="description" content="Personal Dispatcher — Built in a Peterbilt">
+
+  <title>RoadCommand — Personal Dispatcher</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- iOS Home Screen Icon -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIiB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiI+CiAgPHJlY3Qgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiIHJ4PSIzMiIgZmlsbD0iIzExMTMxMiIvPgogIDxyZWN0IHg9IjgiIHk9IjgiIHdpZHRoPSIxNzYiIGhlaWdodD0iMTc2IiByeD0iMjgiIGZpbGw9IiMxYzFmMWMiLz4KICA8cmVjdCB4PSIzMCIgeT0iODUiIHdpZHRoPSI5NSIgaGVpZ2h0PSI1NSIgcng9IjYiIGZpbGw9IiM0YWRlODAiLz4KICA8cmVjdCB4PSIxMDAiIHk9IjcwIiB3aWR0aD0iNTUiIGhlaWdodD0iNzAiIHJ4PSI2IiBmaWxsPSIjNWVkYzgyIi8+CiAgPHJlY3QgeD0iMTA4IiB5PSI3OCIgd2lkdGg9IjM4IiBoZWlnaHQ9IjI4IiByeD0iMyIgZmlsbD0iIzExMTMxMiIgb3BhY2l0eT0iMC43Ii8+CiAgPGNpcmNsZSBjeD0iNTUiIGN5PSIxNDgiIHI9IjE0IiBmaWxsPSIjMTExMzEyIi8+CiAgPGNpcmNsZSBjeD0iNTUiIGN5PSIxNDgiIHI9IjgiIGZpbGw9IiMzMzMiLz4KICA8Y2lyY2xlIGN4PSIxMzAiIGN5PSIxNDgiIHI9IjE0IiBmaWxsPSIjMTExMzEyIi8+CiAgPGNpcmNsZSBjeD0iMTMwIiBjeT0iMTQ4IiByPSI4IiBmaWxsPSIjMzMzIi8+CiAgPHRleHQgeD0iOTYiIHk9IjE3NSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZkMDRkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5SQzwvdGV4dD4KPC9zdmc+">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- AUTH SCREEN — shown before login -->
+<div class="auth-screen active" id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-text">RoadCommand</div>
+      <div class="auth-logo-sub">Personal Dispatcher — Built in a Peterbilt</div>
+    </div>
+    <div class="auth-beta-badge" id="auth-badge">BETA — Free 30 Days</div>
+    <div class="auth-title" id="auth-title">Sign In</div>
+    <div class="auth-error" id="auth-error"></div>
+    <input class="auth-input" id="auth-email" type="email" placeholder="Email address" autocomplete="email">
+    <input class="auth-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="auth-btn" id="auth-submit-btn" onclick="authSubmit()">Sign In</button>
+    <div class="auth-toggle" id="auth-toggle">
+      No account? <a onclick="toggleAuthMode()">Sign up free</a>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP — hidden until auth -->
+<div id="main-app" style="display:none;">
+<div class="app-header" style="display:none;">
+  <div class="app-logo">RoadCommand <span>Personal Dispatcher</span></div>
+  <button onclick="goToSettings()" style="background:none;border:none;color:#ffd04d;font-size:1.3rem;cursor:pointer;padding:.2rem .4rem;" title="Settings">⚙️</button>
+  <div class="header-truck"><strong>2018 Peterbilt 579</strong>Levi & Dylan</div>
+</div>
+
+<div class="main">
+
+  <!-- DASHBOARD -->
+  <div class="screen active" id="screen-dash">
+    <!-- WEATHER & ROAD ALERTS -->
+    <div class="weather-strip" id="weather-strip">
+      <div class="weather-row" id="weather-main" onclick="refreshWeather()">
+        <span class="weather-icon" id="weather-icon">🌤️</span>
+        <div class="weather-text">
+          <div class="weather-title" id="weather-title">Fetching road conditions...</div>
+          <div class="weather-sub" id="weather-sub">Tap to refresh · Based on your GPS location</div>
+        </div>
+        <span class="weather-time" id="weather-time"></span>
+      </div>
+      <div id="weather-alerts"></div>
+    </div>
+
+    <!-- LIVE GPS + FUEL BAR -->
+    <div class="live-bar">
+      <div class="live-box loading" id="gps-box">
+        <div class="live-label"><span class="live-dot" id="gps-dot"></span>Your Location</div>
+        <div class="live-value" id="gps-value">Locating...</div>
+        <div class="live-sub" id="gps-sub">Getting GPS signal</div>
+      </div>
+      <div class="live-box loading" id="fuel-box">
+        <div class="live-label"><span class="live-dot" id="fuel-dot"></span>Diesel Price</div>
+        <div class="live-value" id="fuel-value">Loading...</div>
+        <div class="live-sub" id="fuel-sub">Fetching regional price</div>
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="metric"><div class="metric-val">$4,820</div><div class="metric-label">Week Revenue</div></div>
+      <div class="metric"><div class="metric-val amber">$1.94</div><div class="metric-label">RPM This Week</div></div>
+      <div class="metric"><div class="metric-val">2,481</div><div class="metric-label">Miles This Week</div></div>
+      <div class="metric"><div class="metric-val red">$1,240</div><div class="metric-label">Est. Fuel Cost</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🔥 Hot Loads Matching Parameters</div><button class="tool-help-btn" onclick="showHelp('loads')">? How</button>
+        <span class="load-tag tag-hot">2 New</span>
+      </div>
+      <div style="padding:.5rem .8rem;">
+        <div class="load-card hot" data-rate="1850" data-miles="801">
+          <div class="load-top load-card-clickable" onclick="toggleExpand('d_panel_1850_801')">
+            <div>
+              <div class="load-route"><span class="expand-arrow" id="arrow_d_panel_1850_801">▼</span>Moses Lake, WA <span>→</span> Pasco, WA</div>
+              <div style="margin-top:.3rem;"><span class="load-tag tag-hot">Matches Parameters</span></div>
+            </div>
+            <div><div class="load-rate">$1,850</div><div class="load-rate-sub">$2.31/mi</div></div>
+          </div>
+          <div class="broker-info" onclick="toggleExpand('d_panel_1850_801')" style="cursor:pointer;">
+            <span class="broker-name">CH Robinson:</span>
+            <span class="broker-phone">📞 (509) 555-0142</span>
+          </div>
+          <div class="load-meta" onclick="toggleExpand('d_panel_1850_801')" style="cursor:pointer;">
+            <div><div class="lm-label">Miles</div><div class="lm-val">801</div></div>
+            <div><div class="lm-label">Weight</div><div class="lm-val">42,000 lb</div></div>
+            <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 7</div></div>
+          </div>
+          <div class="load-expand-panel" id="d_panel_1850_801" data-pickup="Moses Lake, WA" data-rate="1850" data-miles="801">
+  <div class="expand-profit-grid">
+    <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$1,850</div></div>
+    <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_d_panel_1850_801">-$524</div></div>
+    <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val" id="net_d_panel_1850_801" green">$1,326</div></div>
+    <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_d_panel_1850_801" green">$1.66/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.31/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">801</div></div>
+  </div>
+  <div class="expand-verdict" id="verdict_d_panel_1850_801" strong">✅ Strong — Take It</div>
+  <div class="deadhead-alert" id="dh_d_panel_1850_801"></div>
+  <div class="expand-notes">
+    <div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>
+    <div class="expand-notes-text" id="notes_d_panel_1850_801">Truckstop notes will appear here when API is connected. Connect in Parameters tab.</div>
+  </div>
+</div>
+<div class="load-actions">
+            <button class="load-action-btn call-btn" onclick="callBroker('(509) 555-0142', 'CH Robinson')">
+              <span class="btn-icon">📞</span>Call
+            </button>
+            <button class="load-action-btn book-btn" onclick="bookLoad(this,'Moses Lake, WA','Pasco, WA',1850,801,'CH Robinson','(509) 555-0142')"><span class="btn-icon">✓</span>Book</button>
+            
+            <button class="load-action-btn skip-btn" onclick="skipLoad(this)">
+              <span class="btn-icon">✕</span>Skip
+            </button>
+          </div>
+        </div>
+        <div class="load-card hot" data-rate="2100" data-miles="963">
+          <div class="load-top load-card-clickable" onclick="toggleExpand('d_panel_2100_963')">
+            <div>
+              <div class="load-route"><span class="expand-arrow" id="arrow_d_panel_2100_963">▼</span>Yakima, WA <span>→</span> Boise, ID</div>
+              <div style="margin-top:.3rem;"><span class="load-tag tag-hot">Matches Parameters</span></div>
+            </div>
+            <div><div class="load-rate">$2,100</div><div class="load-rate-sub">$2.18/mi</div></div>
+          </div>
+          <div class="broker-info" onclick="toggleExpand('d_panel_2100_963')" style="cursor:pointer;">
+            <span class="broker-name">Echo Global:</span>
+            <span class="broker-phone">📞 (509) 555-0287</span>
+          </div>
+          <div class="load-meta" onclick="toggleExpand('d_panel_2100_963')" style="cursor:pointer;">
+            <div><div class="lm-label">Miles</div><div class="lm-val">963</div></div>
+            <div><div class="lm-label">Weight</div><div class="lm-val">38,500 lb</div></div>
+            <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 8</div></div>
+          </div>
+          <div class="load-expand-panel" id="d_panel_2100_963" data-pickup="Yakima, WA" data-rate="2100" data-miles="963">
+  <div class="expand-profit-grid">
+    <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$2,100</div></div>
+    <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_d_panel_2100_963">-$630</div></div>
+    <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val" id="net_d_panel_2100_963" green">$1,470</div></div>
+    <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_d_panel_2100_963" green">$1.53/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.18/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">963</div></div>
+  </div>
+  <div class="expand-verdict" id="verdict_d_panel_2100_963" ok">⚠️ Acceptable — Meets Minimum</div>
+  <div class="deadhead-alert" id="dh_d_panel_2100_963"></div>
+  <div class="expand-notes">
+    <div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>
+    <div class="expand-notes-text" id="notes_d_panel_2100_963">Truckstop notes will appear here when API is connected. Connect in Parameters tab.</div>
+  </div>
+</div>
+<div class="load-actions">
+            <button class="load-action-btn call-btn" onclick="callBroker('(509) 555-0287', 'Echo Global')">
+              <span class="btn-icon">📞</span>Call
+            </button>
+            <button class="load-action-btn book-btn" onclick="bookLoad(this,'Yakima, WA','Boise, ID',2100,963,'Echo Global','(509) 555-0287')"><span class="btn-icon">✓</span>Book</button>
+            
+            <button class="load-action-btn skip-btn" onclick="skipLoad(this)">
+              <span class="btn-icon">✕</span>Skip
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📍 Position & Fuel Details</div></div>
+      <div class="card-body">
+        <div class="form-row" style="margin-bottom:.8rem;">
+          <div><div class="lm-label">Region</div><div class="lm-val" style="font-size:.9rem;margin-top:.3rem;" id="region-display">—</div></div>
+          <div><div class="lm-label">Price Updated</div><div class="lm-val" style="font-size:.9rem;margin-top:.3rem;" id="fuel-updated">—</div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="lm-label">Coordinates</div><div class="lm-val" style="font-size:.82rem;margin-top:.3rem;" id="coords-display">—</div></div>
+          <div><div class="lm-label">EIA Region</div><div class="lm-val" style="font-size:.82rem;margin-top:.3rem;" id="eia-region">—</div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Manual Override Location</label>
+          <div style="display:flex;gap:.5rem;">
+            <input class="form-input" id="location-input" placeholder="City, State or Highway" style="flex:1;">
+            <button class="btn btn-green btn-sm" onclick="updateLocation()">Set</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADS SCREEN -->
+  <div class="screen" id="screen-loads">
+    <div class="section-head">
+      <div class="section-label">— Load Board</div>
+      <div class="section-title">Manage Your Loads</div>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-bottom:1rem;overflow-x:auto;padding-bottom:.3rem;">
+      <button class="btn btn-green btn-sm" onclick="filterLoads('all')" id="filter-all">All</button>
+      <button class="btn btn-outline btn-sm" onclick="filterLoads('hot')" id="filter-hot">🔥 Hot</button>
+      <button class="btn btn-outline btn-sm" onclick="filterLoads('watch')" id="filter-watch">👁 Watching</button>
+      <button class="btn btn-outline btn-sm" onclick="filterLoads('booked')" id="filter-booked">✓ Booked</button>
+    </div>
+
+    <div class="load-card hot" data-rate="1850" data-miles="801">
+      <div class="load-top load-card-clickable" onclick="toggleExpand('l_panel_1850_801')">
+        <div>
+          <div class="load-route">Moses Lake, WA <span>→</span> Pasco, WA</div>
+          <div style="margin-top:.3rem;display:flex;gap:.4rem;flex-wrap:wrap;"><span class="load-tag tag-hot">Hot</span></div>
+        </div>
+        <div><div class="load-rate">$1,850</div><div class="load-rate-sub">$2.31/mi · 801 mi</div></div>
+      </div>
+      <div class="broker-info" onclick="toggleExpand('l_panel_1850_801')" style="cursor:pointer;">
+        <span class="broker-name">CH Robinson:</span>
+        <span class="broker-phone">📞 (509) 555-0142</span>
+      </div>
+      <div class="load-meta" onclick="toggleExpand('l_panel_1850_801')" style="cursor:pointer;">
+        <div><div class="lm-label">Miles</div><div class="lm-val">801</div></div>
+        <div><div class="lm-label">Weight</div><div class="lm-val">42,000 lb</div></div>
+        <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 7</div></div>
+      </div>
+<div class="load-expand-panel" id="l_panel_1850_801" data-pickup="Moses Lake, WA" data-rate="1850" data-miles="801">
+  <div class="expand-profit-grid">
+    <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$1,850</div></div>
+    <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_l_panel_1850_801">-$524</div></div>
+    <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val" id="net_l_panel_1850_801" green">$1,326</div></div>
+    <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_l_panel_1850_801" green">$1.66/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.31/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">801</div></div>
+  </div>
+  <div class="expand-verdict" id="verdict_l_panel_1850_801" strong">✅ Strong — Take It</div>
+  <div class="deadhead-alert" id="dh_l_panel_1850_801"></div>
+  <div class="expand-notes">
+    <div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>
+    <div class="expand-notes-text" id="notes_l_panel_1850_801">Truckstop notes will appear here when API is connected. Connect in Parameters tab.</div>
+  </div>
+</div>
+<div class="load-actions">
+        <button class="load-action-btn call-btn" onclick="callBroker('(509) 555-0142','CH Robinson')"><span class="btn-icon">📞</span>Call</button>
+        <button class="load-action-btn book-btn" onclick="bookLoad(this,'Moses Lake, WA','Pasco, WA',1850,801,'CH Robinson','(509) 555-0142')"><span class="btn-icon">✓</span>Book</button>
+        
+        <button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>
+      </div>
+    </div>
+
+    <div class="load-card watch" data-rate="3200" data-miles="1560">
+      <div class="load-top load-card-clickable" onclick="toggleExpand('l_panel_3200_1560')">
+        <div>
+          <div class="load-route">Spokane, WA <span>→</span> Portland, OR</div>
+          <div style="margin-top:.3rem;"><span class="load-tag tag-watch">Watching</span></div>
+        </div>
+        <div><div class="load-rate">$3,200</div><div class="load-rate-sub">$2.05/mi · 1,560 mi</div></div>
+      </div>
+      <div class="broker-info" onclick="toggleExpand('l_panel_3200_1560')" style="cursor:pointer;">
+        <span class="broker-name">Coyote Logistics:</span>
+        <span class="broker-phone">📞 (800) 555-0391</span>
+      </div>
+      <div class="load-meta" onclick="toggleExpand('l_panel_3200_1560')" style="cursor:pointer;">
+        <div><div class="lm-label">Miles</div><div class="lm-val">1,560</div></div>
+        <div><div class="lm-label">Weight</div><div class="lm-val">44,000 lb</div></div>
+        <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 9</div></div>
+      </div>
+      <div class="load-expand-panel" id="l_panel_3200_1560" data-pickup="Spokane, WA" data-rate="3200" data-miles="1560">
+  <div class="expand-profit-grid">
+    <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$3,200</div></div>
+    <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_l_panel_3200_1560">-$1,020</div></div>
+    <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val" id="net_l_panel_3200_1560" green">$2,180</div></div>
+    <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_l_panel_3200_1560" amber">$1.4/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.05/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">1,560</div></div>
+  </div>
+  <div class="expand-verdict" id="verdict_l_panel_3200_1560" ok">⚠️ Acceptable — Meets Minimum</div>
+  <div class="deadhead-alert" id="dh_l_panel_3200_1560"></div>
+  <div class="expand-notes">
+    <div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>
+    <div class="expand-notes-text" id="notes_l_panel_3200_1560">Truckstop notes will appear here when API is connected. Connect in Parameters tab.</div>
+  </div>
+</div>
+<div class="load-actions">
+        <button class="load-action-btn call-btn" onclick="callBroker('(800) 555-0391','Coyote Logistics')"><span class="btn-icon">📞</span>Call</button>
+        <button class="load-action-btn book-btn" onclick="bookLoad(this,'Spokane, WA','Portland, OR',3200,1560,'Coyote Logistics','(800) 555-0391')"><span class="btn-icon">✓</span>Book</button>
+        
+        <button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>
+      </div>
+    </div>
+
+    <div class="load-card booked" data-rate="2750" data-miles="1298">
+      <div class="load-top load-card-clickable" onclick="toggleExpand('l_panel_2750_1298')">
+        <div>
+          <div class="load-route">Kennewick, WA <span>→</span> Salt Lake City, UT</div>
+          <div style="margin-top:.3rem;"><span class="load-tag tag-booked">Booked</span></div>
+        </div>
+        <div><div class="load-rate">$2,750</div><div class="load-rate-sub">$2.12/mi · 1,298 mi</div></div>
+      </div>
+      <div class="broker-info" onclick="toggleExpand('l_panel_2750_1298')" style="cursor:pointer;">
+        <span class="broker-name">XPO Logistics:</span>
+        <span class="broker-phone">📞 (877) 555-0211</span>
+      </div>
+      <div class="load-meta" onclick="toggleExpand('l_panel_2750_1298')" style="cursor:pointer;">
+        <div><div class="lm-label">Miles</div><div class="lm-val">1,298</div></div>
+        <div><div class="lm-label">Weight</div><div class="lm-val">44,000 lb</div></div>
+        <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 6</div></div>
+      </div>
+      <div class="load-expand-panel" id="l_panel_2750_1298" data-pickup="Kennewick, WA" data-rate="2750" data-miles="1298">
+  <div class="expand-profit-grid">
+    <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$2,750</div></div>
+    <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_l_panel_2750_1298">-$849</div></div>
+    <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val" id="net_l_panel_2750_1298" green">$1,901</div></div>
+    <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_l_panel_2750_1298" amber">$1.46/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.12/mi</div></div>
+    <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">1,298</div></div>
+  </div>
+  <div class="expand-verdict" id="verdict_l_panel_2750_1298" ok">⚠️ Acceptable — Meets Minimum</div>
+  <div class="deadhead-alert" id="dh_l_panel_2750_1298"></div>
+  <div class="expand-notes">
+    <div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>
+    <div class="expand-notes-text" id="notes_l_panel_2750_1298">Truckstop notes will appear here when API is connected. Connect in Parameters tab.</div>
+  </div>
+</div>
+<div class="load-actions">
+        <button class="load-action-btn call-btn" onclick="callBroker('(877) 555-0211','XPO Logistics')"><span class="btn-icon">📞</span>Call</button>
+        <button class="load-action-btn book-btn" onclick="bookLoad(this,'Kennewick, WA','Salt Lake City, UT',2750,1298,'XPO Logistics','(877) 555-0211')"><span class="btn-icon">✓</span>Book</button>
+        
+        <button class="load-action-btn skip-btn"><span class="btn-icon">✕</span>Cancel</button>
+      </div>
+    </div>
+
+    <button class="btn btn-outline" style="margin-top:.5rem;" onclick="showAddLoad()">+ Add Load Manually</button>
+    <div id="add-load-form" style="display:none;margin-top:1rem;">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Add New Load</div></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Origin</label><input class="form-input" placeholder="City, State"></div>
+            <div class="form-group"><label class="form-label">Destination</label><input class="form-input" placeholder="City, State"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Rate ($)</label><input class="form-input" type="number" placeholder="2500"></div>
+            <div class="form-group"><label class="form-label">Miles</label><input class="form-input" type="number" placeholder="800"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Broker Name</label><input class="form-input" placeholder="Broker or company"></div>
+            <div class="form-group"><label class="form-label">Broker Phone</label><input class="form-input" type="tel" placeholder="(555) 000-0000" id="new-load-phone"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Pickup Date</label><input class="form-input" type="date"></div>
+            <div class="form-group"><label class="form-label">Weight (lbs)</label><input class="form-input" type="number" placeholder="40000"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" placeholder="Commodity, special instructions, lumper fees..."></textarea></div>
+          <button class="btn btn-green" onclick="saveLoad()">Save Load</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALCULATOR -->
+  <div class="screen" id="screen-calc">
+    <div class="section-head"><div class="section-label">— Profit Calculator</div><div class="section-title">Know Before You Book</div></div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Load Details</div><button class="tool-help-btn" onclick="showHelp('calc')">? How</button></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Gross Rate ($)</label><input class="form-input" id="calc-rate" type="number" placeholder="2500" oninput="calculateProfit()"></div>
+          <div class="form-group"><label class="form-label">Total Miles</label><input class="form-input" id="calc-miles" type="number" placeholder="800" oninput="calculateProfit()"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Fuel Price ($/gal)</label><input class="form-input" id="calc-fuel" type="number" value="4.25" oninput="calculateProfit()"></div>
+          <div class="form-group"><label class="form-label">MPG</label><input class="form-input" id="calc-mpg" type="number" value="6.5" oninput="calculateProfit()"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Deadhead Miles</label><input class="form-input" id="calc-dead" type="number" value="0" oninput="calculateProfit()"><div class="form-hint">Empty miles to pickup</div></div>
+          <div class="form-group"><label class="form-label">Broker Fee (%)</label><input class="form-input" id="calc-broker" type="number" value="0" oninput="calculateProfit()"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Other Costs ($)</label><input class="form-input" id="calc-other" type="number" value="0" oninput="calculateProfit()"></div>
+      </div>
+    </div>
+    <div class="calc-result" id="calc-result" style="display:none;">
+      <div class="calc-row"><span class="label">Gross Rate</span><span class="val" id="r-gross">—</span></div>
+      <div class="calc-row"><span class="label">Broker Fee</span><span class="val" id="r-broker">—</span></div>
+      <div class="calc-row"><span class="label">Fuel Cost</span><span class="val" id="r-fuel">—</span></div>
+      <div class="calc-row"><span class="label">Other Costs</span><span class="val" id="r-other">—</span></div>
+      <div class="calc-row total" id="r-total-row"><span class="label">Net Profit</span><span class="val" id="r-net">—</span></div>
+      <div class="divider"></div>
+      <div class="calc-row"><span class="label">Rate Per Mile (loaded)</span><span class="val" id="r-rpm">—</span></div>
+      <div class="calc-row"><span class="label">Net Per Mile (all miles)</span><span class="val" id="r-npm">—</span></div>
+      <div class="calc-row"><span class="label">Verdict</span><span class="val" id="r-verdict">—</span></div>
+    </div>
+    <div class="alert alert-amber" style="margin-top:.8rem;"><div class="alert-icon">💡</div><div>Your minimum is set to <strong>$2.00/mi</strong>. Change in Parameters.</div></div>
+  </div>
+
+  <!-- STATE VOLUME TRACKER -->
+  <div class="screen" id="screen-states">
+    <div class="section-head">
+      <div class="section-label">— State Volume Tracker</div>
+      <div class="section-title">Where The Loads Are</div>
+    </div>
+
+    <div class="alert alert-green">
+      <div class="alert-icon">📊</div>
+      <div>Track which states have the most available loads. Log loads manually to build your personal data — or connect the API to auto-populate. Higher volume = better negotiating position.</div>
+    </div>
+
+    <div class="state-controls">
+      <button class="state-filter-btn active" onclick="sortStates('volume',this)">By Volume</button>
+      <button class="state-filter-btn" onclick="sortStates('rpm',this)">By Avg RPM</button>
+      <button class="state-filter-btn" onclick="sortStates('trend',this)">Trending Up</button>
+    </div>
+
+    <div class="state-list" id="state-list">
+      <!-- Populated by JS -->
+    </div>
+
+    <div class="add-state-form" style="margin-top:1rem;">
+      <div class="add-state-title">+ Log Load Volume for a State</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">State</label>
+          <select class="form-select" id="new-state-code">
+            <option value="">Select State</option>
+            <option>WA</option><option>OR</option><option>ID</option>
+            <option>MT</option><option>WY</option><option>UT</option>
+            <option>NV</option><option>CA</option><option>CO</option>
+            <option>AZ</option><option>NM</option><option>TX</option>
+            <option>OK</option><option>KS</option><option>NE</option>
+            <option>SD</option><option>ND</option><option>MN</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Loads Available</label>
+          <input class="form-input" type="number" id="new-state-volume" placeholder="e.g. 24">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Avg Rate/Mile ($)</label>
+          <input class="form-input" type="number" id="new-state-rpm" placeholder="e.g. 2.15" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Trend</label>
+          <select class="form-select" id="new-state-trend">
+            <option value="up">↑ Going Up</option>
+            <option value="flat" selected>→ Flat</option>
+            <option value="down">↓ Going Down</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-green" onclick="addStateData()">Log This State</button>
+    </div>
+  </div>
+
+  <!-- PARAMETERS -->
+  <div class="screen" id="screen-params">
+    <div class="section-head"><div class="section-label">— Your Parameters</div><div class="section-title">Set Your Standards</div></div>
+    <div class="alert alert-green"><div class="alert-icon">✓</div><div>These parameters filter your loads. Only loads that match show as Hot. When API is connected, these become live alert triggers.</div></div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Rate Requirements</div></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Min Rate Per Mile ($)</label><input class="form-input" value="2.00" id="p-rpm"></div>
+          <div class="form-group"><label class="form-label">Min Gross Rate ($)</label><input class="form-input" value="1500" id="p-gross"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Min Miles</label><input class="form-input" value="500" id="p-minmi"></div>
+          <div class="form-group"><label class="form-label">Max Miles</label><input class="form-input" value="2000" id="p-maxmi"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Preferred Lanes</div></div>
+      <div class="card-body">
+        <div class="form-group"><label class="form-label">Home Base</label><input class="form-input" value="Moses Lake, WA" id="p-home"></div>
+        <div class="form-group"><label class="form-label">Preferred Origin States</label><input class="form-input" value="WA, OR, ID, MT" id="p-origins"></div>
+        <div class="form-group"><label class="form-label">Preferred Destination States</label><input class="form-input" value="WA, OR, ID, UT, NV, CA" id="p-dests"></div>
+        <div class="form-group"><label class="form-label">Avoid Areas</label><input class="form-input" placeholder="e.g. NYC metro, LA metro" id="p-avoid"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Equipment & Load</div></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Max Weight (lbs)</label><input class="form-input" value="44000"></div>
+          <div class="form-group"><label class="form-label">Max Deadhead (mi)</label><input class="form-input" value="150"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Preferred Commodities</label><input class="form-input" value="Ag, General, Steel, Equipment"></div>
+        <div class="form-group"><label class="form-label">Avoid Commodities</label><input class="form-input" placeholder="e.g. Hazmat, Livestock"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Alerts</div></div>
+      <div class="card-body">
+        <div class="toggle-row"><div><div class="toggle-label">Push Notifications</div><div class="toggle-sub">Alert when matching load posts</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="toggle-row"><div><div class="toggle-label">Rate Drop Alerts</div><div class="toggle-sub">Alert when market rate drops 10%+</div></div><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+        <div class="toggle-row"><div><div class="toggle-label">Homebound Priority</div><div class="toggle-sub">Flag loads heading toward Moses Lake</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="saveParams()">Save Parameters</button>
+    <div style="height:.8rem;"></div>
+    <div class="alert alert-amber"><div class="alert-icon">🔗</div><div><strong>API Connection — Coming Soon</strong><br>Connect Truckstop API to make these live filters with instant alerts.</div></div>
+  </div>
+
+  <!-- LOGBOOK -->
+  <div class="screen" id="screen-log">
+    <div class="section-head"><div class="section-label">— Logbook</div><div class="section-title">Your Run History</div></div>
+    <div class="dash-grid" style="margin-bottom:1rem;">
+      <div class="metric"><div class="metric-val">$48,200</div><div class="metric-label">YTD Revenue</div></div>
+      <div class="metric"><div class="metric-val amber">$2.08</div><div class="metric-label">YTD Avg RPM</div></div>
+      <div class="metric"><div class="metric-val">23,180</div><div class="metric-label">YTD Miles</div></div>
+      <div class="metric"><div class="metric-val">47</div><div class="metric-label">Loads Completed</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Recent Runs</div></div>
+      <div class="card-body" style="padding:.5rem 0;">
+        <div class="log-item" style="padding:.8rem 1rem;"><div class="log-top"><div class="log-route">Kennewick, WA → Salt Lake City, UT</div><div class="log-date">Apr 5–6</div></div><div class="log-stats"><div class="log-stat">Rate: <strong>$2,750</strong></div><div class="log-stat">Miles: <strong>1,298</strong></div><div class="log-stat">RPM: <strong>$2.12</strong></div></div></div>
+        <div class="log-item" style="padding:.8rem 1rem;"><div class="log-top"><div class="log-route">Portland, OR → Moses Lake, WA</div><div class="log-date">Apr 2–3</div></div><div class="log-stats"><div class="log-stat">Rate: <strong>$1,950</strong></div><div class="log-stat">Miles: <strong>942</strong></div><div class="log-stat">RPM: <strong>$2.07</strong></div></div></div>
+        <div class="log-item" style="padding:.8rem 1rem;"><div class="log-top"><div class="log-route">Boise, ID → Spokane, WA</div><div class="log-date">Mar 29–30</div></div><div class="log-stats"><div class="log-stat">Rate: <strong>$1,620</strong></div><div class="log-stat">Miles: <strong>788</strong></div><div class="log-stat">RPM: <strong>$2.06</strong></div></div></div>
+        <div class="log-item" style="padding:.8rem 1rem;"><div class="log-top"><div class="log-route">Yakima, WA → Las Vegas, NV</div><div class="log-date">Mar 24–26</div></div><div class="log-stats"><div class="log-stat">Rate: <strong>$3,400</strong></div><div class="log-stat">Miles: <strong>1,567</strong></div><div class="log-stat">RPM: <strong>$2.17</strong></div></div></div>
+      </div>
+    </div>
+    <button class="btn btn-outline" onclick="showAddRun()">+ Log Completed Run</button>
+    <div id="add-run-form" style="display:none;margin-top:1rem;">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Log a Run</div></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Origin</label><input class="form-input" placeholder="City, State"></div>
+            <div class="form-group"><label class="form-label">Destination</label><input class="form-input" placeholder="City, State"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Gross Rate ($)</label><input class="form-input" type="number"></div>
+            <div class="form-group"><label class="form-label">Miles</label><input class="form-input" type="number"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Fuel Cost ($)</label><input class="form-input" type="number"></div>
+            <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" placeholder="Broker, commodity, issues..."></textarea></div>
+          <button class="btn btn-green" onclick="saveRun()">Save Run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEGOTIATE SCREEN: Broker Score + Rate Coach + Dead Head -->
+  <div class="screen" id="screen-negotiate">
+    <div class="section-head">
+      <div class="section-label">— Negotiation Hub</div>
+      <div class="section-title">Your Dispatcher Brain</div>
+    </div>
+
+    <div class="alert alert-green">
+      <div class="alert-icon">🧠</div>
+      <div>Enter any load details to get broker intel, market rate data, and a suggested counter-offer before you dial.</div>
+    </div>
+
+    <!-- BROKER SCORECARD -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">🏦 Broker Scorecard</div><button class="tool-help-btn" onclick="showHelp('broker')">? How</button></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Broker Name or MC Number</label>
+          <div style="display:flex;gap:.5rem;">
+            <input class="form-input" id="broker-search" placeholder="e.g. CH Robinson, Echo Global" style="flex:1;">
+            <button class="btn btn-green btn-sm" onclick="lookupBroker()">Check</button>
+          </div>
+        </div>
+        <div id="broker-result" style="display:none;">
+          <div class="divider"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:.8rem;">
+            <div class="metric" style="padding:.7rem;">
+              <div class="metric-val" id="b-score" style="font-size:1.4rem;">A+</div>
+              <div class="metric-label">Credit Score</div>
+            </div>
+            <div class="metric" style="padding:.7rem;">
+              <div class="metric-val amber" id="b-days" style="font-size:1.4rem;">28</div>
+              <div class="metric-label">Avg Days to Pay</div>
+            </div>
+          </div>
+          <div id="broker-flags"></div>
+          <div style="font-size:.78rem;color:#b8c8b8;margin-top:.5rem;font-style:italic;" id="broker-rec"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RATE NEGOTIATION COACH -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">📈 Rate Negotiation Coach</div><button class="tool-help-btn" onclick="showHelp('negotiate')">? How</button></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Origin State</label>
+            <select class="form-select" id="neg-origin">
+              <option value="">Select</option>
+              <option>WA</option><option>OR</option><option>ID</option><option>MT</option>
+              <option>WY</option><option>UT</option><option>NV</option><option>CA</option>
+              <option>CO</option><option>AZ</option><option>TX</option><option>OK</option>
+              <option>NM</option><option>KS</option><option>NE</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Destination State</label>
+            <select class="form-select" id="neg-dest">
+              <option value="">Select</option>
+              <option>WA</option><option>OR</option><option>ID</option><option>MT</option>
+              <option>WY</option><option>UT</option><option>NV</option><option>CA</option>
+              <option>CO</option><option>AZ</option><option>TX</option><option>OK</option>
+              <option>NM</option><option>KS</option><option>NE</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Broker's Offer ($)</label>
+            <input class="form-input" id="neg-offer" type="number" placeholder="2000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Miles</label>
+            <input class="form-input" id="neg-miles" type="number" placeholder="800">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="runNegCoach()">Get My Counter-Offer</button>
+        <div id="neg-result" style="display:none;margin-top:.9rem;">
+          <div class="divider"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:.8rem;">
+            <div class="metric" style="padding:.7rem;">
+              <div class="metric-val" id="neg-market" style="font-size:1.1rem;">—</div>
+              <div class="metric-label">Market Rate</div>
+            </div>
+            <div class="metric" style="padding:.7rem;">
+              <div class="metric-val amber" id="neg-offer-rpm" style="font-size:1.1rem;">—</div>
+              <div class="metric-label">Offer RPM</div>
+            </div>
+            <div class="metric" style="padding:.7rem;">
+              <div class="metric-val" id="neg-counter" style="font-size:1.1rem;color:var(--green);">—</div>
+              <div class="metric-label">Counter At</div>
+            </div>
+          </div>
+          <div class="alert alert-green" style="margin-bottom:0;" id="neg-script"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEAD HEAD FINDER -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">📍 Nearest Load Finder</div><button class="tool-help-btn" onclick="showHelp('deadhead')">? How</button></div>
+      <div class="card-body">
+        <div class="alert alert-amber" style="margin-bottom:.8rem;">
+          <div class="alert-icon">💡</div>
+          <div>Enter your drop city to find the closest available loads. Minimizes empty miles after delivery.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">I am Dropping In</label>
+          <input class="form-input" id="drop-city" placeholder="e.g. Salt Lake City, UT">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Max Deadhead (mi)</label>
+            <input class="form-input" id="drop-dead" type="number" value="150">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Min Rate/Mile ($)</label>
+            <input class="form-input" id="drop-rpm" type="number" value="2.00" step="0.05">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="findNearestLoads()">Find Nearby Loads</button>
+        <div id="nearest-results" style="margin-top:.8rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOOLS SCREEN: Lane Planner + HOS Checker + Doc Tracker -->
+  <div class="screen" id="screen-tools">
+    <div class="section-head">
+      <div class="section-label">— Operations Tools</div>
+      <div class="section-title">Plan Smart. Stay Legal.</div>
+    </div>
+
+    <!-- LANE PLANNER -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">🗺️ Lane Planner</div><button class="tool-help-btn" onclick="showHelp('lanner')">? How</button></div>
+      <div class="card-body">
+        <div class="alert alert-green" style="margin-bottom:.8rem;">
+          <div class="alert-icon">🔄</div>
+          <div>Enter your outbound load to see what return loads are available from your destination before you accept.</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Outbound Origin</label>
+            <input class="form-input" id="lp-origin" placeholder="Moses Lake, WA">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Outbound Destination</label>
+            <input class="form-input" id="lp-dest" placeholder="Salt Lake City, UT">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Outbound Rate ($)</label>
+            <input class="form-input" id="lp-rate" type="number" placeholder="2500">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Outbound Miles</label>
+            <input class="form-input" id="lp-miles" type="number" placeholder="800">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="planLane()">Plan Round Trip</button>
+        <div id="lane-result" style="display:none;margin-top:.9rem;">
+          <div class="divider"></div>
+          <div class="section-label" style="margin-bottom:.5rem;">Return Load Options from Destination</div>
+          <div id="return-loads"></div>
+          <div class="alert alert-amber" style="margin-top:.7rem;">
+            <div class="alert-icon">💡</div>
+            <div id="lane-advice"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOS CHECKER -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">⏱️ HOS Load Checker</div><button class="tool-help-btn" onclick="showHelp('hos')">? How</button></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">My Available Hours</label>
+            <input class="form-input" id="hos-hours" type="number" placeholder="8" step="0.5">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Miles to Deliver</label>
+            <input class="form-input" id="hos-miles" type="number" placeholder="600">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Pickup Window (hrs)</label>
+            <input class="form-input" id="hos-pickup" type="number" placeholder="2" step="0.5">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Avg Speed (mph)</label>
+            <input class="form-input" id="hos-speed" type="number" value="55">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="checkHOS()">Check If Legal</button>
+        <div id="hos-result" style="display:none;margin-top:.9rem;"></div>
+      </div>
+    </div>
+
+    <!-- DOCUMENT TRACKER -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">📄 Load Document Tracker</div><button class="tool-help-btn" onclick="showHelp('docs')">? How</button></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Load Reference / BOL #</label>
+          <input class="form-input" id="doc-bol" placeholder="e.g. BOL-2026-04-001">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Rate Confirmation #</label>
+            <input class="form-input" id="doc-rc" placeholder="RC number">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Broker</label>
+            <input class="form-input" id="doc-broker" placeholder="Broker name">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Load Amount ($)</label>
+            <input class="form-input" id="doc-amount" type="number" placeholder="2500">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Delivery Date</label>
+            <input class="form-input" id="doc-date" type="date">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes / Issues</label>
+          <textarea class="form-textarea" id="doc-notes" placeholder="Any delivery issues, detention, lumper fees, signature obtained..."></textarea>
+        </div>
+        <button class="btn btn-green" onclick="saveDoc()">Save Load Record</button>
+        <div id="doc-list" style="margin-top:.9rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MONEY SCREEN: Invoice Tracker + Payment Status -->
+  <div class="screen" id="screen-money">
+    <div class="section-head">
+      <div class="section-label">— Money Tracker</div>
+      <div class="section-title">Every Dollar. Accounted For.</div>
+    </div>
+
+    <div class="dash-grid" style="margin-bottom:.8rem;">
+      <div class="metric">
+        <div class="metric-val" id="money-outstanding">$0</div>
+        <div class="metric-label">Outstanding</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val amber" id="money-overdue">$0</div>
+        <div class="metric-label">Overdue</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">➕ Log Invoice</div><button class="tool-help-btn" onclick="showHelp('invoice')">? How</button></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Broker / Company</label>
+            <input class="form-input" id="inv-broker" placeholder="CH Robinson">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Amount ($)</label>
+            <input class="form-input" id="inv-amount" type="number" placeholder="2500">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Load / BOL #</label>
+            <input class="form-input" id="inv-ref" placeholder="Reference number">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Invoice Date</label>
+            <input class="form-input" id="inv-date" type="date">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Payment Due (days)</label>
+            <select class="form-select" id="inv-terms">
+              <option value="15">Net 15</option>
+              <option value="30" selected>Net 30</option>
+              <option value="45">Net 45</option>
+              <option value="60">Net 60</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Broker Phone</label>
+            <input class="form-input" id="inv-phone" type="tel" placeholder="(555) 000-0000">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="addInvoice()">Add Invoice</button>
+      </div>
+    </div>
+
+    <button class="reopen-loadback-btn" onclick="reopenLoadback()">🔄 View Return Loads From Last Booked Load</button>
+    <div class="section-label" style="margin:.8rem 0 .5rem;">Active Invoices</div>
+    <div id="invoice-list">
+      <div class="alert alert-amber">
+        <div class="alert-icon">📋</div>
+        <div>No invoices logged yet. Add your first invoice above to start tracking payments.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS SCREEN -->
+  <div class="screen" id="screen-settings">
+    <div class="section-head">
+      <div class="section-label">— Preferences</div>
+      <div class="section-title">Settings</div>
+    </div>
+
+    <div class="alert alert-green" style="margin-bottom:1rem;">
+      <div class="alert-icon">💡</div>
+      <div>Changes apply instantly and are saved to your device. You can always pinch to zoom on any screen regardless of text size setting.</div>
+    </div>
+
+    <!-- TEXT SIZE -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">📝 Text Size</div></div>
+      <div class="card-body">
+        <div style="margin-bottom:.8rem;">
+          <div class="settings-label">Choose Your Text Size</div>
+          <div class="settings-sub">Larger text is easier to read in the cab or in bright sunlight</div>
+        </div>
+        <div class="text-size-btns" style="flex-wrap:wrap;gap:.5rem;">
+          <button class="text-size-btn active" id="size-normal" onclick="setTextSize('normal',this)">
+            Normal<br><span style="font-size:.7rem;opacity:.7;">Default</span>
+          </button>
+          <button class="text-size-btn" id="size-large" onclick="setTextSize('large',this)">
+            Large<br><span style="font-size:.7rem;opacity:.7;">+20%</span>
+          </button>
+          <button class="text-size-btn" id="size-xlarge" onclick="setTextSize('xlarge',this)">
+            X-Large<br><span style="font-size:.7rem;opacity:.7;">+40%</span>
+          </button>
+          <button class="text-size-btn" id="size-xxlarge" onclick="setTextSize('xxlarge',this)">
+            XX-Large<br><span style="font-size:.7rem;opacity:.7;">+60%</span>
+          </button>
+        </div>
+        <div style="margin-top:1rem;padding:.8rem;background:var(--surface2);border-radius:4px;border:1px solid rgba(255,255,255,0.1);">
+          <div id="text-preview" style="color:var(--text);line-height:1.6;">
+            <strong style="color:var(--green);">Preview:</strong> Moses Lake, WA → Pasco, WA<br>
+            <span style="color:#ffd04d;opacity:.85;">Rate: $1,850 · 801 miles · $2.31/mi</span><br>
+            Net profit after fuel: <strong style="color:var(--green);">$980</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DISPLAY MODE -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">🌗 Display Mode</div></div>
+      <div class="card-body">
+        <div style="margin-bottom:.8rem;">
+          <div class="settings-label">Screen Theme</div>
+          <div class="settings-sub">Adjust contrast for different lighting conditions</div>
+        </div>
+        <div class="color-scheme-btns">
+          <button class="scheme-btn active" id="scheme-dark" onclick="setScheme('dark',this)"
+            style="background:#1c1f1c;color:#f0f5f0;">🌑 Dark</button>
+          <button class="scheme-btn" id="scheme-night" onclick="setScheme('night',this)"
+            style="background:#050505;color:#f0f5f0;">🌚 Night</button>
+          <button class="scheme-btn" id="scheme-contrast" onclick="setScheme('contrast',this)"
+            style="background:#000;color:#fff;border-color:rgba(255,255,255,.4);">⚡ High Contrast</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRUCK INFO -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">🚛 Your Truck</div></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Driver Name</label>
+            <input class="form-input" id="set-name" placeholder="Levi" value="Levi">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Co-Driver</label>
+            <input class="form-input" id="set-codriver" placeholder="Dylan" value="Dylan">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Truck Year</label>
+            <input class="form-input" id="set-year" placeholder="2018" value="2018">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Truck Model</label>
+            <input class="form-input" id="set-model" placeholder="Peterbilt 579" value="Peterbilt 579">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="saveTruckInfo()">Save Truck Info</button>
+      </div>
+    </div>
+
+    <!-- FUEL DEFAULTS -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">⛽ Fuel Defaults</div></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">MPG</label>
+            <input class="form-input" id="set-mpg" type="number" value="6.5" step="0.1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Manual Fuel Price</label>
+            <input class="form-input" id="set-fuel" type="number" value="4.25" step="0.01">
+            <div class="form-hint">Used when GPS fuel price unavailable</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Min Rate/Mile ($)</label>
+            <input class="form-input" id="set-minrpm" type="number" value="2.00" step="0.05">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Avg Speed (mph)</label>
+            <input class="form-input" id="set-speed" type="number" value="55">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="saveFuelDefaults()">Save Fuel Defaults</button>
+      </div>
+    </div>
+
+    <!-- ABOUT -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">ℹ️ About RoadCommand</div></div>
+      <div class="card-body">
+        <div style="font-size:.88rem;color:#ffd04d;opacity:.85;line-height:1.8;">
+          <div>Version 1.0 · Built for owner-operators</div>
+          <div>Live diesel prices via U.S. EIA</div>
+          <div>GPS via OpenStreetMap / Nominatim</div>
+          <div style="margin-top:.5rem;color:var(--green);font-style:italic;">"Built in a Peterbilt. Not a boardroom."</div>
+        </div>
+        <button class="btn btn-outline" style="margin-top:.8rem;" onclick="startTutorial()">▶ Replay Tutorial</button>
+      </div>
+    </div>
+
+  
+    <!-- FEEDBACK CARD — append inside settings screen -->
+    <div class="card" id="feedback-card">
+      <div class="card-header"><div class="card-title">📣 Send Feedback</div></div>
+      <div class="card-body">
+        <div class="form-group" style="margin-bottom:.8rem;">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="feedback-type">
+            <option value="Bug">🐛 Bug Report</option>
+            <option value="Feature">💡 Feature Request</option>
+            <option value="General">💬 General Feedback</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:.8rem;">
+          <label class="form-label">Your Feedback</label>
+          <textarea class="form-input" id="feedback-msg" rows="4" placeholder="Describe the bug or feature request..." style="resize:vertical;"></textarea>
+        </div>
+        <button class="btn btn-green" onclick="submitFeedback()">Send Feedback</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MAINTENANCE SCREEN -->
+  <div class="screen" id="screen-maint">
+    <div class="section-head">
+      <div class="section-label">— Maintenance Tracker</div>
+      <div class="section-title">Keep It Rolling</div>
+    </div>
+
+    <div class="maint-cost-banner">
+      <div>
+        <div class="maint-cost-label">Est. Maintenance Cost/Mile</div>
+        <div style="font-size:.7rem;color:#ffd04d;opacity:.7;margin-top:.1rem;">Based on your service intervals</div>
+      </div>
+      <div class="maint-cost-val" id="maint-cpm">$0.18/mi</div>
+    </div>
+
+    <div id="maint-list">
+      <!-- Populated by JS -->
+    </div>
+
+    <div class="card" style="margin-top:.8rem;">
+      <div class="card-header"><div class="card-title">➕ Add / Update Service Item</div></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Service Item</label>
+            <select class="form-select" id="maint-type">
+              <option>Oil Change</option>
+              <option>Tire Rotation</option>
+              <option>Brake Inspection</option>
+              <option>Tire Replacement</option>
+              <option>Air Filter</option>
+              <option>Fuel Filter</option>
+              <option>Coolant Flush</option>
+              <option>Transmission Service</option>
+              <option>DPF Cleaning</option>
+              <option>DEF System</option>
+              <option>Annual DOT Inspection</option>
+              <option>Custom</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Custom Name</label>
+            <input class="form-input" id="maint-custom" placeholder="If Custom selected">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Last Done (Odometer)</label>
+            <input class="form-input" id="maint-last-odo" type="number" placeholder="e.g. 487000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Interval (Miles)</label>
+            <input class="form-input" id="maint-interval" type="number" placeholder="e.g. 15000">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Last Cost ($)</label>
+            <input class="form-input" id="maint-cost" type="number" placeholder="e.g. 350">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Current Odometer</label>
+            <input class="form-input" id="maint-current-odo" type="number" placeholder="e.g. 495000">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="saveMaintItem()">Save Service Item</button>
+      </div>
+    </div>
+
+    <div class="alert alert-amber" style="margin-top:.8rem;">
+      <div class="alert-icon">💡</div>
+      <div>Your maintenance cost per mile is automatically added to profit calculations so your net profit reflects your true operating cost — not just fuel.</div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<!-- BOTTOM NAV - 9 tabs scrollable -->
+<nav class="bottom-nav" style="display:none;" id="bottom-nav">
+  <button class="nav-btn active" onclick="showScreen('dash',this)"><span class="nav-icon">📊</span>Dash</button>
+  <button class="nav-btn" onclick="showScreen('loads',this)"><span class="nav-icon">🚛</span>Loads</button>
+  <button class="nav-btn" onclick="showScreen('negotiate',this)"><span class="nav-icon">🤝</span>Negotiate</button>
+  <button class="nav-btn" onclick="showScreen('tools',this)"><span class="nav-icon">🛠️</span>Tools</button>
+  <button class="nav-btn" onclick="showScreen('money',this)"><span class="nav-icon">💵</span>Money</button>
+  <button class="nav-btn" onclick="showScreen('states',this)"><span class="nav-icon">🗺️</span>States</button>
+  <button class="nav-btn" onclick="showScreen('params',this)"><span class="nav-icon">⚙️</span>Params</button>
+  <button class="nav-btn" onclick="showScreen('log',this)"><span class="nav-icon">📋</span>Log</button>
+  <button class="nav-btn" onclick="showScreen('maint',this)"><span class="nav-icon">🔩</span>Maint</button>
+  <button class="nav-btn" onclick="showScreen('settings',this)"><span class="nav-icon">🔧</span>Settings</button>
+</nav>
+<div class="nav-scroll-hint"></div>
+<div class="nav-swipe-hint" id="swipe-hint">← swipe for more tabs</div>
+
+
+
+<!-- FIRST-TIME TUTORIAL OVERLAY -->
+<div class="tutorial-overlay" id="tutorial-overlay" onclick="nextTutorialStep()">
+  <div class="tutorial-card">
+    <div class="tutorial-header">
+      <div class="tutorial-title">Welcome to RoadCommand</div>
+      <div class="tutorial-step-count" id="t-step-count">Step 1 of 9</div>
+    </div>
+    <div class="tutorial-body" id="t-body">
+      <!-- filled by JS -->
+    </div>
+    <div class="tutorial-tap-hint">👆 Tap anywhere to continue</div>
+    <div class="tutorial-dots" id="t-dots"></div>
+    <div class="tutorial-footer">
+      <button class="btn-tutorial-skip" onclick="event.stopPropagation();skipTutorial()">Skip</button>
+      <button class="btn-tutorial-back" id="t-back-btn" onclick="event.stopPropagation();prevTutorialStep()" style="display:none;">← Back</button>
+      <button class="btn-tutorial-next" id="t-next-btn" onclick="event.stopPropagation();nextTutorialStep()">Tap anywhere →</button>
+    </div>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div class="help-modal-overlay hidden" id="help-modal-overlay" onclick="closeHelpModal(event)">
+  <div class="help-modal" id="help-modal">
+    <div class="help-modal-title">
+      <span id="help-modal-title-text">How to use this tool</span>
+      <button class="help-modal-close" onclick="closeHelpModal()">✕</button>
+    </div>
+    <div id="help-modal-body"></div>
+  </div>
+</div>
+
+<!-- LOADBACK PANEL -->
+<div class="loadback-panel" id="loadback-panel" onclick="closeLoadback(event)">
+  <div class="loadback-sheet" id="loadback-sheet">
+    <div class="loadback-header">
+      <div class="loadback-title">🔄 Return Load Finder</div>
+      <button class="loadback-close" onclick="closeLoadbackDirect()">✕</button>
+    </div>
+    <div id="loadback-content">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+</div><!-- end main-app -->
+
+<!-- Auth JS (loads Supabase, handles login/signup) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/auth.js"></script>
+
+<!-- App JS -->
+<script src="/app.js"></script>
+
+</body>
+</html>
