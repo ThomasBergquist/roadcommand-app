@@ -77,7 +77,7 @@
 <div id="main-app" style="display:none;">
 <div class="app-header" style="display:none;">
   <div class="app-logo">RoadCommand <span>Personal Dispatcher</span></div>
-  <button onclick="signOut()" style="background:none;border:none;color:#ff7e7e;font-size:.7rem;cursor:pointer;padding:.2rem .5rem;border:1px solid rgba(255,126,126,.3);border-radius:3px;letter-spacing:.05em;font-family:Georgia,serif;">SIGN OUT</button>
+  <button onclick="goToSettings()" style="background:none;border:none;color:#ffd04d;font-size:1.3rem;cursor:pointer;padding:.2rem .4rem;" title="Settings">⚙️</button>
   <div class="header-truck" id="header-truck"><strong id="header-truck-model">RoadCommand</strong><span id="header-truck-name"></span></div>
 </div>
 
@@ -1034,7 +1034,7 @@
     </div>
 
   
-    <!-- SIGN OUT CARD -->     <div class="card">       <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;">         <div>           <div class="settings-label">Sign Out</div>           <div class="settings-sub" id="settings-email-display"></div>         </div>         <button class="btn" onclick="signOut()" style="background:var(--red-dim);border:1px solid rgba(255,126,126,.35);color:var(--red);font-size:.8rem;">Sign Out</button>       </div>     </div>      <!-- FEEDBACK CARD — append inside settings screen -->
+    <!-- FEEDBACK CARD — append inside settings screen -->
     <div class="card" id="feedback-card">
       <div class="card-header"><div class="card-title">📣 Send Feedback</div></div>
       <div class="card-body">
@@ -1140,6 +1140,7 @@
   <button class="nav-btn" onclick="showScreen('negotiate',this)"><span class="nav-icon">🤝</span>Negotiate</button>
   <button class="nav-btn" onclick="showScreen('tools',this)"><span class="nav-icon">🛠️</span>Tools</button>
   <button class="nav-btn" onclick="showScreen('money',this)"><span class="nav-icon">💵</span>Money</button>
+  <button class="nav-btn" onclick="showScreen('brokers',this)"><span class="nav-icon">🏦</span>Brokers</button>
   <button class="nav-btn" onclick="showScreen('states',this)"><span class="nav-icon">🗺️</span>States</button>
   <button class="nav-btn" onclick="showScreen('params',this)"><span class="nav-icon">⚙️</span>Params</button>
   <button class="nav-btn" onclick="showScreen('log',this)"><span class="nav-icon">📋</span>Log</button>
@@ -1150,6 +1151,94 @@
 <div class="nav-swipe-hint" id="swipe-hint">← swipe for more tabs</div>
 
 
+
+
+  <!-- BROKERS SCREEN -->
+  <div class="screen" id="screen-brokers">
+    <div class="section-head">
+      <div class="section-label">— Broker Vault</div>
+      <div class="section-title">Your Broker Network</div>
+    </div>
+
+    <!-- Totals banner -->
+    <div class="dash-grid" style="margin-bottom:.8rem;">
+      <div class="metric">
+        <div class="metric-val" id="broker-total-outstanding">$0</div>
+        <div class="metric-label">Outstanding</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val red" id="broker-total-overdue">$0</div>
+        <div class="metric-label">Overdue</div>
+      </div>
+    </div>
+
+    <!-- Add broker form -->
+    <div class="card" id="add-broker-card">
+      <div class="card-header" onclick="toggleAddBroker()" style="cursor:pointer;">
+        <div class="card-title">+ Add Broker</div>
+        <span style="color:#b8c8b8;font-size:.8rem;" id="add-broker-toggle-hint">Tap to expand</span>
+      </div>
+      <div class="card-body" id="add-broker-form" style="display:none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Broker Name *</label>
+            <input class="form-input" id="new-broker-name" placeholder="CH Robinson">
+          </div>
+          <div class="form-group">
+            <label class="form-label">MC Number</label>
+            <input class="form-input" id="new-broker-mc" placeholder="MC-123456">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input class="form-input" id="new-broker-phone" type="tel" placeholder="(800) 555-0100">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-input" id="new-broker-email" type="email" placeholder="dispatch@broker.com">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Payment Terms (days)</label>
+            <select class="form-select" id="new-broker-terms">
+              <option value="15">Net 15</option>
+              <option value="30" selected>Net 30</option>
+              <option value="45">Net 45</option>
+              <option value="60">Net 60</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <input class="form-input" id="new-broker-notes" placeholder="Factoring, contacts, etc.">
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="saveBroker()">Save Broker</button>
+      </div>
+    </div>
+
+    <!-- Broker list -->
+    <div id="broker-list">
+      <div class="alert alert-amber" style="margin-top:.5rem;">
+        <div class="alert-icon">🏦</div>
+        <div>No brokers added yet. Add your first broker above.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BROKER DETAIL PANEL -->
+  <div class="loadback-panel" id="broker-detail-panel">
+    <div class="loadback-sheet">
+      <div class="loadback-header">
+        <div class="loadback-title" id="broker-detail-name">Broker</div>
+        <button class="loadback-close" onclick="closeBrokerDetail()">✕</button>
+      </div>
+      <div id="broker-detail-content">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
 
 <!-- FIRST-TIME TUTORIAL OVERLAY -->
 <div class="tutorial-overlay" id="tutorial-overlay" onclick="nextTutorialStep()">

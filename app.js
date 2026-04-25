@@ -43,6 +43,8 @@ function onAuthReady(firstName, userId, email) {
   refreshWeather();
   setTimeout(startGPS, 500);
   setTimeout(checkFirstTime, 700);
+  // Load broker vault
+  setTimeout(loadBrokers, 800);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1820,14 +1822,14 @@ function startGPS() {
         );
         const d = await r.json();
         const addr = d.address || {};
-        var state_code = (addr['ISO3166-2-lvl4'] || '').split('-').pop().toUpperCase() || (addr.state_code || '').toUpperCase();
-        var city = addr.city || addr.town || addr.village || addr.county || '';
+        const state_code = addr.state_code ? addr.state_code.toUpperCase() : '';
+        const city = addr.city || addr.town || addr.village || addr.county || '';
         const state = addr.state || '';
         currentState = state_code;
         currentCity  = city;
 
         // Update region
-        currentRegion = STATE_REGION[state_code] || STATE_REGION[state_code.trim()] || 'Unknown'; 
+        currentRegion = STATE_REGION[state_code] || 'Unknown';
         updateWeatherForState(state_code);
         document.getElementById('region-display').textContent = city ? city + ', ' + state : state;
         document.getElementById('eia-region').textContent = currentRegion;
@@ -1880,16 +1882,16 @@ async function fetchFuelPrice(region) {
   // We use the weekly retail diesel price series
   // PADD regions: 1=East Coast, 2=Midwest, 3=Gulf, 4=Rocky Mtn, 5=West Coast
   const PADD = {
-    'East Coast':      'EMD_EPD2D_PTE_R10_DPG',
-    'Midwest':         'EMD_EPD2D_PTE_R20_DPG',
-    'Gulf Coast':      'EMD_EPD2D_PTE_R30_DPG',
-    'Rocky Mountain':  'EMD_EPD2D_PTE_R40_DPG',
-    'West Coast':      'EMD_EPD2D_PTE_R50_DPG',
-    'Unknown':         'EMD_EPD2D_PTE_NUS_DPG',  // national average
+    'East Coast':      'EER_EPD2DXL0_PTE_R10_DPG',
+    'Midwest':         'EER_EPD2DXL0_PTE_R20_DPG',
+    'Gulf Coast':      'EER_EPD2DXL0_PTE_R30_DPG',
+    'Rocky Mountain':  'EER_EPD2DXL0_PTE_R40_DPG',
+    'West Coast':      'EER_EPD2DXL0_PTE_R50_DPG',
+    'Unknown':         'EER_EPD2DXL0_PTE_NUS_DPG',  // national average
   };
 
   const seriesId = PADD[region] || PADD['Unknown'];
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
@@ -1944,75 +1946,276 @@ loadSavedPreferences();
 renderMaint();
 refreshWeather();
 // Start GPS + fuel fetch on load
-// ══════════════════════════════════════════════════════════════
-// PULL TO REFRESH
-// ══════════════════════════════════════════════════════════════
-(function() {
-  var startY = 0;
-  var pulling = false;
-  var indicator = document.createElement('div');
-  indicator.id = 'pull-indicator';
-  indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;text-align:center;padding:.5rem;background:var(--green);color:#111312;font-size:.8rem;font-weight:bold;letter-spacing:.05em;z-index:999;transform:translateY(-100%);transition:transform .2s;';
-  indicator.textContent = '↓ Pull to refresh';
-  document.body.appendChild(indicator);
-
-  document.addEventListener('touchstart', function(e) {
-    if (window.scrollY === 0) {
-      startY = e.touches[0].clientY;
-      pulling = true;
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchmove', function(e) {
-    if (!pulling) return;
-    var dist = e.touches[0].clientY - startY;
-    if (dist > 60) {
-      indicator.style.transform = 'translateY(0)';
-      indicator.textContent = '↑ Release to refresh';
-    } else if (dist > 10) {
-      indicator.style.transform = 'translateY(0)';
-      indicator.textContent = '↓ Pull to refresh';
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchend', function(e) {
-    if (!pulling) return;
-    pulling = false;
-    var dist = e.changedTouches[0].clientY - startY;
-    indicator.style.transform = 'translateY(-100%)';
-    indicator.textContent = '↓ Pull to refresh';
-    if (dist > 60) {
-      // Refresh GPS and diesel price
-      indicator.textContent = 'Refreshing...';
-      indicator.style.transform = 'translateY(0)';
-      startGPS();
-      refreshWeather();
-      setTimeout(function() {
-        indicator.style.transform = 'translateY(-100%)';
-      }, 1500);
-    }
-    startY = 0;
-  }, { passive: true });
-})();
 window.addEventListener('load', () => {
   setTimeout(startGPS, 500);
   setTimeout(checkFirstTime, 700);
-
-  // Register service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').then(reg => {
-      reg.update();
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            newWorker.postMessage('SKIP_WAITING');
-          }
-        });
-      });
-    });
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
-    });
-  }
 });
+
+
+// ══════════════════════════════════════════════════════════════
+// BROKER VAULT
+// Supabase-backed broker rolodex + invoice tracker
+// ══════════════════════════════════════════════════════════════
+
+var _brokers = [];       // local cache of brokers from Supabase
+var _brokerInvoices = {}; // invoices keyed by broker_name
+
+// ── Toggle add broker form ────────────────────────────────────
+function toggleAddBroker() {
+  var form = document.getElementById('add-broker-form');
+  var hint = document.getElementById('add-broker-toggle-hint');
+  var open = form.style.display !== 'none';
+  form.style.display = open ? 'none' : 'block';
+  hint.textContent = open ? 'Tap to expand' : 'Tap to collapse';
+}
+
+// ── Save broker to Supabase ───────────────────────────────────
+async function saveBroker() {
+  var name  = document.getElementById('new-broker-name').value.trim();
+  var mc    = document.getElementById('new-broker-mc').value.trim();
+  var phone = document.getElementById('new-broker-phone').value.trim();
+  var email = document.getElementById('new-broker-email').value.trim();
+  var terms = parseInt(document.getElementById('new-broker-terms').value);
+  var notes = document.getElementById('new-broker-notes').value.trim();
+
+  if (!name) { alert('Broker name is required.'); return; }
+
+  try {
+    var { data, error } = await _supabase
+      .from('brokers')
+      .insert({
+        user_id: window._rcUserId,
+        name: name,
+        mc_number: mc,
+        phone: phone,
+        email: email,
+        payment_terms: terms,
+        notes: notes
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Clear form
+    document.getElementById('new-broker-name').value = '';
+    document.getElementById('new-broker-mc').value = '';
+    document.getElementById('new-broker-phone').value = '';
+    document.getElementById('new-broker-email').value = '';
+    document.getElementById('new-broker-notes').value = '';
+    document.getElementById('add-broker-form').style.display = 'none';
+    document.getElementById('add-broker-toggle-hint').textContent = 'Tap to expand';
+
+    // Reload brokers
+    await loadBrokers();
+    alert(name + ' added to your broker network!');
+  } catch(err) {
+    alert('Error saving broker: ' + err.message);
+  }
+}
+
+// ── Load brokers from Supabase ────────────────────────────────
+async function loadBrokers() {
+  if (!window._rcUserId) return;
+  try {
+    var { data, error } = await _supabase
+      .from('brokers')
+      .select('*')
+      .eq('user_id', window._rcUserId)
+      .order('name');
+
+    if (error) throw error;
+    _brokers = data || [];
+    renderBrokers();
+  } catch(err) {
+    console.error('Error loading brokers:', err);
+  }
+}
+
+// ── Render broker list ────────────────────────────────────────
+function renderBrokers() {
+  var list = document.getElementById('broker-list');
+  if (!list) return;
+
+  if (!_brokers.length) {
+    list.innerHTML = '<div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">🏦</div><div>No brokers added yet. Add your first broker above.</div></div>';
+    return;
+  }
+
+  // Calculate totals from local invoices
+  var totalOutstanding = 0;
+  var totalOverdue = 0;
+  var today = new Date();
+
+  invoices.forEach(function(inv) {
+    if (inv.status !== 'paid') {
+      totalOutstanding += inv.amount;
+      if (new Date(inv.dueDate) < today) totalOverdue += inv.amount;
+    }
+  });
+
+  var outEl = document.getElementById('broker-total-outstanding');
+  var ovEl  = document.getElementById('broker-total-overdue');
+  if (outEl) outEl.textContent = '$' + totalOutstanding.toLocaleString();
+  if (ovEl)  ovEl.textContent  = '$' + totalOverdue.toLocaleString();
+
+  list.innerHTML = _brokers.map(function(b) {
+    // Get invoices for this broker
+    var brokerInvs = invoices.filter(function(i) {
+      return i.broker && i.broker.toLowerCase() === b.name.toLowerCase();
+    });
+    var outstanding = brokerInvs.filter(function(i) { return i.status !== 'paid'; })
+      .reduce(function(sum, i) { return sum + i.amount; }, 0);
+    var paid = brokerInvs.filter(function(i) { return i.status === 'paid'; })
+      .reduce(function(sum, i) { return sum + i.amount; }, 0);
+    var invoiceCount = brokerInvs.length;
+
+    return '<div class="load-card" style="cursor:pointer;" onclick="openBrokerDetail(\'' + b.id + '\')">' +
+      '<div class="load-top">' +
+        '<div>' +
+          '<div class="load-route">' + b.name + '</div>' +
+          '<div style="margin-top:.2rem;">' +
+            (b.mc_number ? '<span style="font-size:.72rem;color:#b8c8b8;margin-right:.5rem;">' + b.mc_number + '</span>' : '') +
+            '<span class="load-tag tag-' + (outstanding > 0 ? 'watch' : 'booked') + '">' + b.payment_terms + ' day terms</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          (outstanding > 0 ? '<div style="color:var(--amber);font-weight:bold;font-size:.95rem;">$' + outstanding.toLocaleString() + ' owed</div>' : '<div style="color:var(--green);font-size:.85rem;">✓ Clear</div>') +
+          '<div style="font-size:.72rem;color:#b8c8b8;">' + invoiceCount + ' invoice' + (invoiceCount !== 1 ? 's' : '') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="load-meta">' +
+        '<div><div class="lm-label">Phone</div><div class="lm-val">' + (b.phone || '—') + '</div></div>' +
+        '<div><div class="lm-label">Total Paid</div><div class="lm-val" style="color:var(--green);">$' + paid.toLocaleString() + '</div></div>' +
+        '<div><div class="lm-label">Outstanding</div><div class="lm-val" style="color:' + (outstanding > 0 ? 'var(--amber)' : 'var(--green)') + ';">$' + outstanding.toLocaleString() + '</div></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Open broker detail panel ──────────────────────────────────
+function openBrokerDetail(brokerId) {
+  var broker = _brokers.find(function(b) { return b.id === brokerId; });
+  if (!broker) return;
+
+  var panel   = document.getElementById('broker-detail-panel');
+  var content = document.getElementById('broker-detail-content');
+  var nameEl  = document.getElementById('broker-detail-name');
+  nameEl.textContent = broker.name;
+
+  // Get this broker invoices
+  var brokerInvs = invoices.filter(function(i) {
+    return i.broker && i.broker.toLowerCase() === broker.name.toLowerCase();
+  });
+
+  var today = new Date();
+  var totalPaid = 0, totalOwed = 0, totalOverdue = 0;
+  brokerInvs.forEach(function(i) {
+    if (i.status === 'paid') totalPaid += i.amount;
+    else {
+      totalOwed += i.amount;
+      if (new Date(i.dueDate) < today) totalOverdue += i.amount;
+    }
+  });
+
+  var invoicesHtml = brokerInvs.length > 0
+    ? brokerInvs.map(function(inv) {
+        var due = new Date(inv.dueDate);
+        var daysLeft = Math.ceil((due - today) / (1000*60*60*24));
+        var isOverdue = inv.status === 'pending' && daysLeft < 0;
+        var badge = inv.status === 'paid'
+          ? '<span class="paid-badge">PAID</span>'
+          : isOverdue
+            ? '<span class="overdue-badge">OVERDUE ' + Math.abs(daysLeft) + 'd</span>'
+            : '<span class="due-badge">DUE IN ' + daysLeft + 'd</span>';
+        return '<div class="invoice-item ' + (inv.status==="paid"?"paid":isOverdue?"overdue":"") + '" style="margin:.4rem 1rem;">' +
+          '<div class="inv-top"><div><div class="inv-broker-name">' + (inv.ref || 'Invoice') + '</div><div style="margin-top:.2rem;">' + badge + '</div></div>' +
+          '<div class="inv-amount">$' + inv.amount.toLocaleString() + '</div></div>' +
+          '<div class="inv-meta"><span class="inv-stat">Date: <strong>' + inv.date + '</strong></span><span class="inv-stat">Due: <strong>' + inv.dueDate + '</strong></span></div>' +
+          '<div class="inv-actions">' +
+            (inv.status !== 'paid' ? '<button class="inv-btn green" onclick="markPaid(' + inv.id + ');openBrokerDetail(\'' + brokerId + '\')">✓ Mark Paid</button>' : '') +
+            (broker.phone ? '<button class="inv-btn call" onclick="callBroker(\'' + broker.phone + '\',\'' + broker.name + '\')">📞 Call</button>' : '') +
+          '</div></div>';
+      }).join('')
+    : '<div style="padding:1rem;font-size:.85rem;color:#b8c8b8;">No invoices for this broker yet.</div>';
+
+  content.innerHTML =
+    '<div class="loadback-summary">' +
+      '<div class="loadback-summary-row"><span>MC Number</span><strong>' + (broker.mc_number || '—') + '</strong></div>' +
+      '<div class="loadback-summary-row"><span>Phone</span><strong>' + (broker.phone || '—') + '</strong></div>' +
+      '<div class="loadback-summary-row"><span>Email</span><strong>' + (broker.email || '—') + '</strong></div>' +
+      '<div class="loadback-summary-row"><span>Payment Terms</span><strong>Net ' + broker.payment_terms + '</strong></div>' +
+      (broker.notes ? '<div class="loadback-summary-row"><span>Notes</span><strong>' + broker.notes + '</strong></div>' : '') +
+    '</div>' +
+    '<div style="display:flex;gap:.5rem;padding:.8rem 1rem;">' +
+      (broker.phone ? '<button class="lb-call-btn" onclick="callBroker(\'' + broker.phone + '\',\'' + broker.name + '\')">📞 Call</button>' : '') +
+      '<button class="lb-call-btn" style="color:var(--red);border-color:rgba(255,126,126,.35);" onclick="deleteBroker(\'' + broker.id + '\',\'' + broker.name + '\')">🗑 Delete</button>' +
+    '</div>' +
+    '<div class="loadback-section-title">Invoices — ' + broker.name + '</div>' +
+    invoicesHtml +
+    '<div style="padding:1rem;">' +
+      '<div style="font-size:.72rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">Add Invoice for ' + broker.name + '</div>' +
+      '<div class="form-row" style="margin-bottom:.6rem;">' +
+        '<div class="form-group"><label class="form-label">Amount</label><input class="form-input" id="bd-amount" type="number" placeholder="2500"></div>' +
+        '<div class="form-group"><label class="form-label">Ref #</label><input class="form-input" id="bd-ref" placeholder="BOL-12345"></div>' +
+      '</div>' +
+      '<div class="form-row" style="margin-bottom:.8rem;">' +
+        '<div class="form-group"><label class="form-label">Invoice Date</label><input class="form-input" id="bd-date" type="date"></div>' +
+        '<div class="form-group"><label class="form-label">Terms</label><select class="form-select" id="bd-terms"><option value="15">Net 15</option><option value="30" selected>Net 30</option><option value="45">Net 45</option><option value="60">Net 60</option></select></div>' +
+      '</div>' +
+      '<button class="btn btn-green" onclick="addInvoiceFromBroker(\'' + broker.id + '\',\'' + broker.name + '\',\'' + (broker.phone||'') + '\')">Add Invoice</button>' +
+    '</div>' +
+    '<div style="height:2rem;"></div>';
+
+  panel.classList.add('open');
+}
+
+function addInvoiceFromBroker(brokerId, brokerName, brokerPhone) {
+  var amount = parseFloat(document.getElementById('bd-amount').value);
+  var ref    = document.getElementById('bd-ref').value.trim();
+  var date   = document.getElementById('bd-date').value;
+  var terms  = parseInt(document.getElementById('bd-terms').value);
+
+  if (!amount || !date) { alert('Amount and date required.'); return; }
+
+  var invoiceDate = new Date(date);
+  var dueDate = new Date(invoiceDate);
+  dueDate.setDate(dueDate.getDate() + terms);
+
+  invoices.unshift({
+    broker: brokerName,
+    amount: amount,
+    ref: ref,
+    date: date,
+    terms: terms,
+    phone: brokerPhone,
+    dueDate: dueDate.toISOString().split('T')[0],
+    status: 'pending',
+    id: Date.now()
+  });
+
+  renderInvoices();
+  renderBrokers();
+  openBrokerDetail(brokerId);
+}
+
+function closeBrokerDetail() {
+  document.getElementById('broker-detail-panel').classList.remove('open');
+}
+
+async function deleteBroker(brokerId, brokerName) {
+  if (!confirm('Delete ' + brokerName + ' from your broker network?')) return;
+  try {
+    var { error } = await _supabase
+      .from('brokers')
+      .delete()
+      .eq('id', brokerId);
+    if (error) throw error;
+    closeBrokerDetail();
+    await loadBrokers();
+  } catch(err) {
+    alert('Error deleting broker: ' + err.message);
+  }
+}
+
+// Load brokers when auth is ready — hook into onAuthReady
