@@ -1820,8 +1820,8 @@ function startGPS() {
         );
         const d = await r.json();
         const addr = d.address || {};
-        const state_code = addr['ISO3166-2-lvl4']    ? addr['ISO3166-2-lvl4'].replace('US-','').toUpperCase()    : const iso = addr['ISO3166-2-lvl4'] || ''; const state_code = iso ? iso.split('-').pop().toUpperCase() : (addr.state_code || addr.province || '').toUpperCase(); console.log('RC DEBUG state:', JSON.stringify(addr));
-        const city = addr.city || addr.town || addr.village || addr.county || '';
+        var state_code = (addr['ISO3166-2-lvl4'] || '').split('-').pop().toUpperCase() || (addr.state_code || '').toUpperCase();
+        var city = addr.city || addr.town || addr.village || addr.county || '';
         const state = addr.state || '';
         currentState = state_code;
         currentCity  = city;
