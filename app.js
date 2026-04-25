@@ -2292,7 +2292,7 @@ async function loadInvoiceDocs(invoiceId) {
 
     if (!_invoiceDocs[invoiceId]) _invoiceDocs[invoiceId] = {};
 
-    data.forEach(function(file) {
+    for (var fi = 0; fi < data.length; fi++) { var file = data[fi];
       var docType = file.name.startsWith('rateCon') ? 'rateCon' : 'bol';
       var path = window._rcUserId + '/' + invoiceId + '/' + file.name;
       var { data: urlData } = await _supabase.storage.from('documents').createSignedUrl(path, 3600);
@@ -2309,7 +2309,7 @@ _invoiceDocs[invoiceId][docType] = urlData.signedUrl;
       if (linkEl) {
         linkEl.innerHTML = '<a href="' + urlData.signedUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
       }
-    });
+    }
   } catch(err) {
     console.error('Error loading docs:', err);
   }
