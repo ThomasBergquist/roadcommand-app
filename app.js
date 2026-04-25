@@ -1822,14 +1822,15 @@ function startGPS() {
         );
         const d = await r.json();
         const addr = d.address || {};
-        const state_code = addr.state_code ? addr.state_code.toUpperCase() : '';
+        var iso = addr['ISO3166-2-lvl4'] || '';
+        var state_code = iso ? iso.split('-').pop().toUpperCase() : (addr.state_code || '').toUpperCase();
         const city = addr.city || addr.town || addr.village || addr.county || '';
         const state = addr.state || '';
         currentState = state_code;
         currentCity  = city;
 
         // Update region
-        currentRegion = STATE_REGION[state_code] || 'Unknown';
+        currentRegion = STATE_REGION[state_code] || 'West Coast';
         updateWeatherForState(state_code);
         document.getElementById('region-display').textContent = city ? city + ', ' + state : state;
         document.getElementById('eia-region').textContent = currentRegion;
