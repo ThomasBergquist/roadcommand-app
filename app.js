@@ -2168,6 +2168,8 @@ function openBrokerDetail(brokerId) {
     '<div style="height:2rem;"></div>';
 
   panel.classList.add('open');
+  // Load existing documents for each invoice
+  brokerInvs.forEach(function(inv) { loadInvoiceDocs(inv.id); });
 }
 
 function addInvoiceFromBroker(brokerId, brokerName, brokerPhone) {
@@ -2219,3 +2221,104 @@ async function deleteBroker(brokerId, brokerName) {
 }
 
 // Load brokers when auth is ready — hook into onAuthReady
+
+// ══════════════════════════════════════════════════════════════
+// DOCUMENT VAULT — BOL & Rate Confirmation uploads
+// Files stored in Supabase Storage: documents/{user_id}/{invoice_id}/
+// ══════════════════════════════════════════════════════════════
+
+var _invoiceDocs = {}; // cache: { invoice_id: { rateCon: url, bol: url } }
+
+// ── Upload a document for an invoice ─────────────────────────
+async function uploadInvoiceDoc(invoiceId, docType) {
+  // Create hidden file input
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,.pdf';
+  input.onchange = async function() {
+    var file = input.files[0];
+    if (!file) return;
+
+    var ext  = file.name.split('.').pop().toLowerCase();
+    var path = window._rcUserId + '/' + invoiceId + '/' + docType + '.' + ext;
+
+    try {
+      var { error } = await _supabase.storage
+        .from('documents')
+        .upload(path, file, { upsert: true });
+
+      if (error) throw error;
+
+      // Get public URL
+      var { data } = _supabase.storage.from('documents').getPublicUrl(path);
+
+      // Cache it
+      if (!_invoiceDocs[invoiceId]) _invoiceDocs[invoiceId] = {};
+      _invoiceDocs[invoiceId][docType] = data.publicUrl;
+
+      // Update button to show uploaded
+      var btn = document.getElementById('doc-btn-' + invoiceId + '-' + docType);
+      if (btn) {
+        btn.textContent = '✅ ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' Uploaded';
+        btn.style.color = 'var(--green)';
+        btn.style.borderColor = 'var(--green-border)';
+      }
+
+      // Add view link
+      var linkEl = document.getElementById('doc-link-' + invoiceId + '-' + docType);
+      if (linkEl) {
+        linkEl.innerHTML = '<a href="' + data.publicUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
+      }
+
+      alert((docType === 'rateCon' ? 'Rate Confirmation' : 'BOL') + ' uploaded successfully!');
+    } catch(err) {
+      alert('Upload failed: ' + err.message);
+    }
+  };
+  input.click();
+}
+
+// ── Load existing docs for an invoice ────────────────────────
+async function loadInvoiceDocs(invoiceId) {
+  if (!window._rcUserId) return;
+  try {
+    var { data, error } = await _supabase.storage
+      .from('documents')
+      .list(window._rcUserId + '/' + invoiceId);
+
+    if (error || !data) return;
+
+    if (!_invoiceDocs[invoiceId]) _invoiceDocs[invoiceId] = {};
+
+    data.forEach(function(file) {
+      var docType = file.name.startsWith('rateCon') ? 'rateCon' : 'bol';
+      var path = window._rcUserId + '/' + invoiceId + '/' + file.name;
+      var { data: urlData } = _supabase.storage.from('documents').getPublicUrl(path);
+      _invoiceDocs[invoiceId][docType] = urlData.publicUrl;
+
+      // Update UI
+      var btn = document.getElementById('doc-btn-' + invoiceId + '-' + docType);
+      if (btn) {
+        btn.textContent = '✅ ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' Uploaded';
+        btn.style.color = 'var(--green)';
+        btn.style.borderColor = 'var(--green-border)';
+      }
+      var linkEl = document.getElementById('doc-link-' + invoiceId + '-' + docType);
+      if (linkEl) {
+        linkEl.innerHTML = '<a href="' + urlData.publicUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
+      }
+    });
+  } catch(err) {
+    console.error('Error loading docs:', err);
+  }
+}
+
+// ── Generate doc upload HTML for an invoice ───────────────────
+function getDocUploadHTML(invoiceId) {
+  return '<div style="padding:.5rem 0;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">' +
+    '<button id="doc-btn-' + invoiceId + '-rateCon" class="lb-call-btn" onclick="uploadInvoiceDoc(' + invoiceId + ','rateCon')" style="font-size:.72rem;">📎 Rate Con</button>' +
+    '<span id="doc-link-' + invoiceId + '-rateCon"></span>' +
+    '<button id="doc-btn-' + invoiceId + '-bol" class="lb-call-btn" onclick="uploadInvoiceDoc(' + invoiceId + ','bol')" style="font-size:.72rem;">📎 BOL</button>' +
+    '<span id="doc-link-' + invoiceId + '-bol"></span>' +
+  '</div>';
+}
