@@ -2135,7 +2135,9 @@ function openBrokerDetail(brokerId) {
           '<div class="inv-actions">' +
             (inv.status !== 'paid' ? '<button class="inv-btn green" onclick="markPaid(' + inv.id + ');openBrokerDetail(\'' + brokerId + '\')">✓ Mark Paid</button>' : '') +
             (broker.phone ? '<button class="inv-btn call" onclick="callBroker(\'' + broker.phone + '\',\'' + broker.name + '\')">📞 Call</button>' : '') +
-          '</div></div>';
+          '</div>' +
+          '<div style="padding:.2rem 1rem .6rem;">' + getDocUploadHTML(inv.id) + '</div>' +
+          '</div>';
       }).join('')
     : '<div style="padding:1rem;font-size:.85rem;color:#b8c8b8;">No invoices for this broker yet.</div>';
 
