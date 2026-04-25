@@ -2252,11 +2252,11 @@ async function uploadInvoiceDoc(invoiceId, docType) {
       if (error) throw error;
 
       // Get public URL
-      var { data } = _supabase.storage.from('documents').getPublicUrl(path);
+      var { data } = await _supabase.storage.from('documents').createSignedUrl(path, 3600);
 
       // Cache it
       if (!_invoiceDocs[invoiceId]) _invoiceDocs[invoiceId] = {};
-      _invoiceDocs[invoiceId][docType] = data.publicUrl;
+      _invoiceDocs[invoiceId][docType] = data.signedUrl;
 
       // Update button to show uploaded
       var btn = document.getElementById('doc-btn-' + invoiceId + '-' + docType);
@@ -2269,7 +2269,7 @@ async function uploadInvoiceDoc(invoiceId, docType) {
       // Add view link
       var linkEl = document.getElementById('doc-link-' + invoiceId + '-' + docType);
       if (linkEl) {
-        linkEl.innerHTML = '<a href="' + data.publicUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
+        linkEl.innerHTML = '<a href="' + data.signedUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
       }
 
       alert((docType === 'rateCon' ? 'Rate Confirmation' : 'BOL') + ' uploaded successfully!');
@@ -2295,8 +2295,8 @@ async function loadInvoiceDocs(invoiceId) {
     data.forEach(function(file) {
       var docType = file.name.startsWith('rateCon') ? 'rateCon' : 'bol';
       var path = window._rcUserId + '/' + invoiceId + '/' + file.name;
-      var { data: urlData } = _supabase.storage.from('documents').getPublicUrl(path);
-      _invoiceDocs[invoiceId][docType] = urlData.publicUrl;
+      var { data: urlData } = await _supabase.storage.from('documents').createSignedUrl(path, 3600);
+_invoiceDocs[invoiceId][docType] = urlData.signedUrl;
 
       // Update UI
       var btn = document.getElementById('doc-btn-' + invoiceId + '-' + docType);
@@ -2307,7 +2307,7 @@ async function loadInvoiceDocs(invoiceId) {
       }
       var linkEl = document.getElementById('doc-link-' + invoiceId + '-' + docType);
       if (linkEl) {
-        linkEl.innerHTML = '<a href="' + urlData.publicUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
+        linkEl.innerHTML = '<a href="' + urlData.signedUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
       }
     });
   } catch(err) {
