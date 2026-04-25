@@ -2315,10 +2315,19 @@ async function loadInvoiceDocs(invoiceId) {
 
 // ── Generate doc upload HTML for an invoice ───────────────────
 function getDocUploadHTML(invoiceId) {
-  return '<div style="padding:.5rem 0;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">' +
-    '<button id="doc-btn-' + invoiceId + '-rateCon" class="lb-call-btn" onclick="uploadInvoiceDoc(' + invoiceId + ','rateCon')" style="font-size:.72rem;">📎 Rate Con</button>' +
-    '<span id="doc-link-' + invoiceId + '-rateCon"></span>' +
-    '<button id="doc-btn-' + invoiceId + '-bol" class="lb-call-btn" onclick="uploadInvoiceDoc(' + invoiceId + ','bol')" style="font-size:.72rem;">📎 BOL</button>' +
-    '<span id="doc-link-' + invoiceId + '-bol"></span>' +
-  '</div>';
+  return '<div style="padding:.5rem 0;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">'
+    + '<button class="lb-call-btn doc-upload-btn" data-inv="' + invoiceId + '" data-type="rc" style="font-size:.72rem;" id="doc-btn-' + invoiceId + '-rateCon">📎 Rate Con</button>'
+    + '<span id="doc-link-' + invoiceId + '-rateCon"></span>'
+    + '<button class="lb-call-btn doc-upload-btn" data-inv="' + invoiceId + '" data-type="bol" style="font-size:.72rem;" id="doc-btn-' + invoiceId + '-bol">📎 BOL</button>'
+    + '<span id="doc-link-' + invoiceId + '-bol"></span>'
+    + '</div>';
 }
+
+// Delegate doc upload clicks
+document.addEventListener("click", function(e) {
+  var btn = e.target.closest(".doc-upload-btn");
+  if (!btn) return;
+  var invoiceId = btn.dataset.inv;
+  var docType   = btn.dataset.type === "rc" ? "rateCon" : "bol";
+  uploadInvoiceDoc(invoiceId, docType);
+});
