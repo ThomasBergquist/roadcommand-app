@@ -1827,7 +1827,7 @@ function startGPS() {
         currentCity  = city;
 
         // Update region
-        currentRegion = STATE_REGION[state_code] || 'Unknown';
+        currentRegion = STATE_REGION[state_code] || STATE_REGION[state_code.trim()] || 'Unknown'; console.log('RC state_code=[' + state_code + '] region=' + currentRegion);
         updateWeatherForState(state_code);
         document.getElementById('region-display').textContent = city ? city + ', ' + state : state;
         document.getElementById('eia-region').textContent = currentRegion;
