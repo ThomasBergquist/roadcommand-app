@@ -2094,7 +2094,7 @@ function renderBrokers() {
 }
 
 // ── Open broker detail panel ──────────────────────────────────
-function openBrokerDetail(brokerId) {
+function openBrokerDetail(brokerId) {   console.log('openBrokerDetail called with:', brokerId);   console.log('_brokers:', _brokers.length, _brokers.map(function(b){return b.id;}));   var broker = _brokers.find(function(b) { return b.id === brokerId; });   console.log('broker found:', broker ? broker.name : 'NOT FOUND');   if (!broker) return;
   var broker = _brokers.find(function(b) { return b.id === brokerId; });
   if (!broker) return;
 
