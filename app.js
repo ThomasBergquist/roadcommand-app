@@ -2070,7 +2070,7 @@ function renderBrokers() {
       .reduce(function(sum, i) { return sum + i.amount; }, 0);
     var invoiceCount = brokerInvs.length;
 
-    return '<div class="load-card" style="cursor:pointer;" onclick="openBrokerDetail(\'' + b.id + '\')">' +
+    return '<div class="load-card broker-card" style="cursor:pointer;" data-broker-id="' + b.id + '">' +
       '<div class="load-top">' +
         '<div>' +
           '<div class="load-route">' + b.name + '</div>' +
@@ -2326,8 +2326,16 @@ function getDocUploadHTML(invoiceId) {
 // Delegate doc upload clicks
 document.addEventListener("click", function(e) {
   var btn = e.target.closest(".doc-upload-btn");
-  if (!btn) return;
-  var invoiceId = btn.dataset.inv;
-  var docType   = btn.dataset.type === "rc" ? "rateCon" : "bol";
-  uploadInvoiceDoc(invoiceId, docType);
+  if (btn) {
+    var invoiceId = btn.dataset.inv;
+    var docType   = btn.dataset.type === "rc" ? "rateCon" : "bol";
+    uploadInvoiceDoc(invoiceId, docType);
+    return;
+  }
+  // Delegate broker card clicks
+  var card = e.target.closest(".broker-card");
+  if (card) {
+    var brokerId = card.dataset.brokerId;
+    if (brokerId) openBrokerDetail(brokerId);
+  }
 });
