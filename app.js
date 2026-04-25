@@ -1881,7 +1881,7 @@ async function fetchFuelPrice(region) {
   // PADD regions: 1=East Coast, 2=Midwest, 3=Gulf, 4=Rocky Mtn, 5=West Coast
   const PADD = {
     'East Coast':      'EMD_EPD2D_PTE_R10_DPG',
-    'Midwest':         'EMD_EPD2D_PTE_R20_DPGG',
+    'Midwest':         'EMD_EPD2D_PTE_R20_DPG',
     'Gulf Coast':      'EMD_EPD2D_PTE_R30_DPG',
     'Rocky Mountain':  'EMD_EPD2D_PTE_R40_DPG',
     'West Coast':      'EMD_EPD2D_PTE_R50_DPG',
