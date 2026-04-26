@@ -2014,7 +2014,7 @@ async function fetchFuelPrice(region) {
   const stateCode = currentState || '';
   const seriesId = (stateCode && STATE_SERIES[stateCode]) ? STATE_SERIES[stateCode] : (PADD[region] || PADD['Unknown']);
   const isStatLevel = stateCode && STATE_SERIES[stateCode];
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
@@ -2069,6 +2069,54 @@ loadSavedPreferences();
 renderMaint();
 refreshWeather();
 // Start GPS + fuel fetch on load
+
+// ══════════════════════════════════════════════════════════════
+// PULL TO REFRESH
+// ══════════════════════════════════════════════════════════════
+(function() {
+  var startY = 0;
+  var pulling = false;
+  var indicator = document.createElement('div');
+  indicator.id = 'pull-indicator';
+  indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;text-align:center;padding:.5rem;background:var(--green);color:#111312;font-size:.8rem;font-weight:bold;letter-spacing:.05em;z-index:999;transform:translateY(-100%);transition:transform .2s;';
+  indicator.textContent = 'Pull to refresh';
+  document.body.appendChild(indicator);
+
+  document.addEventListener('touchstart', function(e) {
+    if (window.scrollY === 0) {
+      startY = e.touches[0].clientY;
+      pulling = true;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!pulling) return;
+    var dist = e.touches[0].clientY - startY;
+    if (dist > 10) {
+      indicator.style.transform = 'translateY(0)';
+      indicator.textContent = dist > 60 ? 'Release to refresh' : 'Pull to refresh';
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function(e) {
+    if (!pulling) return;
+    pulling = false;
+    var dist = e.changedTouches[0].clientY - startY;
+    indicator.style.transform = 'translateY(-100%)';
+    indicator.textContent = 'Pull to refresh';
+    if (dist > 60) {
+      indicator.textContent = 'Refreshing...';
+      indicator.style.transform = 'translateY(0)';
+      startGPS();
+      refreshWeather();
+      setTimeout(function() {
+        indicator.style.transform = 'translateY(-100%)';
+      }, 1500);
+    }
+    startY = 0;
+  }, { passive: true });
+})();
+
 window.addEventListener('load', () => {
   setTimeout(startGPS, 500);
   setTimeout(checkFirstTime, 700);
