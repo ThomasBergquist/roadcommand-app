@@ -2071,7 +2071,7 @@ async function fetchFuelPrice(region) {
 
   const seriesId = PADD[region] || PADD['Unknown'];
   const isStatLevel = false;
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
@@ -2737,10 +2737,21 @@ function openFuelModal() {
     var input = document.getElementById('crowd-fuel-input');
     if (input) {
       input.value = defaults.fuelPrice ? defaults.fuelPrice.toFixed(2) : '';
-      input.focus();
+      setTimeout(function() { input.focus(); }, 100);
     }
   }
 }
+
+// Add touch event support for fuel box on mobile
+document.addEventListener('DOMContentLoaded', function() {
+  var fuelBox = document.getElementById('fuel-box');
+  if (fuelBox) {
+    fuelBox.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      openFuelModal();
+    }, { passive: false });
+  }
+});
 
 function closeFuelModal() {
   var modal = document.getElementById('fuel-report-modal');
