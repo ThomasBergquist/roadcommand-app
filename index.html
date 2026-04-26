@@ -112,6 +112,12 @@
         <div style="font-size:.62rem;color:var(--green);opacity:.7;margin-top:.15rem;">⛽ Tap to report pump price</div>
       </div>
     </div>
+    <!-- ODOMETER UPDATE -->
+    <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
+      <input class="form-input" id="dash-odometer" type="number" placeholder="Update odometer (miles)" style="flex:1;font-size:.82rem;">
+      <button class="btn btn-outline" onclick="updateOdometer()" style="white-space:nowrap;font-size:.75rem;padding:.5rem .7rem;">Update Odo</button>
+    </div>
+
     <div class="dash-grid">
       <div class="metric"><div class="metric-val">$4,820</div><div class="metric-label">Week Revenue</div></div>
       <div class="metric"><div class="metric-val amber">$1.94</div><div class="metric-label">RPM This Week</div></div>
@@ -665,7 +671,16 @@
             <input class="form-input" id="neg-miles" type="number" placeholder="800">
           </div>
         </div>
-        <button class="btn btn-green" onclick="runNegCoach()">Get My Counter-Offer</button>
+        <div class="form-row" style="margin-bottom:.8rem;">
+          <div class="form-group">
+            <label class="form-label">Broker Name (optional)</label>
+            <input class="form-input" id="neg-broker-name" placeholder="CH Robinson">
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+          <button class="btn btn-green" onclick="runNegCoach()">Get Counter-Offer</button>
+          <button class="btn" onclick="generateNegScript()" style="background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);">🤖 AI Script</button>
+        </div>
         <div id="neg-result" style="display:none;margin-top:.9rem;">
           <div class="divider"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:.8rem;">
@@ -713,7 +728,29 @@
         <div id="nearest-results" style="margin-top:.8rem;"></div>
       </div>
     </div>
+  
+
+  <!-- ROUTE INTELLIGENCE -->
+  <div class="card" style="margin-top:.8rem;">
+    <div class="card-header"><div class="card-title">🗺️ Route Intelligence</div></div>
+    <div class="card-body">
+      <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">Get AI tactical briefing before you arrive at a destination — rates, backhaul strategy, timing tips.</div>
+      <div class="form-row" style="margin-bottom:.8rem;">
+        <div class="form-group">
+          <label class="form-label">Destination City</label>
+          <input class="form-input" id="route-intel-dest" placeholder="Portland, OR">
+        </div>
+      </div>
+      <button class="btn btn-green" id="route-intel-btn" onclick="getRouteIntel()">🗺️ Get Route Intel</button>
+      <div id="route-intel-output" style="display:none;"></div>
+    </div>
   </div>
+
+  <!-- AI Script Output -->
+  <div id="ai-script-section" style="display:none;margin-top:.8rem;padding:0 1rem 1rem;">
+    <div id="ai-script-output"></div>
+  </div>
+</div>
 
   <!-- TOOLS SCREEN: Lane Planner + HOS Checker + Doc Tracker -->
   <div class="screen" id="screen-tools">
@@ -899,6 +936,16 @@
     </div>
 
     <button class="reopen-loadback-btn" onclick="reopenLoadback()">🔄 View Return Loads From Last Booked Load</button>
+
+    <!-- WEEKLY SUMMARY -->
+    <div class="card" style="margin-top:.8rem;">
+      <div class="card-header"><div class="card-title">📊 Weekly Business Summary</div></div>
+      <div class="card-body">
+        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">AI-generated performance review based on your actual invoice and broker data.</div>
+        <button class="btn btn-green" id="weekly-summary-btn" onclick="generateWeeklySummary()">📊 Generate Weekly Summary</button>
+        <div id="weekly-summary-output" style="display:none;"></div>
+      </div>
+    </div>
     <div class="section-label" style="margin:.8rem 0 .5rem;">Active Invoices</div>
     <div id="invoice-list">
       <div class="alert alert-amber">

@@ -312,56 +312,62 @@ const TUTORIAL_STEPS = [
   {
     icon: '👋',
     title: 'Welcome, ' + (window._rcUserFirstName || 'Driver'),
-    desc: 'RoadCommand is your personal dispatcher — built to eliminate dispatch fees and put you in control of every load decision.',
-    tip: '<strong>This tutorial walks you through every feature.</strong> Takes about 2 minutes. You can also re-run it anytime from the Settings tab.'
+    desc: 'RoadCommand is your personal dispatcher — built by a trucker, for truckers. Every feature eliminates a cost or puts more money in your pocket.',
+    tip: '<strong>This tutorial walks you through every feature.</strong> Takes about 3 minutes. Re-run it anytime from Settings.'
   },
   {
     icon: '📊',
     title: 'Dashboard',
-    desc: 'Your home screen. Shows live GPS location, current diesel price for your region, weekly stats, and hot loads matching your parameters — all automatically.',
-    tip: '<strong>Diesel price updates automatically</strong> based on your GPS location. West Coast, Rocky Mountain, Gulf Coast — it knows where you are.'
+    desc: 'Your command center. Live GPS location, real diesel price for your region, weekly revenue and RPM stats, estimated fuel cost, and hot loads matching your parameters — all updating automatically.',
+    tip: '<strong>Tap the diesel price box</strong> to report what you actually paid at the pump. Your reports and other drivers nearby create a crowdsourced price more accurate than any government average.'
+  },
+  {
+    icon: '⛽',
+    title: 'Crowdsourced Fuel Prices',
+    desc: 'Every time you fuel up, tap the diesel box on the dashboard and enter what you paid. Your report is averaged with other RoadCommand drivers within 100 miles. Once 3 or more drivers report, the app uses real local prices instead of EIA regional averages.',
+    tip: '<strong>The more drivers report, the more accurate it gets.</strong> This is data no load board or government agency has — real pump prices from real truckers on real routes.'
   },
   {
     icon: '🚛',
     title: 'Loads Tab',
-    desc: 'All your loads in one place — Hot, Watching, and Booked. Tap 📞 Call to dial the broker directly. Tap 💰 Calc to run the full profit breakdown. Tap 👁 Watch to save a load for later.',
-    tip: '<strong>Every load shows auto profit</strong> — net after fuel calculated instantly using your real local diesel price. Green = take it. Amber = acceptable. Red = skip it.'
+    desc: 'All your loads — Hot, Watching, and Booked. Every card shows auto profit calculated from your real local diesel price. Tap any card to expand the full breakdown including GPS deadhead cost. Book a load and the Loadback return finder fires automatically.',
+    tip: '<strong>Deadhead cost uses your Empty MPG</strong> — set in Settings. A load that looks profitable at loaded MPG can lose money with deadhead at the wrong rate. This catches it automatically.'
   },
   {
     icon: '🤝',
     title: 'Negotiate Tab',
-    desc: 'Your secret weapon. Check any broker credit score and payment history before you call. Then enter the lane and broker offer to get a word-for-word counter-offer script.',
-    tip: '<strong>Use the Rate Coach before every call.</strong> Enter the origin state, destination state, broker offer, and miles — it tells you exactly what to counter at.'
+    desc: 'Three weapons in one tab: Broker Scorecard checks credit and payment history before you call. Rate Coach gives you market data and a counter-offer. AI Script generates a word-for-word phone script tailored to the exact gap between their offer and what you should be paid.',
+    tip: '<strong>Use AI Script before every negotiation call.</strong> Enter the lane, their offer, and the broker name — it generates a psychologically optimized script using market data and broker history.'
   },
   {
-    icon: '🛠️',
-    title: 'Tools Tab',
-    desc: 'Three tools that replace dispatcher knowledge: Lane Planner finds your return load before you deliver. HOS Checker tells you if a load is legally deliverable. Doc Tracker records every BOL and rate confirmation.',
-    tip: '<strong>Always run Lane Planner before accepting a load.</strong> Knowing your return options before you commit is how experienced operators maximize their average RPM.'
+    icon: '🏦',
+    title: 'Broker Vault',
+    desc: 'Your permanent broker network. Add every broker you work with — MC number, phone, email, payment terms. Every invoice links to their profile. See total outstanding and paid per broker at a glance. Tap any broker to see their full history.',
+    tip: '<strong>Upload Rate Confirmations and BOLs</strong> directly to each invoice. Documents are stored securely in the cloud — accessible from any device at tax time.'
   },
   {
     icon: '💵',
     title: 'Money Tab',
-    desc: 'Track every invoice. See outstanding and overdue totals at a glance. Color-coded: green = paid, amber = due soon, red = overdue. One tap to call the broker and chase payment.',
-    tip: '<strong>Log invoices the day you deliver.</strong> Brokers pay faster when they know you are tracking. Never chase a payment you forgot about.'
+    desc: 'Your full invoice tracker. Outstanding and overdue totals at the top. Every invoice color-coded — green paid, amber due soon, red overdue. Select from your saved brokers to auto-fill details. All invoices sync across all your devices instantly.',
+    tip: '<strong>Log invoices the day you deliver.</strong> Brokers pay faster when they know you are tracking. One tap calls the broker directly from an overdue invoice.'
   },
   {
-    icon: '🗺️',
-    title: 'States Tab',
-    desc: 'Track which states have the most available loads and the best rates. Sort by volume, average RPM, or trending up. Manually update as you observe the market — or connect the API to auto-populate.',
-    tip: '<strong>Check States before planning your week.</strong> High volume + rising trend = strong negotiating position. Low volume = take what you can get and move on.'
-  },
-  {
-    icon: '⚙️',
-    title: 'Parameters Tab',
-    desc: 'Set your minimum rate per mile, preferred lanes, home base, max weight, and alert preferences. These become your live filters when the Truckstop API is connected.',
-    tip: '<strong>Set your real minimums here.</strong> The app uses these to flag Hot loads and calculate whether a broker offer meets your standard.'
+    icon: '🛠️',
+    title: 'Tools Tab',
+    desc: 'Lane Planner calculates round-trip profit before you commit to an outbound. HOS Checker gives you a legal or illegal verdict on any load. Load Doc Tracker records every BOL and rate confirmation number for dispute protection.',
+    tip: '<strong>Always run Lane Planner before accepting a load.</strong> Knowing your return options before you commit is how experienced operators maximize average RPM across the week.'
   },
   {
     icon: '🔧',
+    title: 'Maintenance Tab',
+    desc: 'Track every service item on your truck — oil changes, tires, DPF, brakes, DOT inspection. Progress bars show where each item stands. Cost per mile feeds directly into your profit calculations. Update with your actual odometer and costs.',
+    tip: '<strong>Your real maintenance cost per mile</strong> is shown at the top and used in every profit calculation. Accurate maintenance numbers are the difference between knowing your true profit and guessing.'
+  },
+  {
+    icon: '⚙️',
     title: 'Settings Tab',
-    desc: 'Change text size for easier reading in the cab. Switch to High Contrast mode for bright sunlight. Update your truck info and fuel defaults. All preferences save to your device.',
-    tip: '<strong>Pinch to zoom works on any screen</strong> regardless of text size setting. Settings + pinch zoom = readable in any conditions.'
+    desc: 'Set your loaded MPG and empty MPG separately — deadhead uses empty MPG for accurate fuel cost. Adjust text size for cab readability. Switch to Night Mode for dark conditions. Your truck info, fuel defaults, and preferences all sync to your account.',
+    tip: '<strong>Set Empty MPG accurately.</strong> At 8 MPG empty vs 6.5 loaded, a 100-mile deadhead costs $22 less than the app would calculate using loaded MPG — that adds up to thousands per year.'
   },
 ];
 
@@ -415,7 +421,7 @@ function prevTutorialStep() {
 function skipTutorial() {
   const overlay = document.getElementById('tutorial-overlay');
   overlay.style.display = 'none';
-  try { localStorage.setItem('rc-tutorialdone-v7', '1'); } catch(e) {}
+  try { localStorage.setItem('rc-tutorialdone-v8', '1'); } catch(e) {}
 }
 
 function startTutorial() {
@@ -427,7 +433,7 @@ function startTutorial() {
 
 function checkFirstTime() {
   try {
-    if (!localStorage.getItem('rc-tutorialdone-v7')) {
+    if (!localStorage.getItem('rc-tutorialdone-v8')) {
       setTimeout(startTutorial, 800);
     }
   } catch(e) {
@@ -571,17 +577,18 @@ function closeHelpModal(e) {
 // SETTINGS
 // ══════════════════════════════════════════════════════════════
 function setTextSize(size, btn) {
-  var sizes = { normal: '15px', large: '18px', xlarge: '21px', xxlarge: '24px' };
-  document.documentElement.style.fontSize = sizes[size] || '15px';
+  // Remove any existing text-size class without touching other classes
   ['text-normal','text-large','text-xlarge','text-xxlarge'].forEach(function(c) {
     document.body.classList.remove(c);
   });
   document.body.classList.add('text-' + size);
+
   document.querySelectorAll('.text-size-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
+
+  // Save preference
   try { localStorage.setItem('rc-textsize', size); } catch(e) {}
 }
-
 
 function setScheme(scheme, btn) {
   document.body.classList.remove('high-contrast', 'night-mode');
@@ -954,6 +961,7 @@ async function loadInvoices() {
     renderInvoices();
     renderBrokers();
     updateMoneyTotals();
+    checkDailyBriefing();
   } catch(err) {
     console.error('Error loading invoices:', err);
   }
@@ -1004,8 +1012,6 @@ async function updateInvoiceStatus(id, status) {
 // ── Delete invoice from Supabase ──────────────────────────────
 async function deleteInvoiceFromSupabase(id) {
   if (!window._rcUserId) return;
-  var isUUID = typeof id === 'string' && id.includes('-');
-  if (!isUUID) return;
   try {
     await _supabase
       .from('invoices')
@@ -1094,7 +1100,7 @@ function renderInvoices() {
       : isOverdue
         ? "<span class=\"overdue-badge\">OVERDUE " + Math.abs(daysLeft) + "d</span>"
         : "<span class=\"due-badge\">DUE IN " + daysLeft + "d</span>";
-    return "<div class=\"invoice-item " + (inv.status==="paid"?"paid":isOverdue?"overdue":"") + "\"><div class=\"inv-top\"><div><div class=\"inv-broker-name\">" + inv.broker + "</div><div style=\"margin-top:.2rem;\">" + statusBadge + "</div></div><div class=\"inv-amount\">$" + inv.amount.toLocaleString() + "</div></div><div class=\"inv-meta\">" + (inv.ref?"<span class=\"inv-stat\">Ref: <strong>"+inv.ref+"</strong></span>":"") + "<span class=\"inv-stat\">Invoiced: <strong>" + inv.date + "</strong></span><span class=\"inv-stat\">Due: <strong>" + inv.dueDate + "</strong></span></div><div class=\"inv-actions\">" + (inv.phone?"<button class=\"inv-btn call\" onclick=\"callBroker('" + inv.phone + "','" + inv.broker + "')\">📞 Call</button>":"") + (inv.status!=="paid"?"<button class=\"inv-btn green\" onclick=\"markPaid('" + inv.id + "')\">✓ Mark Paid</button>":"") + "<button class=\"inv-btn red\" onclick=\"removeInvoice('" + inv.id + "')\">✕ Remove</button></div></div>";
+    return "<div class=\"invoice-item " + (inv.status==="paid"?"paid":isOverdue?"overdue":"") + "\"><div class=\"inv-top\"><div><div class=\"inv-broker-name\">" + inv.broker + "</div><div style=\"margin-top:.2rem;\">" + statusBadge + "</div></div><div class=\"inv-amount\">$" + inv.amount.toLocaleString() + "</div></div><div class=\"inv-meta\">" + (inv.ref?"<span class=\"inv-stat\">Ref: <strong>"+inv.ref+"</strong></span>":"") + "<span class=\"inv-stat\">Invoiced: <strong>" + inv.date + "</strong></span><span class=\"inv-stat\">Due: <strong>" + inv.dueDate + "</strong></span></div><div class=\"inv-actions\">" + (inv.phone?"<button class=\"inv-btn call\" onclick=\"callBroker('" + inv.phone + "','" + inv.broker + "')\">📞 Call</button>":"") + (inv.status!=="paid"?"<button class=\"inv-btn green\" onclick=\"markPaid(" + inv.id + ")\">✓ Mark Paid</button>":"") + "<button class=\"inv-btn red\" onclick=\"removeInvoice(" + inv.id + ")\">✕ Remove</button></div></div>";
   }).join("");
   updateMoneyTotals();
 }
@@ -1182,6 +1188,25 @@ function recalcPanel(panelId, rate, miles) {
 
   // Run deadhead warning
   checkDeadhead(panelId, rate, miles);
+
+  // Add AI Decision button if not already present
+  if (window._rcAIWorker || window._rcAnthropicKey) {
+    var verdictEl = document.getElementById('verdict_' + panelId);
+    var aiBtn = document.getElementById('ai-decide-' + panelId);
+    if (verdictEl && !aiBtn) {
+      var panel2 = document.getElementById(panelId);
+      var pickup = panel2 ? (panel2.dataset.pickup || '') : '';
+      var broker = panel2 ? (panel2.dataset.broker || '') : '';
+      var aiDiv = document.createElement('div');
+      aiDiv.style.cssText = 'margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;';
+      aiDiv.innerHTML =
+        '<button class="btn btn-sm" id="ai-decide-' + panelId + '" ' +
+        'onclick="getLoadDecision('' + panelId + '',' + rate + ',' + miles + ','' + broker + '','' + pickup + '')" ' +
+        'style="background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);font-size:.75rem;">🤖 AI Decision</button>' +
+        '<div id="ai-decide-result-' + panelId + '" style="display:none;flex:1;min-width:100%;"></div>';
+      verdictEl.parentNode.insertBefore(aiDiv, verdictEl.nextSibling);
+    }
+  }
 }
 
 // BOOK LOAD — moves to Money tab and pre-fills invoice
@@ -1209,6 +1234,8 @@ function bookLoad(btn, origin, dest, rate, miles, broker, phone) {
     dateField.value = today.toISOString().split("T")[0];
   }
 
+  // Prompt to log run
+  promptLogRun(origin, dest, rate, miles);
   // Show loadback panel — finds return loads based on arrival date
   showLoadback(origin, dest, rate, miles, broker, phone);
 }
@@ -2017,8 +2044,9 @@ function startGPS() {
         gpsDot.className = 'live-dot green';
         gpsBox.className = 'live-box connected';
 
-        // Now fetch fuel price for this region
+        // Now fetch fuel price and NWS alerts
         fetchFuelPrice(currentRegion);
+        fetchNWSAlerts(window._gpsLat, window._gpsLon);
 
       } catch(e) {
         gpsVal.textContent = lat + '°N ' + Math.abs(lon) + '°W';
@@ -2071,24 +2099,37 @@ async function fetchFuelPrice(region) {
 
   const seriesId = PADD[region] || PADD['Unknown'];
   const isStatLevel = false;
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  // Use Cloudflare Worker if available (keeps API key server-side)
+  // Set window._rcEIAWorker = 'https://eia-diesel.YOUR-SUBDOMAIN.workers.dev' to enable
+  var eiaWorkerUrl = window._rcEIAWorker;
+  const url = eiaWorkerUrl
+    ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
     const d = await r.json();
-    const rows = d?.response?.data;
-    if (rows && rows.length > 0) {
-      const price = parseFloat(rows[0].value);
-      const period = rows[0].period || '';
+    // Handle both direct EIA response and worker response
+    var price, period;
+    if (d && d.price) {
+      // Worker response format
+      price = parseFloat(d.price);
+      period = d.period || '';
+    } else {
+      // Direct EIA response format
+      const rows = d?.response?.data;
+      if (!rows || !rows.length) throw new Error('No data');
+      price = parseFloat(rows[0].value);
+      period = rows[0].period || '';
+    }
+    if (price) {
       defaults.fuelPrice = price;
       fuelVal.textContent = '$' + price.toFixed(3) + '/gal';
       fuelSub.textContent = region + ' Region · EIA Live';
       fuelDot.className = 'live-dot green';
       fuelBox.className = 'live-box connected';
       if (fuelUpd) fuelUpd.textContent = 'Week of ' + period;
-      // Refresh all profit bars with new price
       injectProfitBars();
-      // Also update the calculator default input
       const calcFuel = document.getElementById('calc-fuel');
       if (calcFuel) calcFuel.value = price.toFixed(2);
     } else {
@@ -2166,10 +2207,6 @@ refreshWeather();
       indicator.style.transform = 'translateY(0)';
       startGPS();
       refreshWeather();
-      loadInvoices();
-      loadBrokers();
-      loadMaintItems();
-      fetchFuelPrice(currentRegion);
       setTimeout(function() {
         indicator.style.transform = 'translateY(-100%)';
       }, 1500);
@@ -2178,8 +2215,10 @@ refreshWeather();
   }, { passive: true });
 })();
 
-window.addEventListener('load', () => {   setTimeout(startGPS, 500);   setTimeout(checkFirstTime, 700);     });
-
+window.addEventListener('load', () => {
+  setTimeout(startGPS, 500);
+  setTimeout(checkFirstTime, 700);
+});
 
 
 // ══════════════════════════════════════════════════════════════
@@ -2364,7 +2403,7 @@ function openBrokerDetail(brokerId) {
           '<div class="inv-amount">$' + inv.amount.toLocaleString() + '</div></div>' +
           '<div class="inv-meta"><span class="inv-stat">Date: <strong>' + inv.date + '</strong></span><span class="inv-stat">Due: <strong>' + inv.dueDate + '</strong></span></div>' +
           '<div class="inv-actions">' +
-            (inv.status !== 'paid' ? '<button class="inv-btn green" onclick="markPaid(\'' + inv.id + '\');openBrokerDetail(\'' + brokerId + '\')">✓ Mark Paid</button>' : '') +
+            (inv.status !== 'paid' ? '<button class="inv-btn green" onclick="markPaid(' + inv.id + ');openBrokerDetail(\'' + brokerId + '\')">✓ Mark Paid</button>' : '') +
             (broker.phone ? '<button class="inv-btn call" onclick="callBroker(\'' + broker.phone + '\',\'' + broker.name + '\')">📞 Call</button>' : '') +
           '</div>' +
           '<div style="padding:.2rem 1rem .6rem;">' + getDocUploadHTML(inv.id) + '</div>' +
@@ -2756,4 +2795,577 @@ document.addEventListener('touchend', function(e) {
 function closeFuelModal() {
   var modal = document.getElementById('fuel-report-modal');
   if (modal) modal.style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+// AI NEGOTIATION COACH — Powered by Claude
+// Generates custom word-for-word negotiation scripts
+// ══════════════════════════════════════════════════════════════
+
+var _anthropicKey = null; // Set via Cloudflare Worker — never in client code
+var _aiScriptGenerating = false;
+
+async function generateNegScript() {
+  if (_aiScriptGenerating) return;
+
+  var origin  = document.getElementById("neg-origin").value;
+  var dest    = document.getElementById("neg-dest").value;
+  var offer   = parseFloat(document.getElementById("neg-offer").value);
+  var miles   = parseFloat(document.getElementById("neg-miles").value);
+  var broker  = document.getElementById("neg-broker-name") ? document.getElementById("neg-broker-name").value.trim() : "";
+
+  if (!origin || !dest || !offer || !miles) {
+    alert("Fill in origin, destination, offer, and miles first.");
+    return;
+  }
+
+  // Run standard calc first
+  runNegCoach();
+
+  var marketRpm = LANE_RATES[origin + "-" + dest] || LANE_RATES[dest + "-" + origin] || 2.15;
+  var offerRpm  = offer / miles;
+  var marketTotal = Math.round(marketRpm * miles);
+  var gap = marketTotal - offer;
+  var gapRpm = marketRpm - offerRpm;
+
+  // Show AI script section
+  var aiSection = document.getElementById("ai-script-section");
+  var aiOutput  = document.getElementById("ai-script-output");
+  if (!aiSection || !aiOutput) return;
+
+  aiSection.style.display = "block";
+  aiOutput.innerHTML = '<div style="color:var(--green);font-size:.85rem;padding:.5rem 0;">🤖 Generating your script...</div>';
+  _aiScriptGenerating = true;
+
+  var brokerInfo = "";
+  if (broker) {
+    var bKey = broker.toLowerCase();
+    var bData = null;
+    var keys = Object.keys(BROKER_DB);
+    for (var k = 0; k < keys.length; k++) {
+      if (bKey.indexOf(keys[k]) >= 0 || keys[k].indexOf(bKey) >= 0) {
+        bData = BROKER_DB[keys[k]];
+        break;
+      }
+    }
+    if (bData) {
+      brokerInfo = "Broker credit score: " + bData.score + ". Average days to pay: " + bData.days + " days. Notes: " + bData.flags.map(function(f){return f.m;}).join(", ") + ".";
+    }
+  }
+
+  var prompt = "You are an expert freight broker negotiation coach helping an owner-operator trucker get the best rate. Generate a word-for-word phone script for this situation:" +
+    "\n\nLoad details:" +
+    "\n- Origin: " + origin +
+    "\n- Destination: " + dest +
+    "\n- Miles: " + miles +
+    "\n- Broker offer: $" + offer + " ($" + offerRpm.toFixed(2) + "/mile)" +
+    "\n- Market rate for this lane: $" + marketTotal + " ($" + marketRpm.toFixed(2) + "/mile)" +
+    "\n- Gap: $" + Math.abs(gap) + " " + (gap > 0 ? "below market" : "above market") +
+    (broker ? "\n- Broker name: " + broker : "") +
+    (brokerInfo ? "\n- " + brokerInfo : "") +
+    "\n\nGenerate a confident, natural-sounding phone script that:" +
+    "\n1. Acknowledges the offer professionally" +
+    "\n2. Uses market data as leverage" +
+    "\n3. Makes a specific counter-offer at market rate" +
+    "\n4. Includes a psychological close" +
+    "\n5. Has a fallback position if they push back" +
+    "\n\nFormat as: [Opening] then [Counter] then [Close] then [If they push back]. Keep it conversational, confident, and under 150 words total. This is what the trucker will say out loud on the phone.";
+
+  try {
+    // Use Cloudflare Worker proxy if available (keeps API key server-side)
+    // Set window._rcAIWorker = 'https://ai-proxy.YOUR-SUBDOMAIN.workers.dev' to enable
+    var aiWorkerUrl = window._rcAIWorker;
+    var aiEndpoint = aiWorkerUrl || "https://api.anthropic.com/v1/messages";
+    var aiHeaders = aiWorkerUrl
+      ? { "Content-Type": "application/json" }
+      : { "Content-Type": "application/json", "x-api-key": window._rcAnthropicKey || "", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+
+    var response = await fetch(aiEndpoint, {
+      method: "POST",
+      headers: aiHeaders,
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 400,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    var data = await response.json();
+
+    if (data.content && data.content[0] && data.content[0].text) {
+      var script = data.content[0].text;
+      // Format the script nicely
+      aiOutput.innerHTML =
+        '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;">' +
+          '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">🤖 AI-Generated Script — Read This Word for Word</div>' +
+          '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + script + '</div>' +
+          '<div style="margin-top:.8rem;display:flex;gap:.5rem;">' +
+            '<button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="generateNegScript()">🔄 Regenerate</button>' +
+          '</div>' +
+        '</div>';
+    } else if (data.error) {
+      throw new Error(data.error.message || "API error");
+    }
+  } catch(err) {
+    // Fallback to enhanced static script
+    var fallbackScript = buildFallbackScript(origin, dest, offer, miles, broker, marketRpm, marketTotal, gap);
+    aiOutput.innerHTML =
+      '<div style="background:var(--surface2);border:1px solid var(--amber-dim);border-radius:4px;padding:1rem;">' +
+        '<div style="font-size:.7rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">📋 Negotiation Script</div>' +
+        '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + fallbackScript + '</div>' +
+        '<div style="margin-top:.8rem;">' +
+          '<button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  _aiScriptGenerating = false;
+}
+
+function buildFallbackScript(origin, dest, offer, miles, broker, marketRpm, marketTotal, gap) {
+  var offerRpm = offer / miles;
+  var brokerName = broker || "there";
+  var counterTotal = marketTotal;
+  var softCounter = Math.round(marketTotal * 0.97);
+
+  if (gap <= 0) {
+    // Offer is at or above market
+    return "Hey " + brokerName + ", I appreciate you reaching out on this one. Your offer of $" + offer.toLocaleString() + " on the " + origin + " to " + dest + " lane actually looks solid — that is right at market for me. Let me get my paperwork in order and we can get this booked. Send over the rate con and I will sign it today.";
+  } else if (gap <= 100) {
+    // Small gap — gentle push
+    return "Hey " + brokerName + ", thanks for thinking of me on this " + origin + " to " + dest + " load. I am looking at your offer of $" + offer.toLocaleString() + " — I am just a little short of where I need to be. Market on this lane is running $" + marketRpm.toFixed(2) + " a mile right now. If you can get me to $" + counterTotal.toLocaleString() + " I can have wheels rolling today. Can you make that work?\n\nIf they push back: I can meet you at $" + softCounter.toLocaleString() + " but that is my floor on this one. I have got another load looking at me for the same date so I need to make a decision.";
+  } else {
+    // Large gap — hold firm
+    return "Hey " + brokerName + ", I appreciate the call on this " + origin + " to " + dest + " load. I am looking at your number and I have to be honest with you — $" + offer.toLocaleString() + " is pretty far from where the market is sitting right now. I am seeing $" + marketRpm.toFixed(2) + " a mile on this lane consistently, which puts us at $" + counterTotal.toLocaleString() + ". That is what I need to make this work.\n\nIf they push back: I hear you, and I want to find a way to make this happen. My absolute floor is $" + softCounter.toLocaleString() + " — below that I am better off waiting for the next load. What can you do?\n\nIf they still push back: I appreciate your time. Let me know if your market changes — I would love to work with you on the next one.";
+  }
+}
+
+function copyNegScript() {
+  var output = document.getElementById("ai-script-output");
+  if (!output) return;
+  var text = output.querySelector("div[style*='pre-wrap']");
+  if (!text) return;
+  navigator.clipboard.writeText(text.textContent).then(function() {
+    alert("Script copied to clipboard!");
+  }).catch(function() {
+    // Fallback
+    var range = document.createRange();
+    range.selectNodeContents(text);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// AI FEATURES — Daily Briefing, Load Decision, Route Intel,
+//               Invoice Chase, Weekly Summary
+// All route through _rcAIWorker if available
+// ══════════════════════════════════════════════════════════════
+
+async function callAI(prompt, maxTokens) {
+  maxTokens = maxTokens || 300;
+  var aiWorkerUrl = window._rcAIWorker;
+  var aiEndpoint = aiWorkerUrl || "https://api.anthropic.com/v1/messages";
+  var aiHeaders = aiWorkerUrl
+    ? { "Content-Type": "application/json" }
+    : { "Content-Type": "application/json", "x-api-key": window._rcAnthropicKey || "", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+
+  var response = await fetch(aiEndpoint, {
+    method: "POST",
+    headers: aiHeaders,
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+  var data = await response.json();
+  if (data.content && data.content[0]) return data.content[0].text;
+  throw new Error(data.error ? data.error.message : "AI unavailable");
+}
+
+// ── DAILY DISPATCH BRIEFING ───────────────────────────────────
+var _briefingShownToday = false;
+
+async function showDailyBriefing() {
+  // Only show once per day
+  var today = new Date().toDateString();
+  var lastShown = '';
+  try { lastShown = localStorage.getItem('rc-briefing-date') || ''; } catch(e) {}
+  if (lastShown === today) return;
+
+  // Build context
+  var outstanding = invoices.filter(function(i) { return i.status !== 'paid'; })
+    .reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var overdue = invoices.filter(function(i) {
+    return i.status !== 'paid' && new Date(i.dueDate) < new Date();
+  }).reduce(function(sum, i) { return sum + i.amount; }, 0);
+
+  var maintDue = maintItems.filter(function(m) {
+    return (m.currentOdo - m.lastOdo) >= (m.interval * 0.85);
+  }).map(function(m) { return m.name; }).join(', ');
+
+  var prompt = "You are RoadCommand, a dispatcher assistant for an owner-operator trucker. Generate a brief, friendly morning dispatch briefing in 2-3 sentences max. Be direct and practical — this trucker reads this while having coffee before a run." +
+    "\n\nContext:" +
+    "\n- Driver: " + (window._rcUserFirstName || 'Driver') +
+    "\n- Location: " + (currentCity || 'Unknown') + ", " + (currentState || '') +
+    "\n- Current diesel price: $" + (defaults.fuelPrice ? defaults.fuelPrice.toFixed(3) : '?') + "/gal" +
+    "\n- Outstanding invoices: $" + outstanding.toLocaleString() +
+    (overdue > 0 ? " ($" + overdue.toLocaleString() + " overdue)" : "") +
+    (maintDue ? "\n- Maintenance due soon: " + maintDue : "") +
+    "\n- Current region: " + (currentRegion || 'Unknown') +
+    "\n\nGenerate a morning briefing. Mention any overdue invoices or maintenance issues if present. End with one piece of tactical advice for today.";
+
+  try {
+    var text = await callAI(prompt, 150);
+    showBriefingBanner(text);
+    try { localStorage.setItem('rc-briefing-date', today); } catch(e) {}
+  } catch(e) {
+    console.log('Daily briefing unavailable:', e.message);
+  }
+}
+
+function showBriefingBanner(text) {
+  var existing = document.getElementById('daily-briefing-banner');
+  if (existing) existing.remove();
+
+  var banner = document.createElement('div');
+  banner.id = 'daily-briefing-banner';
+  banner.style.cssText = 'background:var(--surface);border:1px solid var(--green-border);border-radius:4px;padding:.9rem 1rem;margin-bottom:.8rem;position:relative;';
+  banner.innerHTML =
+    '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem;">🤖 Morning Briefing</div>' +
+    '<div style="font-size:.85rem;line-height:1.7;color:var(--text);">' + text + '</div>' +
+    '<button onclick="this.parentElement.remove()" style="position:absolute;top:.5rem;right:.5rem;background:none;border:none;color:#b8c8b8;cursor:pointer;font-size:1rem;">✕</button>';
+
+  var dashScreen = document.getElementById('screen-dash');
+  var firstCard = dashScreen ? dashScreen.querySelector('.card, .weather-strip, .live-bar') : null;
+  if (firstCard) {
+    dashScreen.insertBefore(banner, firstCard);
+  }
+}
+
+// ── LOAD DECISION AI ─────────────────────────────────────────
+async function getLoadDecision(panelId, rate, miles, broker, pickup) {
+  var btn = document.getElementById('ai-decide-' + panelId);
+  if (btn) { btn.textContent = '🤖 Analyzing...'; btn.disabled = true; }
+
+  var deadMiles = getDeadheadMiles(pickup) || 0;
+  var fuelPrice = defaults.fuelPrice || 4.25;
+  var mpg = defaults.mpg || 6.5;
+  var emptyMpg = defaults.emptyMpg || 8.0;
+  var loadedFuel = Math.round((miles / mpg) * fuelPrice);
+  var deadFuel = Math.round((deadMiles / emptyMpg) * fuelPrice);
+  var net = rate - loadedFuel - deadFuel;
+  var rpm = (rate / miles).toFixed(2);
+
+  // Get broker data if available
+  var brokerInfo = "";
+  if (broker) {
+    var bKey = broker.toLowerCase();
+    var keys = Object.keys(BROKER_DB);
+    for (var k = 0; k < keys.length; k++) {
+      if (bKey.indexOf(keys[k]) >= 0 || keys[k].indexOf(bKey) >= 0) {
+        var bd = BROKER_DB[keys[k]];
+        brokerInfo = "Broker credit: " + bd.score + ", avg " + bd.days + " days to pay.";
+        break;
+      }
+    }
+  }
+
+  var prompt = "You are a freight dispatcher advising an owner-operator trucker. Give a quick yes or no recommendation on this load with ONE sentence of reasoning. Be blunt — no fluff." +
+    "\n\nLoad: $" + rate + " for " + miles + " miles from " + (pickup || 'unknown') +
+    "\nRate per mile: $" + rpm +
+    "\nNet after fuel: $" + net + " (incl. " + deadMiles + " mi deadhead)" +
+    "\nBroker: " + (broker || "unknown") + (brokerInfo ? " — " + brokerInfo : "") +
+    "\nDriver min RPM: $2.00/mi" +
+    "\n\nReply format: TAKE IT or PASS — [one sentence reason]";
+
+  try {
+    var text = await callAI(prompt, 80);
+    var resultEl = document.getElementById('ai-decide-result-' + panelId);
+    if (resultEl) {
+      var isTake = text.toUpperCase().includes('TAKE');
+      resultEl.innerHTML =
+        '<div style="padding:.5rem .7rem;border-radius:3px;font-size:.82rem;margin-top:.4rem;' +
+        'background:' + (isTake ? 'var(--green-dim)' : 'var(--red-dim)') + ';' +
+        'border:1px solid ' + (isTake ? 'var(--green-border)' : 'rgba(255,126,126,.35)') + ';' +
+        'color:' + (isTake ? 'var(--green)' : 'var(--red)') + ';">' +
+        '🤖 ' + text + '</div>';
+      resultEl.style.display = 'block';
+    }
+  } catch(e) {
+    if (btn) btn.textContent = 'AI unavailable';
+  }
+  if (btn) { btn.textContent = '🤖 AI Decision'; btn.disabled = false; }
+}
+
+// ── INVOICE CHASE ASSISTANT ──────────────────────────────────
+async function draftChaseMessage(invoiceId) {
+  var inv = invoices.find(function(i) { return i.id == invoiceId; });
+  if (!inv) return;
+
+  var today = new Date();
+  var due = new Date(inv.dueDate);
+  var daysOverdue = Math.ceil((today - due) / (1000*60*60*24));
+
+  var prompt = "Write a short, professional collection message for an overdue freight invoice. Keep it firm but professional — this is a business relationship worth preserving." +
+    "\n\nDetails:" +
+    "\n- Broker: " + inv.broker +
+    "\n- Amount: $" + inv.amount.toLocaleString() +
+    "\n- Reference: " + (inv.ref || 'N/A') +
+    "\n- Days overdue: " + daysOverdue +
+    "\n- Driver name: " + (window._rcUserFirstName || 'Driver') +
+    "\n\nWrite a 3-4 sentence email or text message. Include the amount and reference number. Be direct about needing payment but leave the relationship intact.";
+
+  var btn = document.getElementById('chase-btn-' + invoiceId);
+  if (btn) { btn.textContent = 'Drafting...'; btn.disabled = true; }
+
+  try {
+    var text = await callAI(prompt, 200);
+    // Show in a modal-style overlay
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:950;display:flex;align-items:flex-end;padding:1rem;';
+    modal.innerHTML =
+      '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:8px;width:100%;max-width:480px;margin:0 auto;padding:1.5rem;">' +
+        '<div style="font-size:.85rem;font-weight:bold;color:var(--green);margin-bottom:.8rem;">📨 Collection Message Draft</div>' +
+        '<div style="font-size:.85rem;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:4px;padding:.8rem;margin-bottom:1rem;">' + text + '</div>' +
+        '<div style="display:flex;gap:.5rem;">' +
+          '<button class="btn btn-green" style="flex:1;" onclick="navigator.clipboard.writeText(this.closest('div').previousElementSibling.textContent).then(function(){alert('Copied!');})">📋 Copy</button>' +
+          '<button class="btn btn-outline" style="flex:1;" onclick="this.closest('[style*=fixed]').remove()">Close</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+  } catch(e) {
+    alert('AI unavailable. Try again later.');
+  }
+  if (btn) { btn.textContent = '📨 Draft Chase Message'; btn.disabled = false; }
+}
+
+// ── WEEKLY BUSINESS SUMMARY ──────────────────────────────────
+async function generateWeeklySummary() {
+  var btn = document.getElementById('weekly-summary-btn');
+  if (btn) { btn.textContent = 'Generating...'; btn.disabled = true; }
+
+  var totalRevenue = invoices.reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var paidRevenue = invoices.filter(function(i) { return i.status === 'paid'; })
+    .reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var outstanding = totalRevenue - paidRevenue;
+  var brokerCount = _brokers.length;
+  var maintCPM = 0;
+  maintItems.forEach(function(m) { maintCPM += m.cost / m.interval; });
+
+  var prompt = "Generate a brief weekly business performance summary for an owner-operator trucker. Be direct, specific, and tactical — like a good dispatcher giving a Friday debrief." +
+    "\n\nBusiness data:" +
+    "\n- Driver: " + (window._rcUserFirstName || 'Driver') +
+    "\n- Total invoiced (all time): $" + totalRevenue.toLocaleString() +
+    "\n- Paid: $" + paidRevenue.toLocaleString() +
+    "\n- Outstanding: $" + outstanding.toLocaleString() +
+    "\n- Active brokers: " + brokerCount +
+    "\n- Maintenance cost/mile: $" + maintCPM.toFixed(3) +
+    "\n- Current diesel: $" + (defaults.fuelPrice ? defaults.fuelPrice.toFixed(3) : '?') + "/gal" +
+    "\n- Region: " + (currentRegion || 'Unknown') +
+    "\n\nWrite 3-4 sentences: performance assessment, one concern or opportunity, one tactical recommendation for next week. End with an encouraging close.";
+
+  try {
+    var text = await callAI(prompt, 200);
+    var output = document.getElementById('weekly-summary-output');
+    if (output) {
+      output.innerHTML =
+        '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.8rem;">' +
+          '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">📊 Weekly Business Summary</div>' +
+          '<div style="font-size:.88rem;line-height:1.8;color:var(--text);">' + text + '</div>' +
+        '</div>';
+      output.style.display = 'block';
+    }
+  } catch(e) {
+    alert('AI unavailable. Try again later.');
+  }
+  if (btn) { btn.textContent = '📊 Generate Weekly Summary'; btn.disabled = false; }
+}
+
+// ── ROUTE INTELLIGENCE ───────────────────────────────────────
+async function getRouteIntel(destination) {
+  if (!destination) {
+    destination = document.getElementById('route-intel-dest') ?
+      document.getElementById('route-intel-dest').value.trim() : '';
+  }
+  if (!destination) { alert('Enter a destination city first.'); return; }
+
+  var btn = document.getElementById('route-intel-btn');
+  var output = document.getElementById('route-intel-output');
+  if (btn) { btn.textContent = 'Analyzing...'; btn.disabled = true; }
+
+  var destKey = destination.toLowerCase().split(',')[0].trim();
+  var returnLoads = RETURN_LOADS[destKey] || NEARBY_LOADS[destKey] || [];
+  var topReturn = returnLoads.length > 0
+    ? returnLoads[0].route + " at $" + returnLoads[0].rpm.toFixed(2) + "/mi"
+    : "limited return data in database";
+
+  var prompt = "Give a 3-point tactical briefing for a trucker delivering to " + destination + ". Be specific and practical — things that affect money: lane rates, backhaul market, timing tips." +
+    "\n\nContext:" +
+    "\n- Driver coming from: " + (currentCity || currentState || 'Pacific Northwest') +
+    "\n- Best return load in database: " + topReturn +
+    "\n- Current diesel in their region: $" + (defaults.fuelPrice ? defaults.fuelPrice.toFixed(3) : '?') +
+    "\n\nFormat as exactly 3 numbered points. Each point max 2 sentences. Focus on: (1) what to expect on rates from that market, (2) best return lane strategy, (3) timing or tactical tip.";
+
+  try {
+    var text = await callAI(prompt, 250);
+    if (output) {
+      output.innerHTML =
+        '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.8rem;">' +
+          '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">🗺️ Route Intel — ' + destination + '</div>' +
+          '<div style="font-size:.85rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + text + '</div>' +
+        '</div>';
+      output.style.display = 'block';
+    }
+  } catch(e) {
+    if (output) output.innerHTML = '<div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">⚠️</div><div>AI unavailable. Check your connection.</div></div>';
+    if (output) output.style.display = 'block';
+  }
+  if (btn) { btn.textContent = '🗺️ Get Route Intel'; btn.disabled = false; }
+}
+
+// ── AUTO-LOG RUN ON BOOK ─────────────────────────────────────
+function promptLogRun(origin, dest, rate, miles) {
+  var today = new Date().toISOString().split('T')[0];
+  var rpm = (rate / miles).toFixed(2);
+  if (confirm('Log this as a completed run?
+' + origin + ' → ' + dest + '
+$' + rate.toLocaleString() + ' · $' + rpm + '/mi')) {
+    var logList = document.getElementById('run-list');
+    if (logList) {
+      var item = document.createElement('div');
+      item.className = 'run-row';
+      item.innerHTML =
+        '<div><div class="run-route">' + origin + ' → ' + dest + '</div>' +
+        '<div class="run-meta">' + today + ' · ' + miles + ' mi</div></div>' +
+        '<div><div class="run-profit">$' + rate.toLocaleString() + '</div>' +
+        '<div class="run-rpm">$' + rpm + '/mi</div></div>';
+      logList.insertBefore(item, logList.firstChild);
+    }
+    // Update YTD stats
+    var ytdRev = document.getElementById('log-ytd-rev');
+    if (ytdRev) {
+      var current = parseFloat(ytdRev.textContent.replace(/[^0-9.]/g,'')) || 0;
+      ytdRev.textContent = '$' + (current + rate).toLocaleString();
+    }
+  }
+}
+
+// ── REAL BROKER DAYS-TO-PAY from invoice history ─────────────
+function calcBrokerAvgDays(brokerName) {
+  var brokerInvs = invoices.filter(function(i) {
+    return i.broker && i.broker.toLowerCase() === brokerName.toLowerCase() && i.status === 'paid';
+  });
+  if (!brokerInvs.length) return null;
+  var totalDays = brokerInvs.reduce(function(sum, inv) {
+    var invoiced = new Date(inv.date);
+    var due = new Date(inv.dueDate);
+    return sum + inv.terms; // use terms as proxy since we don't store paid date yet
+  }, 0);
+  return Math.round(totalDays / brokerInvs.length);
+}
+
+// ── ODOMETER INPUT on dashboard ──────────────────────────────
+function updateOdometer() {
+  var input = document.getElementById('dash-odometer');
+  if (!input) return;
+  var odo = parseInt(input.value);
+  if (!odo || odo < 100000) { alert('Enter a valid odometer reading (100,000+)'); return; }
+  // Update all maintenance items current odometer
+  maintItems = maintItems.map(function(item) {
+    return Object.assign({}, item, { currentOdo: odo });
+  });
+  renderMaint();
+  // Save to Supabase
+  maintItems.forEach(function(item) { saveMaintItemToSupabase(item); });
+  input.value = '';
+  alert('Odometer updated to ' + odo.toLocaleString() + ' mi. Maintenance status refreshed.');
+}
+
+// ── TRIGGER DAILY BRIEFING after data loads ──────────────────
+// Called after invoices and brokers load
+function checkDailyBriefing() {
+  if (window._rcAIWorker || window._rcAnthropicKey) {
+    setTimeout(showDailyBriefing, 2000);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// NATIONAL WEATHER SERVICE — Live Road Alerts
+// Free API, no key needed
+// ══════════════════════════════════════════════════════════════
+
+var _nwsLastFetch = 0;
+var _nwsAlerts = [];
+
+async function fetchNWSAlerts(lat, lon) {
+  if (Date.now() - _nwsLastFetch < 30 * 60 * 1000 && _nwsAlerts.length) {
+    renderNWSAlerts(_nwsAlerts);
+    return;
+  }
+  try {
+    var alertsRes = await fetch(
+      'https://api.weather.gov/alerts/active?point=' + parseFloat(lat).toFixed(4) + ',' + parseFloat(lon).toFixed(4),
+      { headers: { 'User-Agent': 'RoadCommand/1.0 (admin@roadcommand.co)' } }
+    );
+    if (!alertsRes.ok) throw new Error('NWS unavailable');
+    var alertsData = await alertsRes.json();
+    var features = alertsData.features || [];
+    var truckKeywords = ['winter storm','blizzard','ice','freezing','snow','wind advisory','high wind','chain','fog','frost','freeze','road','travel'];
+    var relevant = features.filter(function(f) {
+      var event = (f.properties.event || '').toLowerCase();
+      var headline = (f.properties.headline || '').toLowerCase();
+      return truckKeywords.some(function(kw) { return event.includes(kw) || headline.includes(kw); });
+    }).slice(0, 3);
+    _nwsAlerts = relevant;
+    _nwsLastFetch = Date.now();
+    renderNWSAlerts(relevant);
+  } catch(e) {
+    // Keep static alerts as fallback
+    console.log('NWS unavailable, using static alerts');
+  }
+}
+
+function renderNWSAlerts(alerts) {
+  var iconEl  = document.getElementById('weather-icon');
+  var titleEl = document.getElementById('weather-title');
+  var subEl   = document.getElementById('weather-sub');
+  var mainRow = document.getElementById('weather-main');
+  var alertsEl= document.getElementById('weather-alerts');
+  var timeEl  = document.getElementById('weather-time');
+
+  if (!mainRow) return;
+  var now = new Date();
+  if (timeEl) timeEl.textContent = now.getHours() + ':' + String(now.getMinutes()).padStart(2,'0');
+
+  if (!alerts || !alerts.length) {
+    mainRow.className = 'weather-row clear';
+    if (iconEl)  iconEl.textContent  = '✅';
+    if (titleEl) titleEl.textContent = 'No Active Road Alerts — NWS';
+    if (subEl)   subEl.textContent   = 'National Weather Service reports no alerts for your area';
+    if (alertsEl) alertsEl.innerHTML = '';
+    return;
+  }
+
+  var sev  = alerts[0].properties.severity || 'Minor';
+  var event= alerts[0].properties.event || 'Weather Alert';
+  var desc = (alerts[0].properties.description || '').split('.')[0].trim();
+  var rowClass = (sev === 'Extreme' || sev === 'Severe') ? 'alert' : 'warning';
+  var icon = sev === 'Extreme' ? '🚨' : sev === 'Severe' ? '❄️' : '⚠️';
+
+  mainRow.className = 'weather-row ' + rowClass;
+  if (iconEl)  iconEl.textContent  = icon;
+  if (titleEl) titleEl.textContent = event + ' — NWS Live';
+  if (subEl)   subEl.textContent   = desc;
+
+  if (alertsEl) {
+    alertsEl.innerHTML = alerts.slice(1).map(function(a) {
+      var cls = (a.properties.severity === 'Extreme' || a.properties.severity === 'Severe') ? 'alert' : 'warning';
+      var ic  = (a.properties.severity === 'Extreme') ? '🚨' : '⚠️';
+      var d   = (a.properties.description || '').split('.')[0].trim();
+      return '<div class="weather-row ' + cls + '"><span class="weather-icon">' + ic + '</span><div class="weather-text"><div class="weather-title">' + (a.properties.event || 'Alert') + '</div><div class="weather-sub">' + d + '</div></div></div>';
+    }).join('');
+  }
 }
