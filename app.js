@@ -2169,6 +2169,7 @@ refreshWeather();
       loadInvoices();
       loadBrokers();
       loadMaintItems();
+      fetchFuelPrice(currentRegion);
       setTimeout(function() {
         indicator.style.transform = 'translateY(-100%)';
       }, 1500);
