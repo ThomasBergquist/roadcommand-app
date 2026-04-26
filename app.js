@@ -1004,6 +1004,8 @@ async function updateInvoiceStatus(id, status) {
 // ── Delete invoice from Supabase ──────────────────────────────
 async function deleteInvoiceFromSupabase(id) {
   if (!window._rcUserId) return;
+  var isUUID = typeof id === 'string' && id.includes('-');
+  if (!isUUID) return;
   try {
     await _supabase
       .from('invoices')
