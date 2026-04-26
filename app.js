@@ -43,8 +43,9 @@ function onAuthReady(firstName, userId, email) {
   refreshWeather();
   setTimeout(startGPS, 500);
   setTimeout(checkFirstTime, 700);
-  // Load broker vault
+  // Load broker vault and invoices
   setTimeout(loadBrokers, 800);
+  setTimeout(loadInvoices, 1000);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -262,7 +263,7 @@ function filterLoads(type) {
 
 // INLINE PROFIT CALCULATOR
 // Default settings — synced from Parameters tab
-const defaults = { fuelPrice: 4.25, mpg: 6.5, deadhead: 0, brokerPct: 0 };
+const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0 };
 
 function autoProfit(rate, miles) {
   const totalMiles = miles + defaults.deadhead;
@@ -569,12 +570,14 @@ function closeHelpModal(e) {
 // SETTINGS
 // ══════════════════════════════════════════════════════════════
 function setTextSize(size, btn) {
-  document.body.className = document.body.className
-    .replace(/text-\S+/g, '').trim();
+  // Remove any existing text-size class without touching other classes
+  ['text-normal','text-large','text-xlarge','text-xxlarge'].forEach(function(c) {
+    document.body.classList.remove(c);
+  });
   document.body.classList.add('text-' + size);
 
-  document.querySelectorAll('.text-size-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  document.querySelectorAll('.text-size-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
 
   // Save preference
   try { localStorage.setItem('rc-textsize', size); } catch(e) {}
@@ -609,12 +612,14 @@ function saveTruckInfo() {
 }
 
 function saveFuelDefaults() {
-  const mpg    = parseFloat(document.getElementById('set-mpg').value) || 6.5;
-  const fuel   = parseFloat(document.getElementById('set-fuel').value) || 4.25;
-  const minrpm = parseFloat(document.getElementById('set-minrpm').value) || 2.00;
-  const speed  = parseFloat(document.getElementById('set-speed').value) || 55;
+  const mpg      = parseFloat(document.getElementById('set-mpg').value) || 6.5;
+  const emptyMpg = parseFloat(document.getElementById('set-empty-mpg') ? document.getElementById('set-empty-mpg').value : 8.0) || 8.0;
+  const fuel     = parseFloat(document.getElementById('set-fuel').value) || 4.25;
+  const minrpm   = parseFloat(document.getElementById('set-minrpm').value) || 2.00;
+  const speed    = parseFloat(document.getElementById('set-speed').value) || 55;
 
   defaults.mpg       = mpg;
+  defaults.emptyMpg  = emptyMpg;
   defaults.fuelPrice = fuel;
 
   // Update calc tab defaults
@@ -627,7 +632,7 @@ function saveFuelDefaults() {
   injectProfitBars();
 
   try {
-    localStorage.setItem('rc-defaults', JSON.stringify({ mpg, fuel, minrpm, speed }));
+    localStorage.setItem('rc-defaults', JSON.stringify({ mpg, emptyMpg, fuel, minrpm, speed }));
   } catch(e) {}
   alert('Fuel defaults saved! Profit bars updated.');
 }
@@ -648,8 +653,9 @@ function loadSavedPreferences() {
     const savedDefaults = localStorage.getItem('rc-defaults');
     if (savedDefaults) {
       const d = JSON.parse(savedDefaults);
-      if (d.mpg)   { defaults.mpg = d.mpg;   document.getElementById('set-mpg').value = d.mpg; }
-      if (d.fuel)  { defaults.fuelPrice = d.fuel; document.getElementById('set-fuel').value = d.fuel; }
+      if (d.mpg)      { defaults.mpg = d.mpg; document.getElementById('set-mpg').value = d.mpg; }
+      if (d.emptyMpg) { defaults.emptyMpg = d.emptyMpg; var emEl = document.getElementById('set-empty-mpg'); if (emEl) emEl.value = d.emptyMpg; }
+      if (d.fuel)     { defaults.fuelPrice = d.fuel; document.getElementById('set-fuel').value = d.fuel; }
       if (d.speed) { document.getElementById('set-speed').value = d.speed; }
     }
     const truck = localStorage.getItem('rc-truck');
@@ -911,7 +917,105 @@ function renderDocs() {
     }).join("");
 }
 
-var invoices = [];
+// ══════════════════════════════════════════════════════════════
+// INVOICE SYSTEM — Supabase backed
+// All invoices saved to cloud, linked to brokers where possible
+// ══════════════════════════════════════════════════════════════
+
+var invoices = []; // local cache loaded from Supabase
+
+// ── Load all invoices from Supabase ──────────────────────────
+async function loadInvoices() {
+  if (!window._rcUserId) return;
+  try {
+    var { data, error } = await _supabase
+      .from('invoices')
+      .select('*')
+      .eq('user_id', window._rcUserId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    // Map Supabase rows to local invoice format
+    invoices = (data || []).map(function(row) {
+      return {
+        id:        row.id,
+        broker:    row.broker_name,
+        amount:    row.amount,
+        ref:       row.ref,
+        date:      row.invoice_date,
+        terms:     row.terms,
+        phone:     row.phone,
+        dueDate:   row.due_date,
+        status:    row.status,
+        notes:     row.notes,
+        broker_id: row.broker_id,
+        supabase:  true
+      };
+    });
+    renderInvoices();
+    renderBrokers();
+    updateMoneyTotals();
+  } catch(err) {
+    console.error('Error loading invoices:', err);
+  }
+}
+
+// ── Save invoice to Supabase ──────────────────────────────────
+async function saveInvoiceToSupabase(inv) {
+  if (!window._rcUserId) return inv;
+  try {
+    var { data, error } = await _supabase
+      .from('invoices')
+      .insert({
+        user_id:      window._rcUserId,
+        broker_id:    inv.broker_id || null,
+        broker_name:  inv.broker,
+        amount:       inv.amount,
+        ref:          inv.ref,
+        phone:        inv.phone,
+        invoice_date: inv.date,
+        due_date:     inv.dueDate,
+        terms:        inv.terms,
+        status:       inv.status || 'pending',
+        notes:        inv.notes || ''
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return Object.assign({}, inv, { id: data.id, supabase: true });
+  } catch(err) {
+    console.error('Error saving invoice:', err);
+    return inv;
+  }
+}
+
+// ── Update invoice status in Supabase ────────────────────────
+async function updateInvoiceStatus(id, status) {
+  if (!window._rcUserId) return;
+  try {
+    await _supabase
+      .from('invoices')
+      .update({ status: status })
+      .eq('id', id)
+      .eq('user_id', window._rcUserId);
+  } catch(err) {
+    console.error('Error updating invoice:', err);
+  }
+}
+
+// ── Delete invoice from Supabase ──────────────────────────────
+async function deleteInvoiceFromSupabase(id) {
+  if (!window._rcUserId) return;
+  try {
+    await _supabase
+      .from('invoices')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', window._rcUserId);
+  } catch(err) {
+    console.error('Error deleting invoice:', err);
+  }
+}
+
 function addInvoice() {
   var broker  = document.getElementById("inv-broker").value.trim();
   var amount  = parseFloat(document.getElementById("inv-amount").value);
@@ -923,8 +1027,17 @@ function addInvoice() {
   var invoiceDate = new Date(date);
   var dueDate = new Date(invoiceDate);
   dueDate.setDate(dueDate.getDate() + terms);
-  invoices.unshift({broker:broker, amount:amount, ref:ref, date:date, terms:terms, phone:phone, dueDate:dueDate.toISOString().split("T")[0], status:"pending", id:Date.now()});
+  var inv = {broker:broker, amount:amount, ref:ref, date:date, terms:terms, phone:phone, dueDate:dueDate.toISOString().split("T")[0], status:"pending", id:Date.now()};
+  inv.broker_id = window._selectedBrokerId || null;
+  invoices.unshift(inv);
   renderInvoices();
+  // Save to Supabase and update local id with server id
+  saveInvoiceToSupabase(inv).then(function(saved) {
+    var idx = invoices.findIndex(function(i) { return i.id === inv.id; });
+    if (idx >= 0) invoices[idx] = saved;
+    renderBrokers();
+    window._selectedBrokerId = null;
+  });
   document.getElementById("inv-broker").value = "";
   document.getElementById("inv-amount").value = "";
   document.getElementById("inv-ref").value = "";
@@ -933,13 +1046,19 @@ function addInvoice() {
 
 function markPaid(id) {
   var inv = invoices.find(function(i) { return i.id === id; });
-  if (inv) inv.status = "paid";
+  if (inv) {
+    inv.status = "paid";
+    updateInvoiceStatus(id, "paid");
+  }
   renderInvoices();
+  renderBrokers();
 }
 
 function removeInvoice(id) {
+  deleteInvoiceFromSupabase(id);
   invoices = invoices.filter(function(i) { return i.id !== id; });
   renderInvoices();
+  renderBrokers();
 }
 
 function updateMoneyTotals() {
@@ -1003,6 +1122,7 @@ function recalcPanel(panelId, rate, miles) {
   // Get current defaults
   var fuelPrice = (window._df && window._df.fuelPrice) ? window._df.fuelPrice : defaults.fuelPrice;
   var mpg       = (window._df && window._df.mpg)       ? window._df.mpg       : defaults.mpg;
+  var emptyMpg  = defaults.emptyMpg || 8.0;
 
   // Get deadhead miles from GPS to pickup location
   var panel = document.getElementById(panelId);
@@ -1018,9 +1138,9 @@ function recalcPanel(panelId, rate, miles) {
   }
 
   var totalMiles  = miles + deadMiles;
-  var fuelCost    = Math.round((totalMiles / mpg) * fuelPrice);
   var loadedFuel  = Math.round((miles / mpg) * fuelPrice);
-  var deadFuel    = Math.round((deadMiles / mpg) * fuelPrice);
+  var deadFuel    = Math.round((deadMiles / emptyMpg) * fuelPrice);
+  var fuelCost    = loadedFuel + deadFuel;
   var net         = rate - fuelCost;
   var npm         = (net / totalMiles).toFixed(2);
   var rpm         = (rate / miles).toFixed(2);
@@ -1295,8 +1415,8 @@ function checkDeadhead(panelId, rate, miles) {
   }
 
   var fuelPrice = window._df ? window._df.fuelPrice : 4.25;
-  var mpg       = window._df ? window._df.mpg : 6.5;
-  var deadCost  = Math.round((deadMiles / mpg) * fuelPrice);
+  var emptyMpg  = defaults.emptyMpg || 8.0;
+  var deadCost  = Math.round((deadMiles / emptyMpg) * fuelPrice);
   var pct       = Math.round((deadMiles / miles) * 100);
 
   var tier, msg;
@@ -1894,7 +2014,7 @@ async function fetchFuelPrice(region) {
   const stateCode = currentState || '';
   const seriesId = (stateCode && STATE_SERIES[stateCode]) ? STATE_SERIES[stateCode] : (PADD[region] || PADD['Unknown']);
   const isStatLevel = stateCode && STATE_SERIES[stateCode];
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
@@ -2030,6 +2150,7 @@ async function loadBrokers() {
     if (error) throw error;
     _brokers = data || [];
     renderBrokers();
+    populateBrokerDropdown();
   } catch(err) {
     console.error('Error loading brokers:', err);
   }
@@ -2189,21 +2310,27 @@ function addInvoiceFromBroker(brokerId, brokerName, brokerPhone) {
   var dueDate = new Date(invoiceDate);
   dueDate.setDate(dueDate.getDate() + terms);
 
-  invoices.unshift({
-    broker: brokerName,
-    amount: amount,
-    ref: ref,
-    date: date,
-    terms: terms,
-    phone: brokerPhone,
-    dueDate: dueDate.toISOString().split('T')[0],
-    status: 'pending',
-    id: Date.now()
-  });
-
+  var inv = {
+    broker:    brokerName,
+    broker_id: brokerId,
+    amount:    amount,
+    ref:       ref,
+    date:      date,
+    terms:     terms,
+    phone:     brokerPhone,
+    dueDate:   dueDate.toISOString().split('T')[0],
+    status:    'pending',
+    id:        Date.now()
+  };
+  invoices.unshift(inv);
   renderInvoices();
-  renderBrokers();
-  openBrokerDetail(brokerId);
+  // Save to Supabase with broker_id link
+  saveInvoiceToSupabase(inv).then(function(saved) {
+    var idx = invoices.findIndex(function(i) { return i.id === inv.id; });
+    if (idx >= 0) invoices[idx] = saved;
+    renderBrokers();
+    openBrokerDetail(brokerId);
+  });
 }
 
 function closeBrokerDetail() {
@@ -2344,3 +2471,36 @@ document.addEventListener("click", function(e) {
     if (brokerId) openBrokerDetail(brokerId);
   }
 });
+
+// ── Populate broker dropdown in Money tab invoice form ────────
+function populateBrokerDropdown() {
+  var select = document.getElementById('inv-broker-select');
+  if (!select) return;
+  // Clear existing options except first
+  while (select.options.length > 1) select.remove(1);
+  // Add brokers from loaded list
+  _brokers.forEach(function(b) {
+    var opt = document.createElement('option');
+    opt.value = b.name;
+    opt.dataset.brokerId = b.id;
+    opt.dataset.phone = b.phone || '';
+    opt.textContent = b.name;
+    select.appendChild(opt);
+  });
+}
+
+function onBrokerSelectChange() {
+  var select = document.getElementById('inv-broker-select');
+  var nameInput = document.getElementById('inv-broker');
+  var phoneInput = document.getElementById('inv-phone');
+  if (!select) return;
+  var selected = select.options[select.selectedIndex];
+  if (selected && selected.value !== '') {
+    if (nameInput) nameInput.value = selected.value;
+    if (phoneInput && selected.dataset.phone) phoneInput.value = selected.dataset.phone;
+    // Store broker_id for linking
+    window._selectedBrokerId = selected.dataset.brokerId || null;
+  } else {
+    window._selectedBrokerId = null;
+  }
+}
