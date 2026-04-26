@@ -2358,7 +2358,7 @@ function openBrokerDetail(brokerId) {
           '<div class="inv-amount">$' + inv.amount.toLocaleString() + '</div></div>' +
           '<div class="inv-meta"><span class="inv-stat">Date: <strong>' + inv.date + '</strong></span><span class="inv-stat">Due: <strong>' + inv.dueDate + '</strong></span></div>' +
           '<div class="inv-actions">' +
-            (inv.status !== 'paid' ? '<button class="inv-btn green" onclick="markPaid(' + inv.id + ');openBrokerDetail(\'' + brokerId + '\')">✓ Mark Paid</button>' : '') +
+            (inv.status !== 'paid' ? '<button class="inv-btn green" onclick="markPaid(\'' + inv.id + '\');openBrokerDetail(\'' + brokerId + '\')">✓ Mark Paid</button>' : '') +
             (broker.phone ? '<button class="inv-btn call" onclick="callBroker(\'' + broker.phone + '\',\'' + broker.name + '\')">📞 Call</button>' : '') +
           '</div>' +
           '<div style="padding:.2rem 1rem .6rem;">' + getDocUploadHTML(inv.id) + '</div>' +
