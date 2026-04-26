@@ -2003,20 +2003,39 @@ async function fetchFuelPrice(region) {
   // EIA API — free, no key needed for series data
   // We use the weekly retail diesel price series
   // PADD regions: 1=East Coast, 2=Midwest, 3=Gulf, 4=Rocky Mtn, 5=West Coast
+  const STATE_SERIES = {
+    'WA': 'EMD_EPD2D_PTE_SWA_DPG',
+    'OR': 'EMD_EPD2D_PTE_SOR_DPG',
+    'CA': 'EMD_EPD2D_PTE_SCA_DPG',
+    'NV': 'EMD_EPD2D_PTE_SNV_DPG',
+    'AZ': 'EMD_EPD2D_PTE_SAZ_DPG',
+    'TX': 'EMD_EPD2D_PTE_STX_DPG',
+    'FL': 'EMD_EPD2D_PTE_SFL_DPG',
+    'NY': 'EMD_EPD2D_PTE_SNY_DPG',
+    'IL': 'EMD_EPD2D_PTE_SIL_DPG',
+    'PA': 'EMD_EPD2D_PTE_SPA_DPG',
+    'GA': 'EMD_EPD2D_PTE_SGA_DPG',
+    'OH': 'EMD_EPD2D_PTE_SOH_DPG',
+    'CO': 'EMD_EPD2D_PTE_SCO_DPG',
+    'UT': 'EMD_EPD2D_PTE_SUT_DPG',
+    'ID': 'EMD_EPD2D_PTE_SID_DPG',
+    'MT': 'EMD_EPD2D_PTE_SMT_DPG',
+  };
+
   const PADD = {
     'East Coast':      'EMD_EPD2D_PTE_R10_DPG',
     'Midwest':         'EMD_EPD2D_PTE_R20_DPG',
     'Gulf Coast':      'EMD_EPD2D_PTE_R30_DPG',
     'Rocky Mountain':  'EMD_EPD2D_PTE_R40_DPG',
     'West Coast':      'EMD_EPD2D_PTE_R50_DPG',
-    'Unknown':         'EMD_EPD2D_PTE_NUS_DPG',  // national average
+    'Unknown':         'EMD_EPD2D_PTE_NUS_DPG',
   };
 
   // Try state-level series first, fall back to regional
   const stateCode = currentState || '';
   const seriesId = (stateCode && STATE_SERIES[stateCode]) ? STATE_SERIES[stateCode] : (PADD[region] || PADD['Unknown']);
-  const isStatLevel = stateCode && STATE_SERIES[stateCode];
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const isStatLevel = !!(stateCode && STATE_SERIES[stateCode]);
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
