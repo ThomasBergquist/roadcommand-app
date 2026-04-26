@@ -1199,11 +1199,21 @@ function recalcPanel(panelId, rate, miles) {
       var broker = panel2 ? (panel2.dataset.broker || '') : '';
       var aiDiv = document.createElement('div');
       aiDiv.style.cssText = 'margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;';
-      aiDiv.innerHTML =
-        '<button class="btn btn-sm" id="ai-decide-' + panelId + '" ' +
-        'onclick="getLoadDecision('' + panelId + '',' + rate + ',' + miles + ','' + broker + '','' + pickup + '')" ' +
-        'style="background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);font-size:.75rem;">🤖 AI Decision</button>' +
-        '<div id="ai-decide-result-' + panelId + '" style="display:none;flex:1;min-width:100%;"></div>';
+            var aiBtn = document.createElement('button');
+      aiBtn.className = 'btn btn-sm ai-decide-btn';
+      aiBtn.id = 'ai-decide-' + panelId;
+      aiBtn.style.cssText = 'background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);font-size:.75rem;';
+      aiBtn.textContent = '🤖 AI Decision';
+      aiBtn.dataset.panelId = panelId;
+      aiBtn.dataset.rate = rate;
+      aiBtn.dataset.miles = miles;
+      aiBtn.dataset.broker = broker || '';
+      aiBtn.dataset.pickup = pickup || '';
+      var aiResult = document.createElement('div');
+      aiResult.id = 'ai-decide-result-' + panelId;
+      aiResult.style.cssText = 'display:none;flex:1;min-width:100%;';
+      aiDiv.appendChild(aiBtn);
+      aiDiv.appendChild(aiResult);
       verdictEl.parentNode.insertBefore(aiDiv, verdictEl.nextSibling);
     }
   }
@@ -2601,7 +2611,7 @@ function getDocUploadHTML(invoiceId) {
     + '</div>';
 }
 
-// Delegate doc upload clicks
+// Delegate doc upload clicks, broker card clicks, AI decide clicks
 document.addEventListener("click", function(e) {
   var btn = e.target.closest(".doc-upload-btn");
   if (btn) {
@@ -2615,6 +2625,38 @@ document.addEventListener("click", function(e) {
   if (card) {
     var brokerId = card.dataset.brokerId;
     if (brokerId) openBrokerDetail(brokerId);
+    return;
+  }
+  // Delegate chase modal copy/close
+  var copyChase = e.target.closest(".copy-chase-btn");
+  if (copyChase) {
+    var textEl = copyChase.closest('div').previousElementSibling;
+    if (textEl) navigator.clipboard.writeText(textEl.textContent).then(function(){ alert('Copied!'); });
+    return;
+  }
+  var closeChase = e.target.closest(".close-chase-modal");
+  if (closeChase) {
+    var modal = closeChase.closest('[style*="position:fixed"]') || closeChase.closest('[style*="fixed"]');
+    if (modal) modal.remove();
+    return;
+  }
+  // Delegate AI decision button clicks
+  var aiBtn = e.target.closest(".ai-decide-btn");
+  if (aiBtn) {
+    getLoadDecision(
+      aiBtn.dataset.panelId,
+      parseFloat(aiBtn.dataset.rate),
+      parseFloat(aiBtn.dataset.miles),
+      aiBtn.dataset.broker,
+      aiBtn.dataset.pickup
+    );
+    return;
+  }
+  // Delegate remove invoice clicks
+  var removeBtn = e.target.closest(".remove-invoice-btn");
+  if (removeBtn) {
+    var invId = removeBtn.dataset.invId;
+    if (invId) removeInvoice(invId);
   }
 });
 
@@ -3131,8 +3173,8 @@ async function draftChaseMessage(invoiceId) {
         '<div style="font-size:.85rem;font-weight:bold;color:var(--green);margin-bottom:.8rem;">📨 Collection Message Draft</div>' +
         '<div style="font-size:.85rem;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:4px;padding:.8rem;margin-bottom:1rem;">' + text + '</div>' +
         '<div style="display:flex;gap:.5rem;">' +
-          '<button class="btn btn-green" style="flex:1;" onclick="navigator.clipboard.writeText(this.closest('div').previousElementSibling.textContent).then(function(){alert('Copied!');})">📋 Copy</button>' +
-          '<button class="btn btn-outline" style="flex:1;" onclick="this.closest('[style*=fixed]').remove()">Close</button>' +
+          '<button class="btn btn-green copy-chase-btn" style="flex:1;">📋 Copy</button>' +
+          '<button class="btn btn-outline close-chase-modal" style="flex:1;">Close</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
@@ -3230,9 +3272,8 @@ async function getRouteIntel(destination) {
 function promptLogRun(origin, dest, rate, miles) {
   var today = new Date().toISOString().split('T')[0];
   var rpm = (rate / miles).toFixed(2);
-  if (confirm('Log this as a completed run?
-' + origin + ' → ' + dest + '
-$' + rate.toLocaleString() + ' · $' + rpm + '/mi')) {
+  var confirmMsg = 'Log this as a completed run? ' + origin + ' to ' + dest + ' - $' + rate.toLocaleString() + ' at $' + rpm + '/mi';
+  if (confirm(confirmMsg)) {
     var logList = document.getElementById('run-list');
     if (logList) {
       var item = document.createElement('div');
