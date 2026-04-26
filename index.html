@@ -105,10 +105,11 @@
         <div class="live-value" id="gps-value">Locating...</div>
         <div class="live-sub" id="gps-sub">Getting GPS signal</div>
       </div>
-      <div class="live-box loading" id="fuel-box">
+      <div class="live-box loading" id="fuel-box" onclick="openFuelModal()" style="cursor:pointer;">
         <div class="live-label"><span class="live-dot" id="fuel-dot"></span>Diesel Price</div>
         <div class="live-value" id="fuel-value">Loading...</div>
         <div class="live-sub" id="fuel-sub">Fetching regional price</div>
+        <div style="font-size:.62rem;color:var(--green);opacity:.7;margin-top:.15rem;">⛽ Tap to report pump price</div>
       </div>
     </div>
     <div class="dash-grid">
@@ -1298,6 +1299,34 @@
     </div>
   </div>
 </div>
+
+  <!-- FUEL PRICE REPORT MODAL -->
+  <div id="fuel-report-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:900;align-items:flex-end;padding:1rem;">
+    <div style="background:var(--surface);border:1px solid var(--green-border);border-radius:8px;width:100%;max-width:480px;margin:0 auto;padding:1.5rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div style="font-size:1rem;font-weight:bold;color:var(--green);">⛽ Report Pump Price</div>
+        <button onclick="closeFuelModal()" style="background:none;border:none;color:#b8c8b8;font-size:1.2rem;cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:.85rem;color:#b8c8b8;margin-bottom:1rem;line-height:1.6;">
+        What did you pay at the pump? Your report helps all RoadCommand drivers in your area get accurate local prices.
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label class="form-label">Diesel Price ($/gal)</label>
+        <input class="form-input" id="crowd-fuel-input" type="number" step="0.01" placeholder="4.25" style="font-size:1.2rem;text-align:center;">
+      </div>
+      <div style="font-size:.75rem;color:#b8c8b8;margin-bottom:1rem;">
+        📍 Your GPS location will be attached to this report. Reports are anonymous and averaged with nearby drivers.
+      </div>
+      <div style="display:flex;gap:.5rem;">
+        <button class="btn btn-green" onclick="submitFuelPrice()" style="flex:1;">Submit Price Report</button>
+        <button class="btn btn-outline" onclick="closeFuelModal()" style="flex:0 0 auto;">Cancel</button>
+      </div>
+      <div style="margin-top:.8rem;font-size:.72rem;color:#b8c8b8;text-align:center;">
+        Prices from 3+ nearby drivers replace EIA regional data automatically
+      </div>
+    </div>
+  </div>
+
 </div><!-- end main-app -->
 
 <!-- Auth JS (loads Supabase, handles login/signup) -->

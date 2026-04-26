@@ -43,9 +43,10 @@ function onAuthReady(firstName, userId, email) {
   refreshWeather();
   setTimeout(startGPS, 500);
   setTimeout(checkFirstTime, 700);
-  // Load broker vault and invoices
+  // Load broker vault, invoices, and maintenance
   setTimeout(loadBrokers, 800);
   setTimeout(loadInvoices, 1000);
+  setTimeout(loadMaintItems, 1200);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1438,13 +1439,59 @@ function checkDeadhead(panelId, rate, miles) {
 // ══════════════════════════════════════════════════════════════
 // MAINTENANCE TRACKER
 // ══════════════════════════════════════════════════════════════
+// Default maintenance items — realistic costs for Class 8 semi
+// Users update these with their actual odometer and costs
+// Saved to Supabase when user edits
 var maintItems = [
-  { name:"Oil Change",        lastOdo:487000, interval:15000, cost:320,  currentOdo:495000 },
-  { name:"Tire Rotation",     lastOdo:485000, interval:25000, cost:120,  currentOdo:495000 },
-  { name:"Annual DOT Inspect",lastOdo:470000, interval:100000,cost:450,  currentOdo:495000 },
-  { name:"DPF Cleaning",      lastOdo:450000, interval:100000,cost:800,  currentOdo:495000 },
-  { name:"Brake Inspection",  lastOdo:480000, interval:30000, cost:200,  currentOdo:495000 },
+  { name:"Oil Change",        lastOdo:487000, interval:15000,  cost:650,  currentOdo:495000 },
+  { name:"Tire Rotation",     lastOdo:485000, interval:25000,  cost:200,  currentOdo:495000 },
+  { name:"Annual DOT Inspect",lastOdo:470000, interval:100000, cost:450,  currentOdo:495000 },
+  { name:"DPF Cleaning",      lastOdo:450000, interval:100000, cost:1200, currentOdo:495000 },
+  { name:"Brake Inspection",  lastOdo:480000, interval:30000,  cost:350,  currentOdo:495000 },
 ];
+
+// ── Load maintenance items from Supabase ──────────────────────
+async function loadMaintItems() {
+  if (!window._rcUserId) return;
+  try {
+    var { data, error } = await _supabase
+      .from('maintenance')
+      .select('*')
+      .eq('user_id', window._rcUserId);
+    if (error || !data || !data.length) return;
+    // Replace defaults with user saved items
+    maintItems = data.map(function(row) {
+      return {
+        name:       row.name,
+        lastOdo:    row.last_odo,
+        interval:   row.interval_miles,
+        cost:       row.cost,
+        currentOdo: row.current_odo
+      };
+    });
+    renderMaint();
+  } catch(err) {
+    console.error('Error loading maintenance:', err);
+  }
+}
+
+// ── Save maintenance item to Supabase ─────────────────────────
+async function saveMaintItemToSupabase(item) {
+  if (!window._rcUserId) return;
+  try {
+    // Upsert based on user_id + name
+    await _supabase.from('maintenance').upsert({
+      user_id:        window._rcUserId,
+      name:           item.name,
+      last_odo:       item.lastOdo,
+      interval_miles: item.interval,
+      cost:           item.cost,
+      current_odo:    item.currentOdo
+    }, { onConflict: 'user_id,name' });
+  } catch(err) {
+    console.error('Error saving maintenance:', err);
+  }
+}
 
 function renderMaint() {
   var list = document.getElementById("maint-list");
@@ -1514,6 +1561,7 @@ function saveMaintItem() {
   }
 
   renderMaint();
+  saveMaintItemToSupabase(item);
   document.getElementById("maint-last-odo").value = "";
   document.getElementById("maint-interval").value = "";
   document.getElementById("maint-cost").value = "";
@@ -1994,6 +2042,14 @@ function startGPS() {
 
 // ─── EIA FUEL PRICE ───────────────────────────────────────────────
 async function fetchFuelPrice(region) {
+  // Check crowdsourced prices first if GPS available
+  if (window._gpsLat && window._gpsLon) {
+    var crowdResult = await fetchCrowdFuelPrice(window._gpsLat, window._gpsLon);
+    if (crowdResult && crowdResult.count >= 3) {
+      updateFuelDisplay(crowdResult.price, crowdResult.count);
+      return; // Use crowd data, skip EIA
+    }
+  }
   const fuelBox  = document.getElementById('fuel-box');
   const fuelDot  = document.getElementById('fuel-dot');
   const fuelVal  = document.getElementById('fuel-value');
@@ -2015,7 +2071,7 @@ async function fetchFuelPrice(region) {
 
   const seriesId = PADD[region] || PADD['Unknown'];
   const isStatLevel = false;
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
@@ -2552,4 +2608,141 @@ function onBrokerSelectChange() {
   } else {
     window._selectedBrokerId = null;
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+// CROWDSOURCED FUEL PRICE SYSTEM
+// Users submit real pump prices — averaged by proximity
+// Falls back to EIA regional if not enough local data
+// ══════════════════════════════════════════════════════════════
+
+var _crowdFuelPrice  = null;  // cached crowdsourced price
+var _crowdReportCount = 0;    // how many reports in range
+
+// ── Haversine distance in miles between two points ────────────
+function distanceMiles(lat1, lon1, lat2, lon2) {
+  var R = 3958.8;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ── Fetch nearby crowdsourced prices from Supabase ────────────
+async function fetchCrowdFuelPrice(lat, lon) {
+  if (!lat || !lon) return null;
+  try {
+    // Get all prices from last 7 days
+    var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    var { data, error } = await _supabase
+      .from('fuel_prices')
+      .select('price, latitude, longitude, created_at, location_name')
+      .gte('created_at', sevenDaysAgo)
+      .order('created_at', { ascending: false });
+
+    if (error || !data || !data.length) return null;
+
+    // Filter to within 100 miles
+    var nearby = data.filter(function(row) {
+      return distanceMiles(lat, lon, row.latitude, row.longitude) <= 100;
+    });
+
+    if (!nearby.length) return null;
+
+    // Average the prices
+    var avg = nearby.reduce(function(sum, r) { return sum + parseFloat(r.price); }, 0) / nearby.length;
+    _crowdReportCount = nearby.length;
+    _crowdFuelPrice   = Math.round(avg * 1000) / 1000;
+    return { price: _crowdFuelPrice, count: nearby.length };
+  } catch(err) {
+    console.error('Crowd fuel error:', err);
+    return null;
+  }
+}
+
+// ── Submit a fuel price report ────────────────────────────────
+async function submitFuelPrice() {
+  var input = document.getElementById('crowd-fuel-input');
+  var price = parseFloat(input ? input.value : 0);
+  if (!price || price < 2 || price > 10) {
+    alert('Please enter a valid diesel price between $2 and $10.');
+    return;
+  }
+  if (!window._rcUserId) { alert('Please sign in to submit a price.'); return; }
+  if (!window._gpsLat || !window._gpsLon) { alert('GPS location required to submit a price.'); return; }
+
+  try {
+    var { error } = await _supabase.from('fuel_prices').insert({
+      user_id:       window._rcUserId,
+      price:         price,
+      latitude:      window._gpsLat,
+      longitude:     window._gpsLon,
+      location_name: currentCity || 'Unknown'
+    });
+    if (error) throw error;
+
+    // Update local display immediately
+    defaults.fuelPrice = price;
+    var fuelVal = document.getElementById('fuel-value');
+    var fuelSub = document.getElementById('fuel-sub');
+    var fuelBox = document.getElementById('fuel-box');
+    var fuelDot = document.getElementById('fuel-dot');
+    if (fuelVal) fuelVal.textContent = '$' + price.toFixed(3) + '/gal';
+    if (fuelSub) fuelSub.textContent = 'Your report · ' + (currentCity || 'Local');
+    if (fuelDot) fuelDot.className = 'live-dot green';
+    if (fuelBox) fuelBox.className = 'live-box connected';
+
+    // Close modal
+    closeFuelModal();
+    injectProfitBars();
+
+    // Refresh crowd data
+    fetchCrowdFuelPrice(window._gpsLat, window._gpsLon).then(function(result) {
+      if (result && result.count >= 3) {
+        updateFuelDisplay(result.price, result.count);
+      }
+    });
+
+    alert('Thanks! Your price report helps all RoadCommand drivers in your area.');
+  } catch(err) {
+    alert('Error submitting price: ' + err.message);
+  }
+}
+
+// ── Update fuel display with crowd data ──────────────────────
+function updateFuelDisplay(price, count) {
+  var fuelVal = document.getElementById('fuel-value');
+  var fuelSub = document.getElementById('fuel-sub');
+  var fuelUpd = document.getElementById('fuel-updated');
+  if (fuelVal) fuelVal.textContent = '$' + price.toFixed(3) + '/gal';
+  if (fuelSub) {
+    if (count >= 3) {
+      fuelSub.textContent = 'Driver reports · ' + count + ' nearby';
+    } else {
+      fuelSub.textContent = 'Limited data · ' + count + ' report' + (count > 1 ? 's' : '') + ' nearby';
+    }
+  }
+  if (fuelUpd) fuelUpd.textContent = 'Crowdsourced — last 7 days';
+  defaults.fuelPrice = price;
+  injectProfitBars();
+}
+
+// ── Open fuel price modal ─────────────────────────────────────
+function openFuelModal() {
+  var modal = document.getElementById('fuel-report-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    var input = document.getElementById('crowd-fuel-input');
+    if (input) {
+      input.value = defaults.fuelPrice ? defaults.fuelPrice.toFixed(2) : '';
+      input.focus();
+    }
+  }
+}
+
+function closeFuelModal() {
+  var modal = document.getElementById('fuel-report-modal');
+  if (modal) modal.style.display = 'none';
 }
