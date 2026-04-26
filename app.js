@@ -2166,6 +2166,9 @@ refreshWeather();
       indicator.style.transform = 'translateY(0)';
       startGPS();
       refreshWeather();
+      loadInvoices();
+      loadBrokers();
+      loadMaintItems();
       setTimeout(function() {
         indicator.style.transform = 'translateY(-100%)';
       }, 1500);
