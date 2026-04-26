@@ -4,7 +4,7 @@
    Version bump this string to force cache refresh on all clients
    ═══════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'roadcommand-v3';
+const CACHE_NAME = 'roadcommand-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
