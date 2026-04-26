@@ -1,5 +1,5 @@
 /* RoadCommand — sw.js v4 */
-const CACHE_NAME = 'roadcommand-v4';
+const CACHE_NAME = 'roadcommand-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
