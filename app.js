@@ -570,7 +570,7 @@ function closeHelpModal(e) {
 // ══════════════════════════════════════════════════════════════
 // SETTINGS
 // ══════════════════════════════════════════════════════════════
-function setTextSize(size, btn) {
+function setTextSize(size, btn) {   var sizes = { normal: '15px', large: '18px', xlarge: '21px', xxlarge: '24px' };   document.documentElement.style.fontSize = sizes[size] || '15px';   ['text-normal','text-large','text-xlarge','text-xxlarge'].forEach(function(c) {     document.body.classList.remove(c);   });   document.body.classList.add('text-' + size);   document.querySelectorAll('.text-size-btn').forEach(function(b) { b.classList.remove('active'); });   if (btn) btn.classList.add('active');   try { localStorage.setItem('rc-textsize', size); } catch(e) {} }(size, btn) {
   // Remove any existing text-size class without touching other classes
   ['text-normal','text-large','text-xlarge','text-xxlarge'].forEach(function(c) {
     document.body.classList.remove(c);
