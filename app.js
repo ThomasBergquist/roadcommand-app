@@ -1942,7 +1942,9 @@ function startGPS() {
         );
         const d = await r.json();
         const addr = d.address || {};
-        const state_code = addr.state_code ? addr.state_code.toUpperCase() : '';
+        // Nominatim returns state as ISO3166-2-lvl4 = 'US-WA' format on mobile
+        var iso = addr['ISO3166-2-lvl4'] || '';
+        var state_code = iso ? iso.split('-').pop().toUpperCase() : (addr.state_code || '').toUpperCase();
         const city = addr.city || addr.town || addr.village || addr.county || '';
         const state = addr.state || '';
         currentState = state_code;
@@ -2014,7 +2016,7 @@ async function fetchFuelPrice(region) {
   const stateCode = currentState || '';
   const seriesId = (stateCode && STATE_SERIES[stateCode]) ? STATE_SERIES[stateCode] : (PADD[region] || PADD['Unknown']);
   const isStatLevel = stateCode && STATE_SERIES[stateCode];
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
