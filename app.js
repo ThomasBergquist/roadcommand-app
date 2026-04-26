@@ -2173,10 +2173,8 @@ refreshWeather();
   }, { passive: true });
 })();
 
-window.addEventListener('load', () => {   setTimeout(startGPS, 500);   setTimeout(checkFirstTime, 700);    if ('serviceWorker' in navigator) {     navigator.serviceWorker.register('/sw.js').then(function(reg) {       reg.update();       reg.addEventListener('updatefound', function() {         var newWorker = reg.installing;         newWorker.addEventListener('statechange', function() {           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {             newWorker.postMessage('SKIP_WAITING');           }         });       });     });     navigator.serviceWorker.addEventListener('controllerchange', function() {       window.location.reload();     });   } }); () => {
-  setTimeout(startGPS, 500);
-  setTimeout(checkFirstTime, 700);
-});
+window.addEventListener('load', () => {   setTimeout(startGPS, 500);   setTimeout(checkFirstTime, 700);    if ('serviceWorker' in navigator) {     navigator.serviceWorker.register('/sw.js').then(function(reg) {       reg.update();       reg.addEventListener('updatefound', function() {         var newWorker = reg.installing;         newWorker.addEventListener('statechange', function() {           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {             newWorker.postMessage('SKIP_WAITING');           }         });       });     });     navigator.serviceWorker.addEventListener('controllerchange', function() {       window.location.reload();     });   } });
+
 
 
 // ══════════════════════════════════════════════════════════════
