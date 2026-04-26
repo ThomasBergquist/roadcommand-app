@@ -2071,7 +2071,7 @@ async function fetchFuelPrice(region) {
 
   const seriesId = PADD[region] || PADD['Unknown'];
   const isStatLevel = false;
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
@@ -2742,16 +2742,14 @@ function openFuelModal() {
   }
 }
 
-// Add touch event support for fuel box on mobile
-document.addEventListener('DOMContentLoaded', function() {
-  var fuelBox = document.getElementById('fuel-box');
+// Add touch event support for fuel box on mobile via delegation
+document.addEventListener('touchend', function(e) {
+  var fuelBox = e.target.closest('#fuel-box');
   if (fuelBox) {
-    fuelBox.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      openFuelModal();
-    }, { passive: false });
+    e.preventDefault();
+    openFuelModal();
   }
-});
+}, { passive: false });
 
 function closeFuelModal() {
   var modal = document.getElementById('fuel-report-modal');
