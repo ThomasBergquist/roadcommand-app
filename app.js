@@ -1822,15 +1822,14 @@ function startGPS() {
         );
         const d = await r.json();
         const addr = d.address || {};
-        var iso = addr['ISO3166-2-lvl4'] || '';
-        var state_code = iso ? iso.split('-').pop().toUpperCase() : (addr.state_code || '').toUpperCase();
+        const state_code = addr.state_code ? addr.state_code.toUpperCase() : '';
         const city = addr.city || addr.town || addr.village || addr.county || '';
         const state = addr.state || '';
         currentState = state_code;
         currentCity  = city;
 
         // Update region
-        currentRegion = STATE_REGION[state_code] || 'West Coast';
+        currentRegion = STATE_REGION[state_code] || 'Unknown';
         updateWeatherForState(state_code);
         document.getElementById('region-display').textContent = city ? city + ', ' + state : state;
         document.getElementById('eia-region').textContent = currentRegion;
@@ -1883,16 +1882,19 @@ async function fetchFuelPrice(region) {
   // We use the weekly retail diesel price series
   // PADD regions: 1=East Coast, 2=Midwest, 3=Gulf, 4=Rocky Mtn, 5=West Coast
   const PADD = {
-    'East Coast':      'EMD_EPD2D_PTE_R10_DPG',
-    'Midwest':         'EMD_EPD2D_PTE_R20_DPG',
-    'Gulf Coast':      'EMD_EPD2D_PTE_R30_DPG',
-    'Rocky Mountain':  'EMD_EPD2D_PTE_R40_DPG',
-    'West Coast':      'EMD_EPD2D_PTE_R50_DPG',
-    'Unknown':         'EMD_EPD2D_PTE_NUS_DPG',  // national average
+    'East Coast':      'EER_EPD2DXL0_PTE_R10_DPG',
+    'Midwest':         'EER_EPD2DXL0_PTE_R20_DPG',
+    'Gulf Coast':      'EER_EPD2DXL0_PTE_R30_DPG',
+    'Rocky Mountain':  'EER_EPD2DXL0_PTE_R40_DPG',
+    'West Coast':      'EER_EPD2DXL0_PTE_R50_DPG',
+    'Unknown':         'EER_EPD2DXL0_PTE_NUS_DPG',  // national average
   };
 
-  const seriesId = PADD[region] || PADD['Unknown'];
-  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+  // Try state-level series first, fall back to regional
+  const stateCode = currentState || '';
+  const seriesId = (stateCode && STATE_SERIES[stateCode]) ? STATE_SERIES[stateCode] : (PADD[region] || PADD['Unknown']);
+  const isStatLevel = stateCode && STATE_SERIES[stateCode];
+  const url = 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
 
   try {
     const r = await fetch(url);
@@ -1903,7 +1905,7 @@ async function fetchFuelPrice(region) {
       const period = rows[0].period || '';
       defaults.fuelPrice = price;
       fuelVal.textContent = '$' + price.toFixed(3) + '/gal';
-      fuelSub.textContent = region + ' Region · EIA Live';
+      fuelSub.textContent = (isStatLevel ? stateCode + ' State' : region + ' Region') + ' · EIA Live';
       fuelDot.className = 'live-dot green';
       fuelBox.className = 'live-box connected';
       if (fuelUpd) fuelUpd.textContent = 'Week of ' + period;
@@ -2095,7 +2097,7 @@ function renderBrokers() {
 }
 
 // ── Open broker detail panel ──────────────────────────────────
-function openBrokerDetail(brokerId) {   if (!_brokers.length) { setTimeout(function(){ openBrokerDetail(brokerId); }, 300); return; }   var broker = _brokers.find(function(b) { return b.id === brokerId; });   if (!broker) return;
+function openBrokerDetail(brokerId) {
   var broker = _brokers.find(function(b) { return b.id === brokerId; });
   if (!broker) return;
 
@@ -2253,11 +2255,11 @@ async function uploadInvoiceDoc(invoiceId, docType) {
       if (error) throw error;
 
       // Get public URL
-      var { data } = await _supabase.storage.from('documents').createSignedUrl(path, 3600);
+      var { data } = _supabase.storage.from('documents').getPublicUrl(path);
 
       // Cache it
       if (!_invoiceDocs[invoiceId]) _invoiceDocs[invoiceId] = {};
-      _invoiceDocs[invoiceId][docType] = data.signedUrl;
+      _invoiceDocs[invoiceId][docType] = data.publicUrl;
 
       // Update button to show uploaded
       var btn = document.getElementById('doc-btn-' + invoiceId + '-' + docType);
@@ -2270,7 +2272,7 @@ async function uploadInvoiceDoc(invoiceId, docType) {
       // Add view link
       var linkEl = document.getElementById('doc-link-' + invoiceId + '-' + docType);
       if (linkEl) {
-        linkEl.innerHTML = '<a href="' + data.signedUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
+        linkEl.innerHTML = '<a href="' + data.publicUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
       }
 
       alert((docType === 'rateCon' ? 'Rate Confirmation' : 'BOL') + ' uploaded successfully!');
@@ -2293,11 +2295,11 @@ async function loadInvoiceDocs(invoiceId) {
 
     if (!_invoiceDocs[invoiceId]) _invoiceDocs[invoiceId] = {};
 
-    for (var fi = 0; fi < data.length; fi++) { var file = data[fi];
+    data.forEach(function(file) {
       var docType = file.name.startsWith('rateCon') ? 'rateCon' : 'bol';
       var path = window._rcUserId + '/' + invoiceId + '/' + file.name;
-      var { data: urlData } = await _supabase.storage.from('documents').createSignedUrl(path, 3600);
-_invoiceDocs[invoiceId][docType] = urlData.signedUrl;
+      var { data: urlData } = _supabase.storage.from('documents').getPublicUrl(path);
+      _invoiceDocs[invoiceId][docType] = urlData.publicUrl;
 
       // Update UI
       var btn = document.getElementById('doc-btn-' + invoiceId + '-' + docType);
@@ -2308,9 +2310,9 @@ _invoiceDocs[invoiceId][docType] = urlData.signedUrl;
       }
       var linkEl = document.getElementById('doc-link-' + invoiceId + '-' + docType);
       if (linkEl) {
-        linkEl.innerHTML = '<a href="' + urlData.signedUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
+        linkEl.innerHTML = '<a href="' + urlData.publicUrl + '" target="_blank" style="color:var(--green);font-size:.72rem;">View ' + (docType === 'rateCon' ? 'Rate Con' : 'BOL') + ' →</a>';
       }
-    }
+    });
   } catch(err) {
     console.error('Error loading docs:', err);
   }
