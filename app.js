@@ -3120,7 +3120,7 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     "\nRate per mile: $" + rpm +
     "\nNet after fuel: $" + net + " (incl. " + deadMiles + " mi deadhead)" +
     "\nBroker: " + (broker || "unknown") + (brokerInfo ? " — " + brokerInfo : "") +
-    "\nDriver min RPM: $2.00/mi" +
+    "\nDriver min RPM: $" + (defaults.minRpm || defaults.minrpm || '2.00') + "/mi" +
     "\n\nReply format: TAKE IT or PASS — [one sentence reason]";
 
   try {
