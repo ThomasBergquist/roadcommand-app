@@ -3017,7 +3017,7 @@ async function callAI(prompt, maxTokens) {
     method: "POST",
     headers: aiHeaders,
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: maxTokens,
       messages: [{ role: "user", content: prompt }]
     })
