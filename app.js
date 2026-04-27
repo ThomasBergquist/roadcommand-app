@@ -663,7 +663,7 @@ function loadSavedPreferences() {
       if (d.mpg)      { defaults.mpg = d.mpg; document.getElementById('set-mpg').value = d.mpg; }
       if (d.emptyMpg) { defaults.emptyMpg = d.emptyMpg; var emEl = document.getElementById('set-empty-mpg'); if (emEl) emEl.value = d.emptyMpg; }
       if (d.fuel)     { defaults.fuelPrice = d.fuel; document.getElementById('set-fuel').value = d.fuel; }
-      if (d.speed) { document.getElementById('set-speed').value = d.speed; }
+      if (d.speed)  { document.getElementById('set-speed').value = d.speed; } if (d.minrpm) { defaults.minRpm = d.minrpm; var mrEl = document.getElementById('set-minrpm'); if (mrEl) mrEl.value = d.minrpm; }
     }
     const truck = localStorage.getItem('rc-truck');
     if (truck) {
