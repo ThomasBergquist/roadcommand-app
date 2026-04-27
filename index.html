@@ -943,6 +943,9 @@
         <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">AI-generated performance review based on your actual invoice and broker data.</div>
         <button class="btn btn-green" id="weekly-summary-btn" onclick="generateWeeklySummary()">📊 Generate Weekly Summary</button>
         <div id="weekly-summary-output" style="display:none;"></div>
+        <div style="display:flex;gap:.5rem;margin-bottom:.8rem;">
+  <input class="form-input" id="broker-vault-search" placeholder="Search brokers by name or MC#" oninput="searchBrokers()" style="flex:1;">
+</div>
       </div>
     </div>
     <div class="section-label" style="margin:.8rem 0 .5rem;">Active Invoices</div>
@@ -1281,6 +1284,9 @@
     </div>
 
     <!-- Broker list -->
+    <div style="display:flex;gap:.5rem;margin-bottom:.8rem;">
+  <input class="form-input" id="broker-vault-search" placeholder="Search brokers by name or MC#" oninput="searchBrokers()" style="flex:1;">
+</div>
     <div id="broker-list">
       <div class="alert alert-amber" style="margin-top:.5rem;">
         <div class="alert-icon">🏦</div>
