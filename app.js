@@ -240,7 +240,7 @@ function calculateProfit() {
   document.getElementById('r-npm').textContent = (npm < 0 ? '-' : '') + fmt(npm) + '/mi';
   let verdict, color;
   var minR = defaults.minRpm || 2.00;
-  if (rpm >= 2.3) { verdict = '✅ Strong — Take It'; color = 'var(--green)'; }
+  if (rpm >= minR && rpm >= 2.3) { verdict = '✅ Strong — Take It'; color = 'var(--green)'; }
   else if (rpm >= minR) { verdict = '⚠️ Acceptable — Meets Minimum'; color = 'var(--amber)'; }
   else { verdict = '❌ Skip — Below Your Minimum'; color = 'var(--red)'; }
   document.getElementById('r-verdict').textContent = verdict;
@@ -272,7 +272,7 @@ function autoProfit(rate, miles) {
   const rpm = rate / miles;
   let tier, verdictText;
   var minR = defaults.minRpm || 2.00;
-  if (rpm >= 2.3)      { tier = 'strong'; verdictText = '✅ Strong — Take It'; }
+  if (rpm >= minR && rpm >= 2.3) { tier = 'strong'; verdictText = '✅ Strong — Take It'; }
   else if (rpm >= minR) { tier = 'ok';     verdictText = '⚠️ Acceptable'; }
   else                 { tier = 'weak';   verdictText = '❌ Below Minimum'; }
   const fmt = n => '$' + Math.abs(n).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -1153,7 +1153,7 @@ function recalcPanel(panelId, rate, miles) {
 
   var tier, verdictText;
   var minR = defaults.minRpm || 2.00;
-  if (parseFloat(rpm) >= 2.30)      { tier = "strong"; verdictText = "✅ Strong — Take It"; }
+  if (parseFloat(rpm) >= minR && parseFloat(rpm) >= 2.30) { tier = "strong"; verdictText = "✅ Strong — Take It"; }
   else if (parseFloat(rpm) >= minR) { tier = "ok";     verdictText = "⚠️ Acceptable — Meets Minimum"; }
   else                               { tier = "weak";   verdictText = "❌ Below Minimum — Skip It"; }
 
