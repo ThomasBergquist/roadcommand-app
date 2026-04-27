@@ -239,8 +239,9 @@ function calculateProfit() {
   document.getElementById('r-rpm').textContent = fmt(rpm) + '/mi';
   document.getElementById('r-npm').textContent = (npm < 0 ? '-' : '') + fmt(npm) + '/mi';
   let verdict, color;
+  var minR = defaults.minRpm || 2.00;
   if (rpm >= 2.3) { verdict = '✅ Strong — Take It'; color = 'var(--green)'; }
-  else if (rpm >= 2.0) { verdict = '⚠️ Acceptable — Meets Minimum'; color = 'var(--amber)'; }
+  else if (rpm >= minR) { verdict = '⚠️ Acceptable — Meets Minimum'; color = 'var(--amber)'; }
   else { verdict = '❌ Skip — Below Your Minimum'; color = 'var(--red)'; }
   document.getElementById('r-verdict').textContent = verdict;
   document.getElementById('r-verdict').style.color = color;
@@ -254,6 +255,7 @@ function saveParams() {
   const mpg  = parseFloat(document.getElementById('calc-mpg')  && document.getElementById('calc-mpg').value)  || 6.5;
   defaults.fuelPrice = fuel;
   defaults.mpg = mpg;
+  defaults.minRpm = minrpm; 
   injectProfitBars();
   alert('Parameters saved! Profit estimates updated.');
 }
@@ -264,7 +266,7 @@ function filterLoads(type) {
 
 // INLINE PROFIT CALCULATOR
 // Default settings — synced from Parameters tab
-const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0 };
+const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0, minRpm: 2.00 };
 
 function autoProfit(rate, miles) {
   const totalMiles = miles + defaults.deadhead;
@@ -273,8 +275,9 @@ function autoProfit(rate, miles) {
   const net = rate - fuelCost - brokerFee;
   const rpm = rate / miles;
   let tier, verdictText;
+  var minR = defaults.minRpm || 2.00;
   if (rpm >= 2.3)      { tier = 'strong'; verdictText = '✅ Strong — Take It'; }
-  else if (rpm >= 2.0) { tier = 'ok';     verdictText = '⚠️ Acceptable'; }
+  else if (rpm >= minR) { tier = 'ok';     verdictText = '⚠️ Acceptable'; }
   else                 { tier = 'weak';   verdictText = '❌ Below Minimum'; }
   const fmt = n => '$' + Math.abs(n).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return { net, rpm, tier, verdictText, fuelCost, fmt };
@@ -1153,8 +1156,9 @@ function recalcPanel(panelId, rate, miles) {
   var rpm         = (rate / miles).toFixed(2);
 
   var tier, verdictText;
+  var minR = defaults.minRpm || 2.00;
   if (parseFloat(rpm) >= 2.30)      { tier = "strong"; verdictText = "✅ Strong — Take It"; }
-  else if (parseFloat(rpm) >= 2.00) { tier = "ok";     verdictText = "⚠️ Acceptable — Meets Minimum"; }
+  else if (parseFloat(rpm) >= minR) { tier = "ok";     verdictText = "⚠️ Acceptable — Meets Minimum"; }
   else                               { tier = "weak";   verdictText = "❌ Below Minimum — Skip It"; }
 
   // Update fuel display
