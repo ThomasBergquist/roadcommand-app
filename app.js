@@ -250,18 +250,14 @@ function calculateProfit() {
 }
 
 function saveParams() {
-  // Update defaults from Parameters inputs so profit bars refresh
-  const fuel = parseFloat(document.getElementById('calc-fuel') && document.getElementById('calc-fuel').value) || 4.25;
-  const mpg  = parseFloat(document.getElementById('calc-mpg')  && document.getElementById('calc-mpg').value)  || 6.5;
+  const fuel   = parseFloat(document.getElementById('calc-fuel') && document.getElementById('calc-fuel').value) || 4.25;
+  const mpg    = parseFloat(document.getElementById('calc-mpg')  && document.getElementById('calc-mpg').value)  || 6.5;
+  const minrpm = parseFloat(document.getElementById('set-minrpm') && document.getElementById('set-minrpm').value) || 2.00;
   defaults.fuelPrice = fuel;
-  defaults.mpg = mpg;
-  defaults.minRpm = minrpm; 
+  defaults.mpg       = mpg;
+  defaults.minRpm    = minrpm;
   injectProfitBars();
   alert('Parameters saved! Profit estimates updated.');
-}
-function filterLoads(type) {
-  document.querySelectorAll('[id^=filter-]').forEach(b => b.className = 'btn btn-outline btn-sm');
-  document.getElementById('filter-' + type).className = 'btn btn-green btn-sm';
 }
 
 // INLINE PROFIT CALCULATOR
