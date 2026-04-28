@@ -251,7 +251,7 @@ function track(eventName, properties) {
       user_id:    window._rcUserId,
       event_name: eventName,
       properties: properties || {}
-    })
+    }).then(() => {});
   } catch(e) {}
 }
 
