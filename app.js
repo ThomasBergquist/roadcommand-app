@@ -1620,6 +1620,10 @@ async function exportMonthlyTax(year, month) {
   if (btn) { btn.textContent = 'Building export...'; btn.disabled = true; }
   try {
     if (typeof JSZip === 'undefined') await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+      // Pre-load docs for all invoices in this month
+    for (var p = 0; p < monthInvoices.length; p++) {
+      await loadInvoiceDocs(monthInvoices[p].id);
+    }
     var zip = new JSZip(), monthFolder = zip.folder(folderName);
     var csvLines = ['Invoice Date,Broker,Reference,Amount,Due Date,Status,Notes'], totalAmount = 0, paidAmount = 0;
     for (var i = 0; i < monthInvoices.length; i++) {
@@ -1656,6 +1660,10 @@ async function exportYearlyTax(year) {
   if (!yearInvoices.length) { alert('No invoices found for ' + year + '.'); if (btn) { btn.textContent = '📦 Export Full Year'; btn.disabled = false; } return; }
   try {
     if (typeof JSZip === 'undefined') await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    // Pre-load docs for all invoices this year
+    for (var p = 0; p < yearInvoices.length; p++) {
+      await loadInvoiceDocs(yearInvoices[p].id);
+    }
     var zip = new JSZip(), yearFolder = zip.folder(String(year) + '-Full-Year');
     var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     var yearTotal = 0, yearPaid = 0, yearCsvLines = ['Month,Broker,Reference,Amount,Due Date,Status'];
