@@ -1626,7 +1626,7 @@ async function exportMonthlyTax(year, month) {
       var inv = monthInvoices[i]; totalAmount += inv.amount; if (inv.status === 'paid') paidAmount += inv.amount;
       csvLines.push([inv.date, '"' + (inv.broker||'') + '"', '"' + (inv.ref||'') + '"', inv.amount, inv.dueDate, inv.status, '"' + (inv.notes||'') + '"'].join(','));
       var safeBroker = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-');
-      var invFolder = monthFolder.folder('Invoice-' + safeBroker + '-' + (inv.date||'nodate'));
+      var safeRef = (inv.ref || String(i)).replace(/[^a-zA-Z0-9]/g, '-'); var invFolder = monthFolder.folder('Invoice-' + safeBroker + '-' + (inv.date||'nodate') + '-' + safeRef);
       invFolder.file('invoice-summary.txt',
         'ROADCOMMAND INVOICE RECORD\n==========================\n' +
         'Broker:       ' + (inv.broker||'—') + '\nReference:    ' + (inv.ref||'—') + '\nAmount:       $' + inv.amount.toLocaleString() +
@@ -1667,7 +1667,7 @@ async function exportYearlyTax(year) {
       for (var i = 0; i < mInvs.length; i++) {
         var inv = mInvs[i]; yearTotal += inv.amount; if (inv.status === 'paid') yearPaid += inv.amount;
         yearCsvLines.push([monthNames[m-1], '"' + (inv.broker||'') + '"', '"' + (inv.ref||'') + '"', inv.amount, inv.dueDate, inv.status].join(','));
-        var sb = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-'), iFolder = mFolder.folder('Invoice-' + sb + '-' + (inv.date||'nodate'));
+        var sb = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-'); var safeRef = (inv.ref || String(i)).replace(/[^a-zA-Z0-9]/g, '-'); var iFolder = mFolder.folder('Invoice-' + sb + '-' + (inv.date||'nodate') + '-' + safeRef);
         iFolder.file('invoice-summary.txt', 'Broker: ' + (inv.broker||'—') + '\nRef: ' + (inv.ref||'—') + '\nAmount: $' + inv.amount.toLocaleString() + '\nDate: ' + (inv.date||'—') + '\nDue: ' + (inv.dueDate||'—') + '\nStatus: ' + (inv.status||'pending').toUpperCase());
         var docs = _invoiceDocs[inv.id] || {};
         if (docs.rateCon) { var rcB2 = await fetchDocAsBlob(docs.rateCon); if (rcB2) iFolder.file('rate-confirmation.' + getExtFromUrl(docs.rateCon), rcB2); }
