@@ -1624,15 +1624,6 @@ async function exportMonthlyTax(year, month) {
     for (var p = 0; p < monthInvoices.length; p++) {
       await loadInvoiceDocs(monthInvoices[p].id);
     }
-    // DEBUG - remove after testing
-    for (var d = 0; d < monthInvoices.length; d++) {
-      var testDocs = _invoiceDocs[monthInvoices[d].id] || {};
-      console.log('Invoice', d, monthInvoices[d].broker, 'docs:', JSON.stringify(testDocs));
-      if (testDocs.bol) {
-        var testBlob = await fetchDocAsBlob(testDocs.bol);
-        console.log('BOL blob:', testBlob ? testBlob.size + ' bytes' : 'NULL');
-      }
-    }
     var zip = new JSZip(), monthFolder = zip.folder(folderName);
     var csvLines = ['Invoice Date,Broker,Reference,Amount,Due Date,Status,Notes'], totalAmount = 0, paidAmount = 0;
     for (var i = 0; i < monthInvoices.length; i++) {
