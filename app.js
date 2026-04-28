@@ -7,6 +7,12 @@ function onAuthReady(firstName, userId, email) {
   window._rcUserFirstName = firstName || 'Driver';
   window._rcUserId        = userId;
   window._rcUserEmail     = email;
+  window._rcSessionStart  = Date.now();
+  track('session_started', { region: currentRegion || 'unknown' });
+  window.addEventListener('beforeunload', function() {
+    var duration = Math.round((Date.now() - window._rcSessionStart) / 1000);
+    track('session_ended', { duration_seconds: duration });
+  });
 
   var truckModel = window._rcTruckYear && window._rcTruckModel
     ? window._rcTruckYear + ' ' + window._rcTruckModel
@@ -138,6 +144,7 @@ function showScreen(id, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   if (btn) btn.classList.add('active');
+  track('tab_opened', { tab: id });
 }
 
 function goToSettings() {
@@ -234,6 +241,18 @@ function filterLoads(type) {
 }
 
 const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0, minRpm: 2.00 };
+
+// ── ANALYTICS ────────────────────────────────────────────────
+function track(eventName, properties) {
+  if (!window._rcUserId) return;
+  try {
+    _supabase.from('events').insert({
+      user_id:    window._rcUserId,
+      event_name: eventName,
+      properties: properties || {}
+    });
+  } catch(e) {}
+}
 
 function autoProfit(rate, miles) {
   const totalMiles = miles + defaults.deadhead;
@@ -653,6 +672,7 @@ function addInvoice() {
   var inv = { broker: broker, amount: amount, ref: ref, date: date, terms: terms, phone: phone, dueDate: dueDate.toISOString().split("T")[0], status: "pending", id: Date.now(), broker_id: window._selectedBrokerId || null };
   invoices.unshift(inv);
   renderInvoices();
+  track('invoice_added', { amount: amount, broker: broker, terms: terms });
   saveInvoiceToSupabase(inv).then(function(saved) {
     var idx = invoices.findIndex(function(i) { return i.id === inv.id; });
     if (idx >= 0) invoices[idx] = saved;
@@ -664,7 +684,11 @@ function addInvoice() {
 
 function markPaid(id) {
   var inv = invoices.find(function(i) { return i.id == id; });
-  if (inv) { inv.status = "paid"; updateInvoiceStatus(id, "paid"); }
+  if (inv) {
+    inv.status = "paid";
+    updateInvoiceStatus(id, "paid");
+    track('invoice_marked_paid', { amount: inv.amount, broker: inv.broker });
+  }
   renderInvoices();
   renderBrokers();
 }
@@ -837,6 +861,7 @@ function bookLoad(btn, origin, dest, rate, miles, broker, phone) {
   var refField    = document.getElementById("inv-ref");    if (refField)    refField.value    = origin + " to " + dest;
   var dateField   = document.getElementById("inv-date");   if (dateField)   dateField.value   = new Date().toISOString().split("T")[0];
   promptLogRun(origin, dest, rate, miles);
+  track('load_booked', { rate: rate, miles: miles, rpm: parseFloat((rate/miles).toFixed(2)), origin: origin, dest: dest, broker: broker });
   showLoadback(origin, dest, rate, miles, broker, phone);
 }
 
@@ -1374,6 +1399,7 @@ async function saveBroker() {
     document.getElementById('add-broker-form').style.display = 'none';
     document.getElementById('add-broker-toggle-hint').textContent = 'Tap to expand';
     await loadBrokers();
+    track('broker_added', { name: name, terms: terms });
     alert(name + ' added to your broker network!');
   } catch(err) { alert('Error saving broker: ' + err.message); }
 }
@@ -1620,17 +1646,13 @@ async function exportMonthlyTax(year, month) {
   if (btn) { btn.textContent = 'Building export...'; btn.disabled = true; }
   try {
     if (typeof JSZip === 'undefined') await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-      // Pre-load docs for all invoices in this month
-    for (var p = 0; p < monthInvoices.length; p++) {
-      await loadInvoiceDocs(monthInvoices[p].id);
-    }
     var zip = new JSZip(), monthFolder = zip.folder(folderName);
     var csvLines = ['Invoice Date,Broker,Reference,Amount,Due Date,Status,Notes'], totalAmount = 0, paidAmount = 0;
     for (var i = 0; i < monthInvoices.length; i++) {
       var inv = monthInvoices[i]; totalAmount += inv.amount; if (inv.status === 'paid') paidAmount += inv.amount;
       csvLines.push([inv.date, '"' + (inv.broker||'') + '"', '"' + (inv.ref||'') + '"', inv.amount, inv.dueDate, inv.status, '"' + (inv.notes||'') + '"'].join(','));
       var safeBroker = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-');
-      var safeRef = (inv.ref || String(i)).replace(/[^a-zA-Z0-9]/g, '-'); var invFolder = monthFolder.folder('Invoice-' + safeBroker + '-' + (inv.date||'nodate') + '-' + safeRef);
+      var invFolder = monthFolder.folder('Invoice-' + safeBroker + '-' + (inv.date||'nodate'));
       invFolder.file('invoice-summary.txt',
         'ROADCOMMAND INVOICE RECORD\n==========================\n' +
         'Broker:       ' + (inv.broker||'—') + '\nReference:    ' + (inv.ref||'—') + '\nAmount:       $' + inv.amount.toLocaleString() +
@@ -1648,6 +1670,7 @@ async function exportMonthlyTax(year, month) {
     var url = URL.createObjectURL(content), a = document.createElement('a');
     a.href = url; a.download = 'RoadCommand-' + folderName + '-Tax-Export.zip'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     alert('Export ready! ' + monthInvoices.length + ' invoices exported for ' + monthName + ' ' + year + '.');
+    track('tax_export_downloaded', { year: year, month: month, invoice_count: monthInvoices.length, total: totalAmount });
   } catch(err) { alert('Export failed: ' + err.message); console.error('Tax export error:', err); }
   if (btn) { btn.textContent = '📦 Export Month'; btn.disabled = false; }
 }
@@ -1660,10 +1683,6 @@ async function exportYearlyTax(year) {
   if (!yearInvoices.length) { alert('No invoices found for ' + year + '.'); if (btn) { btn.textContent = '📦 Export Full Year'; btn.disabled = false; } return; }
   try {
     if (typeof JSZip === 'undefined') await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-    // Pre-load docs for all invoices this year
-    for (var p = 0; p < yearInvoices.length; p++) {
-      await loadInvoiceDocs(yearInvoices[p].id);
-    }
     var zip = new JSZip(), yearFolder = zip.folder(String(year) + '-Full-Year');
     var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     var yearTotal = 0, yearPaid = 0, yearCsvLines = ['Month,Broker,Reference,Amount,Due Date,Status'];
@@ -1675,7 +1694,7 @@ async function exportYearlyTax(year) {
       for (var i = 0; i < mInvs.length; i++) {
         var inv = mInvs[i]; yearTotal += inv.amount; if (inv.status === 'paid') yearPaid += inv.amount;
         yearCsvLines.push([monthNames[m-1], '"' + (inv.broker||'') + '"', '"' + (inv.ref||'') + '"', inv.amount, inv.dueDate, inv.status].join(','));
-        var sb = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-'); var safeRef = (inv.ref || String(i)).replace(/[^a-zA-Z0-9]/g, '-'); var iFolder = mFolder.folder('Invoice-' + sb + '-' + (inv.date||'nodate') + '-' + safeRef);
+        var sb = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-'), iFolder = mFolder.folder('Invoice-' + sb + '-' + (inv.date||'nodate'));
         iFolder.file('invoice-summary.txt', 'Broker: ' + (inv.broker||'—') + '\nRef: ' + (inv.ref||'—') + '\nAmount: $' + inv.amount.toLocaleString() + '\nDate: ' + (inv.date||'—') + '\nDue: ' + (inv.dueDate||'—') + '\nStatus: ' + (inv.status||'pending').toUpperCase());
         var docs = _invoiceDocs[inv.id] || {};
         if (docs.rateCon) { var rcB2 = await fetchDocAsBlob(docs.rateCon); if (rcB2) iFolder.file('rate-confirmation.' + getExtFromUrl(docs.rateCon), rcB2); }
@@ -1800,6 +1819,7 @@ async function submitFuelPrice() {
     if (fv) fv.textContent = '$' + price.toFixed(3) + '/gal'; if (fs) fs.textContent = 'Your report · ' + (currentCity || 'Local'); if (fd) fd.className = 'live-dot green'; if (fb) fb.className = 'live-box connected';
     closeFuelModal(); injectProfitBars();
     fetchCrowdFuelPrice(window._gpsLat, window._gpsLon).then(function(result) { if (result && result.count >= 3) updateFuelDisplay(result.price, result.count); });
+    track('fuel_price_reported', { price: price, city: currentCity || 'unknown' });
     alert('Thanks! Your price report helps all RoadCommand drivers in your area.');
   } catch(err) { alert('Error submitting price: ' + err.message); }
 }
@@ -1831,6 +1851,7 @@ async function generateNegScript() {
   var miles   = parseFloat(document.getElementById("neg-miles").value);
   var broker  = document.getElementById("neg-broker-name") ? document.getElementById("neg-broker-name").value.trim() : "";
   if (!origin || !dest || !offer || !miles) { alert("Fill in origin, destination, offer, and miles first."); return; }
+  track('negotiation_script_requested', { origin: origin, dest: dest, offer: offer, miles: miles, broker: broker });
   runNegCoach();
   var marketRpm = LANE_RATES[origin+"-"+dest] || LANE_RATES[dest+"-"+origin] || 2.15;
   var offerRpm = offer / miles, marketTotal = Math.round(marketRpm * miles), gap = marketTotal - offer;
@@ -1945,6 +1966,7 @@ async function draftChaseMessage(invoiceId) {
 
 async function generateWeeklySummary() {
   var btn = document.getElementById('weekly-summary-btn'); if (btn) { btn.textContent = 'Generating...'; btn.disabled = true; }
+  track('weekly_summary_generated', {});
   var totalRevenue = invoices.reduce(function(sum, i) { return sum + i.amount; }, 0);
   var paidRevenue  = invoices.filter(function(i) { return i.status === 'paid'; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
   var outstanding = totalRevenue - paidRevenue, brokerCount = _brokers.length, maintCPM = 0;
@@ -1961,6 +1983,7 @@ async function generateWeeklySummary() {
 async function getRouteIntel(destination) {
   if (!destination) { destination = document.getElementById('route-intel-dest') ? document.getElementById('route-intel-dest').value.trim() : ''; }
   if (!destination) { alert('Enter a destination city first.'); return; }
+  track('route_intel_requested', { destination: destination });
   var btn = document.getElementById('route-intel-btn'), output = document.getElementById('route-intel-output');
   if (btn) { btn.textContent = 'Analyzing...'; btn.disabled = true; }
   var destKey = destination.toLowerCase().split(',')[0].trim();
