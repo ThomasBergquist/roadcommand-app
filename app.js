@@ -6,6 +6,7 @@
 function onAuthReady(firstName, userId, email) {
   window._rcUserFirstName = firstName || 'Driver';
   window._rcUserId        = userId;
+  window._supabaseReady   = true;
   window._rcUserEmail     = email;
   window._rcSessionStart  = Date.now();
   track('session_started', { region: currentRegion || 'unknown' });
@@ -244,7 +245,7 @@ const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, broker
 
 // ── ANALYTICS ────────────────────────────────────────────────
 function track(eventName, properties) {
-  if (!window._rcUserId) return;
+  if (!window._rcUserId || !window._supabaseReady) return;
   try {
     _supabase.from('events').insert({
       user_id:    window._rcUserId,
@@ -257,7 +258,6 @@ function track(eventName, properties) {
     console.log('track exception:', eventName, e.message);
   }
 }
-
 function autoProfit(rate, miles) {
   const totalMiles = miles + defaults.deadhead;
   const fuelCost = (totalMiles / defaults.mpg) * defaults.fuelPrice;
