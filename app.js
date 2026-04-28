@@ -247,7 +247,7 @@ const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, broker
 function track(eventName, properties) {
   if (!window._rcUserId || !window._supabaseReady) return;
   try {
-    _supabase.from('events').insert({
+    window._supabase.from('events').insert({
       user_id:    window._rcUserId,
       event_name: eventName,
       properties: properties || {}
