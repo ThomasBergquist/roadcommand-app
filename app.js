@@ -251,9 +251,7 @@ function track(eventName, properties) {
       user_id:    window._rcUserId,
       event_name: eventName,
       properties: properties || {}
-    }).then(function(result) {
-      if (result.error) console.log('track error:', eventName, result.error.message);
-    });
+    })
   } catch(e) {
     console.log('track exception:', eventName, e.message);
   }
