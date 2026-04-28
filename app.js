@@ -252,10 +252,9 @@ function track(eventName, properties) {
       event_name: eventName,
       properties: properties || {}
     })
-  } catch(e) {
-    console.log('track exception:', eventName, e.message);
-  }
+  } catch(e) {}
 }
+
 function autoProfit(rate, miles) {
   const totalMiles = miles + defaults.deadhead;
   const fuelCost = (totalMiles / defaults.mpg) * defaults.fuelPrice;
