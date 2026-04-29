@@ -2192,13 +2192,17 @@ function calcAuthorityScore(carrier) {
   var safetyRating = (carrier.safetyRating || '').toLowerCase();
   if (safetyRating === 'unsatisfactory') { score -= 35; issues.push('Unsatisfactory safety rating'); }
   else if (safetyRating === 'conditional') { score -= 15; issues.push('Conditional safety rating'); }
-  // Insurance
-  var hasInsurance = carrier.bipdInsuranceOnFile === 'Y' || carrier.cargoInsuranceOnFile === 'Y';
-  if (!hasInsurance) { score -= 25; issues.push('Insurance not on file'); }
-  // OOS rate — if available
-  var oosRate = parseFloat(carrier.oosRate || 0);
-  if (oosRate > 30) { score -= 15; issues.push('High out-of-service rate'); }
-  else if (oosRate > 20) { score -= 8; }
+  // Insurance — bipdInsuranceOnFile returns a dollar amount string e.g. "1000" meaning $1M
+  var bipdAmt = parseFloat(carrier.bipdInsuranceOnFile || 0);
+  var hasInsurance = bipdAmt > 0;
+  if (!hasInsurance) { score -= 25; issues.push('BIPD insurance not on file — fix immediately'); }
+  // Driver OOS rate
+  var driverOos = parseFloat(carrier.driverOosRate || 0);
+  var vehicleOos = parseFloat(carrier.vehicleOosRate || 0);
+  if (driverOos > 25) { score -= 15; issues.push('Driver OOS rate ' + driverOos.toFixed(1) + '% — national avg 5.51%'); }
+  else if (driverOos > 10) { score -= 8; issues.push('Driver OOS rate elevated — review driver compliance'); }
+  if (vehicleOos > 35) { score -= 15; issues.push('Vehicle OOS rate ' + vehicleOos.toFixed(1) + '% — national avg 20.72%'); }
+  else if (vehicleOos > 20) { score -= 8; issues.push('Vehicle OOS rate above national average'); }
   score = Math.max(0, Math.min(100, score));
   var tier, color, label;
   if (score >= 85)      { tier = 'strong'; color = 'var(--green)'; label = 'Strong'; }
@@ -2275,11 +2279,17 @@ function renderFMCSACard(carrier, state) {
   }
   var { score, tier, color, label, issues } = calcAuthorityScore(carrier);
   var authStatus   = (carrier.allowedToOperate || '').toUpperCase() === 'Y';
-  var hasInsurance = carrier.bipdInsuranceOnFile === 'Y' || carrier.cargoInsuranceOnFile === 'Y';
+  var bipdAmt      = parseFloat(carrier.bipdInsuranceOnFile || 0);
+  var hasInsurance = bipdAmt > 0;
+  var bipdDisplay  = bipdAmt > 0 ? '✅ $' + bipdAmt.toLocaleString() + ',000' : '❌ Not on File';
+  var cargoOnFile  = parseFloat(carrier.cargoInsuranceOnFile || 0) > 0;
+  var bondOnFile   = parseFloat(carrier.bondInsuranceOnFile || 0) > 0;
   var safetyRating = carrier.safetyRating || 'Not Rated';
   var safetyColor  = safetyRating.toLowerCase() === 'satisfactory' ? 'var(--green)' : safetyRating.toLowerCase() === 'conditional' ? 'var(--amber)' : safetyRating.toLowerCase() === 'unsatisfactory' ? 'var(--red)' : '#b8c8b8';
-  var oosRate = carrier.oosRate ? parseFloat(carrier.oosRate).toFixed(1) + '%' : 'N/A';
-  var nationalOOS = '20.7%'; // national average vehicle OOS rate
+  var driverOos    = carrier.driverOosRate ? parseFloat(carrier.driverOosRate).toFixed(1) + '%' : 'N/A';
+  var vehicleOos   = carrier.vehicleOosRate ? parseFloat(carrier.vehicleOosRate).toFixed(1) + '%' : 'N/A';
+  var driverOosAvg = carrier.driverOosRateNationalAverage || '5.51';
+  var vehicleOosAvg= carrier.vehicleOosRateNationalAverage || '20.72';
 
   screen.innerHTML =
     '<div class="section-head"><div class="section-label">— Authority Health</div><div class="section-title">FMCSA Carrier Profile</div></div>' +
@@ -2318,12 +2328,12 @@ function renderFMCSACard(carrier, state) {
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">' +
           fmcsaStatBox('Authority', authStatus ? '✅ Active' : '❌ Inactive', authStatus ? 'var(--green)' : 'var(--red)') +
           fmcsaStatBox('Safety Rating', safetyRating, safetyColor) +
-          fmcsaStatBox('Insurance on File', hasInsurance ? '✅ Yes' : '❌ No', hasInsurance ? 'var(--green)' : 'var(--red)') +
-          fmcsaStatBox('Operating Status', carrier.operatingStatus || 'Unknown', '#b8c8b8') +
+          fmcsaStatBox('BIPD Insurance', bipdDisplay, hasInsurance ? 'var(--green)' : 'var(--red)') +
+          fmcsaStatBox('Common Authority', carrier.commonAuthorityStatus === 'A' ? '✅ Active' : '—', carrier.commonAuthorityStatus === 'A' ? 'var(--green)' : '#b8c8b8') +
           fmcsaStatBox('Power Units', carrier.totalPowerUnits || '—', 'var(--text)') +
           fmcsaStatBox('Drivers', carrier.totalDrivers || '—', 'var(--text)') +
-          fmcsaStatBox('OOS Rate', oosRate, parseFloat(carrier.oosRate||0) > 20 ? 'var(--amber)' : 'var(--green)') +
-          fmcsaStatBox('National OOS Avg', nationalOOS, '#b8c8b8') +
+          fmcsaStatBox('Driver OOS Rate', driverOos + ' (avg ' + driverOosAvg + '%)', parseFloat(carrier.driverOosRate||0) > 10 ? 'var(--amber)' : 'var(--green)') +
+          fmcsaStatBox('Vehicle OOS Rate', vehicleOos + ' (avg ' + vehicleOosAvg + '%)', parseFloat(carrier.vehicleOosRate||0) > 25 ? 'var(--amber)' : 'var(--green)') +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -2335,23 +2345,42 @@ function renderFMCSACard(carrier, state) {
         fmcsaDetailRow('Legal Name', carrier.legalName || '—') +
         fmcsaDetailRow('DBA Name', carrier.dbaName || '—') +
         fmcsaDetailRow('DOT Number', carrier.dotNumber || '—') +
-        fmcsaDetailRow('MC Number', carrier.docketNumber || '—') +
-        fmcsaDetailRow('Entity Type', carrier.entityType || '—') +
-        fmcsaDetailRow('Phone', carrier.telephone || '—') +
-        fmcsaDetailRow('State', carrier.phyState || '—') +
-        fmcsaDetailRow('BIPD Insurance', carrier.bipdInsuranceOnFile === 'Y' ? '✅ On File' : '❌ Not on File') +
-        fmcsaDetailRow('Cargo Insurance', carrier.cargoInsuranceOnFile === 'Y' ? '✅ On File' : '❌ Not on File') +
-        fmcsaDetailRow('Bond/Trust', carrier.bondInsuranceOnFile === 'Y' ? '✅ On File' : '❌ Not on File') +
+        fmcsaDetailRow('Entity Type', carrier.censusTypeId ? carrier.censusTypeId.censusTypeDesc : '—') +
+        fmcsaDetailRow('City / State', (carrier.phyCity || '') + (carrier.phyState ? ', ' + carrier.phyState : '')) +
+        fmcsaDetailRow('BIPD Insurance', bipdDisplay) +
+        fmcsaDetailRow('Cargo Insurance', cargoOnFile ? '✅ On File' : 'Not Required') +
+        fmcsaDetailRow('Bond/Trust', bondOnFile ? '✅ On File' : 'Not Required') +
+        fmcsaDetailRow('Common Authority', carrier.commonAuthorityStatus === 'A' ? '✅ Active' : carrier.commonAuthorityStatus || '—') +
+        fmcsaDetailRow('Broker Authority', carrier.brokerAuthorityStatus === 'A' ? '✅ Active' : 'Not Active') +
+        fmcsaDetailRow('Carrier Operation', carrier.carrierOperation ? carrier.carrierOperation.carrierOperationDesc : '—') +
+        fmcsaDetailRow('Total Crashes', carrier.crashTotal !== undefined ? carrier.crashTotal : '—') +
+        fmcsaDetailRow('Fatal Crashes', carrier.fatalCrash !== undefined ? carrier.fatalCrash : '—') +
+      '</div>' +
+    '</div>' +
+
+    // OOS DETAIL
+    '<div class="card" style="margin-bottom:.8rem;">' +
+      '<div class="card-header"><div class="card-title">🔍 Out of Service Detail</div></div>' +
+      '<div class="card-body">' +
+        '<div style="font-size:.78rem;color:#b8c8b8;margin-bottom:.8rem;">High OOS rates flag your carrier profile to brokers and FMCSA auditors. Work to get these below national averages.</div>' +
+        fmcsaDetailRow('Driver Inspections', carrier.driverInsp || '0') +
+        fmcsaDetailRow('Driver OOS', carrier.driverOosInsp || '0') +
+        fmcsaDetailRow('Driver OOS Rate', driverOos) +
+        fmcsaDetailRow('Driver OOS Avg', driverOosAvg + '%') +
+        fmcsaDetailRow('Vehicle Inspections', carrier.vehicleInsp || '0') +
+        fmcsaDetailRow('Vehicle OOS', carrier.vehicleOosInsp || '0') +
+        fmcsaDetailRow('Vehicle OOS Rate', vehicleOos) +
+        fmcsaDetailRow('Vehicle OOS Avg', vehicleOosAvg + '%') +
       '</div>' +
     '</div>' +
 
     // WHAT THIS MEANS
-    '<div class="alert alert-green" style="margin-bottom:1rem;">' +
+    '<div class="alert ' + (authStatus && hasInsurance ? 'alert-green' : 'alert-amber') + '" style="margin-bottom:1rem;">' +
       '<div class="alert-icon">💡</div>' +
       '<div style="font-size:.82rem;line-height:1.7;">' +
         '<strong>Why this matters:</strong> Brokers check your FMCSA record before every load. ' +
-        (authStatus && hasInsurance && safetyRating !== 'Unsatisfactory'
-          ? 'Your record looks clean. Brokers will book you with confidence.'
+        (authStatus && hasInsurance && safetyRating.toLowerCase() !== 'unsatisfactory'
+          ? 'Your authority is active and insurance is confirmed. Brokers will book you with confidence.'
           : 'Some items need attention. Fix these to avoid being passed over for loads.') +
       '</div>' +
     '</div>' +
