@@ -2166,8 +2166,17 @@ async function loadFMCSAProfile() {
   renderFMCSACard(null, 'loading');
   var data = await fetchFMCSAProfile(mc);
   if (!data) { renderFMCSACard(null, 'error'); return; }
-  // Parse the carrier object — FMCSA returns content.carrier
-  var carrier = (data.content && data.content.carrier) ? data.content.carrier : data.carrier || data;
+  // Parse the carrier object — FMCSA returns content as an array: content[0].carrier
+  var carrier = null;
+  if (data.content && Array.isArray(data.content) && data.content[0] && data.content[0].carrier) {
+    carrier = data.content[0].carrier;
+  } else if (data.content && data.content.carrier) {
+    carrier = data.content.carrier;
+  } else if (data.carrier) {
+    carrier = data.carrier;
+  } else {
+    carrier = data;
+  }
   _fmcsaData = carrier;
   window._fmcsaData = carrier;
   // Save to Supabase profile
