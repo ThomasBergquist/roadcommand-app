@@ -1222,22 +1222,31 @@
 
 </div><!-- end main -->
 
-<!-- BOTTOM NAV - 9 tabs scrollable -->
+<!-- MORE DRAWER OVERLAY -->
+<div id="more-overlay" class="more-overlay" onclick="closeMoreDrawer()"></div>
+
+<!-- MORE DRAWER -->
+<div id="more-drawer" class="more-drawer">
+  <div class="more-drawer-handle"></div>
+  <div class="more-drawer-title">More Tools</div>
+  <div class="more-drawer-grid">
+    <button class="more-drawer-btn" onclick="showScreen('negotiate',this)"><span class="more-drawer-icon">🤝</span><span class="more-drawer-label">Dispatcher</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('states',this)"><span class="more-drawer-icon">🗺️</span><span class="more-drawer-label">States</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('params',this)"><span class="more-drawer-icon">⚙️</span><span class="more-drawer-label">Params</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('log',this)"><span class="more-drawer-icon">📋</span><span class="more-drawer-label">Log</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('maint',this)"><span class="more-drawer-icon">🔩</span><span class="more-drawer-label">Maint</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('settings',this)"><span class="more-drawer-icon">🔧</span><span class="more-drawer-label">Settings</span></button>
+  </div>
+</div>
+
+<!-- BOTTOM NAV - 5 primary tabs -->
 <nav class="bottom-nav" style="display:none;" id="bottom-nav">
-  <button class="nav-btn active" onclick="showScreen('dash',this)"><span class="nav-icon">📊</span>Dash</button>
-  <button class="nav-btn" onclick="showScreen('loads',this)"><span class="nav-icon">🚛</span>Loads</button>
-  <button class="nav-btn" onclick="showScreen('negotiate',this)"><span class="nav-icon">🤝</span>Negotiate</button>
-  <button class="nav-btn" onclick="showScreen('tools',this)"><span class="nav-icon">🛠️</span>Tools</button>
-  <button class="nav-btn" onclick="showScreen('money',this)"><span class="nav-icon">💵</span>Money</button>
-  <button class="nav-btn" onclick="showScreen('brokers',this)"><span class="nav-icon">🏦</span>Brokers</button>
-  <button class="nav-btn" onclick="showScreen('states',this)"><span class="nav-icon">🗺️</span>States</button>
-  <button class="nav-btn" onclick="showScreen('params',this)"><span class="nav-icon">⚙️</span>Params</button>
-  <button class="nav-btn" onclick="showScreen('log',this)"><span class="nav-icon">📋</span>Log</button>
-  <button class="nav-btn" onclick="showScreen('maint',this)"><span class="nav-icon">🔩</span>Maint</button>
-  <button class="nav-btn" onclick="showScreen('settings',this)"><span class="nav-icon">🔧</span>Settings</button>
+  <button class="nav-btn active" data-screen="dash" onclick="showScreen('dash',this)"><span class="nav-icon">📊</span>Dash</button>
+  <button class="nav-btn" data-screen="loads" onclick="showScreen('loads',this)"><span class="nav-icon">🚛</span>Loads</button>
+  <button class="nav-btn" data-screen="money" onclick="showScreen('money',this)"><span class="nav-icon">💵</span>Money</button>
+  <button class="nav-btn" data-screen="brokers" onclick="showScreen('brokers',this)"><span class="nav-icon">🏦</span>Brokers</button>
+  <button class="nav-btn" id="more-nav-btn" onclick="toggleMoreDrawer(event)"><span class="nav-icon">☰</span>More</button>
 </nav>
-<div class="nav-scroll-hint"></div>
-<div class="nav-swipe-hint" id="swipe-hint">← swipe for more tabs</div>
 
 
 
