@@ -2487,9 +2487,9 @@ function updateDashboardStats() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// SURVIVAL SCORE (like SmartPlan but better — uses real data)
+// COMMAND SCORE — carrier business health calculated from real data
 // ══════════════════════════════════════════════════════════════
-function calcSurvivalScore() {
+function calcCommandScore() {
   var score = 50; // base
   var factors = [];
 
@@ -2534,13 +2534,13 @@ function calcSurvivalScore() {
   return { score, tier, color, label, factors };
 }
 
-function renderSurvivalScore() {
-  var card = document.getElementById('survival-score-card');
+function renderCommandScore() {
+  var card = document.getElementById('command-score-card');
   if (!card) return;
-  var { score, color, label, factors } = calcSurvivalScore();
+  var { score, color, label, factors } = calcCommandScore();
   card.innerHTML =
-    '<div class="card-header" style="cursor:pointer;" onclick="toggleSurvivalDetail()">' +
-      '<div class="card-title">📈 Carrier Survival Score</div>' +
+    '<div class="card-header" style="cursor:pointer;" onclick="toggleCommandDetail()">' +
+      '<div class="card-title">📈 Carrier Command Score</div>' +
       '<span style="font-size:.75rem;color:#b8c8b8;">Tap for details ▼</span>' +
     '</div>' +
     '<div class="card-body" style="padding:.8rem 1rem;">' +
@@ -2554,7 +2554,7 @@ function renderSurvivalScore() {
       '<div style="background:var(--surface2);border-radius:100px;height:6px;overflow:hidden;margin-bottom:.8rem;">' +
         '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + score + '%;transition:width .5s;"></div>' +
       '</div>' +
-      '<div id="survival-detail" style="display:none;">' +
+      '<div id="command-detail" style="display:none;">' +
         factors.map(function(f) {
           var ic = f.t === 'good' ? '✅' : f.t === 'warn' ? '⚠️' : '❌';
           var fc = f.t === 'good' ? 'var(--green)' : f.t === 'warn' ? 'var(--amber)' : 'var(--red)';
@@ -2565,8 +2565,8 @@ function renderSurvivalScore() {
     '</div>';
 }
 
-function toggleSurvivalDetail() {
-  var d = document.getElementById('survival-detail');
+function toggleCommandDetail() {
+  var d = document.getElementById('command-detail');
   if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
 }
 
@@ -2575,12 +2575,12 @@ var _origOnAuthReady = onAuthReady;
 onAuthReady = function(firstName, userId, email) {
   _origOnAuthReady(firstName, userId, email);
   setTimeout(loadSavedMCNumber, 1500);
-  setTimeout(function() { updateDashboardStats(); renderSurvivalScore(); }, 3000);
+  setTimeout(function() { updateDashboardStats(); renderCommandScore(); }, 3000);
 };
 
-// Also refresh survival score when invoices load
+// Also refresh command score when invoices load
 var _origLoadInvoices = loadInvoices;
 loadInvoices = async function() {
   await _origLoadInvoices();
-  setTimeout(function() { updateDashboardStats(); renderSurvivalScore(); }, 500);
+  setTimeout(function() { updateDashboardStats(); renderCommandScore(); }, 500);
 };
