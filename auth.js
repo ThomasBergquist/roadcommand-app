@@ -6,6 +6,8 @@
 const SUPABASE_URL      = 'https://kaxspubuhzpqgbomvcmo.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtheHNwdWJ1aHpwcWdib212Y21vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5ODU4NzgsImV4cCI6MjA5MjU2MTg3OH0._5mvIKv2ZhtDRzT2yLf8NeDH8VseqKy47g9nXczXndM';
 
+const BETA_CODE = 'RCfirst15';
+
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window._supabase = _supabase;
 
@@ -15,20 +17,23 @@ let _currentUser = null;
 // ── Toggle Sign In / Sign Up ─────────────────────────────────────
 function toggleAuthMode() {
   _authMode = _authMode === 'signin' ? 'signup' : 'signin';
-  const title  = document.getElementById('auth-title');
-  const btn    = document.getElementById('auth-submit-btn');
-  const toggle = document.getElementById('auth-toggle');
-  const badge  = document.getElementById('auth-badge');
+  const title    = document.getElementById('auth-title');
+  const btn      = document.getElementById('auth-submit-btn');
+  const toggle   = document.getElementById('auth-toggle');
+  const badge    = document.getElementById('auth-badge');
+  const codeWrap = document.getElementById('beta-code-wrap');
   if (_authMode === 'signup') {
     title.textContent   = 'Create Your Account';
     btn.textContent     = 'Sign Up Free';
     toggle.innerHTML    = 'Already have an account? <a onclick="toggleAuthMode()">Sign in</a>';
     badge.style.display = 'block';
+    if (codeWrap) codeWrap.style.display = 'block';
   } else {
     title.textContent   = 'Sign In';
     btn.textContent     = 'Sign In';
     toggle.innerHTML    = 'No account? <a onclick="toggleAuthMode()">Sign up free</a>';
     badge.style.display = 'none';
+    if (codeWrap) codeWrap.style.display = 'none';
   }
   clearAuthError();
 }
@@ -52,6 +57,17 @@ async function authSubmit() {
   const password = document.getElementById('auth-password').value;
   const btn      = document.getElementById('auth-submit-btn');
   if (!email || !password) { showAuthError('Email and password are required.'); return; }
+
+  // Beta code check on signup only
+  if (_authMode === 'signup') {
+    const codeInput = document.getElementById('beta-code');
+    const entered   = codeInput ? codeInput.value.trim() : '';
+    if (entered !== BETA_CODE) {
+      showAuthError('Invalid beta access code. Contact admin@roadcommand.co to join the beta.');
+      return;
+    }
+  }
+
   btn.textContent = 'Please wait...';
   btn.disabled    = true;
   try {
@@ -90,17 +106,14 @@ function showProfileSetup() {
 }
 
 async function saveProfile() {
-  const firstName   = document.getElementById('profile-firstname').value.trim();
-  const codriver    = document.getElementById('profile-codriver').value.trim();
-  const truckYear   = document.getElementById('profile-year').value.trim();
-  const truckModel  = document.getElementById('profile-model').value.trim();
-  const btn         = document.getElementById('profile-save-btn');
-
+  const firstName  = document.getElementById('profile-firstname').value.trim();
+  const codriver   = document.getElementById('profile-codriver').value.trim();
+  const truckYear  = document.getElementById('profile-year').value.trim();
+  const truckModel = document.getElementById('profile-model').value.trim();
+  const btn        = document.getElementById('profile-save-btn');
   if (!firstName) { alert('First name is required.'); return; }
-
   btn.textContent = 'Saving...';
   btn.disabled    = true;
-
   try {
     const { error } = await _supabase.from('profiles').insert({
       user_id:     _currentUser.id,
@@ -126,22 +139,15 @@ async function loadProfileAndEnter() {
       .select('*')
       .eq('user_id', _currentUser.id)
       .single();
-
-    if (error || !data) {
-      // No profile yet — show setup screen
-      showProfileSetup();
-      return;
-    }
+    if (error || !data) { showProfileSetup(); return; }
     enterApp(data);
   } catch (err) {
-    // If anything fails just enter with email prefix
     enterApp({ first_name: _currentUser.email.split('@')[0] });
   }
 }
 
 // ── Enter App ────────────────────────────────────────────────────
 function enterApp(profile) {
-  // Store globally for app.js to use
   window._rcUserFirstName = profile.first_name || 'Driver';
   window._rcUserCodriver  = profile.codriver   || '';
   window._rcTruckYear     = profile.truck_year  || '';
@@ -149,20 +155,15 @@ function enterApp(profile) {
   window._rcUserId        = _currentUser.id;
   window._rcUserEmail     = _currentUser.email;
 
-  // Hide auth/profile screens
   document.getElementById('auth-screen').classList.remove('active');
   document.getElementById('profile-setup-screen').classList.remove('active');
-
-  // Show app
   document.querySelector('.app-header').style.display = '';
   document.getElementById('main-app').style.display   = '';
   document.getElementById('bottom-nav').style.display = '';
 
-   // Wire up workers
   window._rcEIAWorker = 'https://eia-diesel-price.wild-sunset-1d5f.workers.dev';
   window._rcAIWorker  = 'https://roadcommand-ai.wild-sunset-1d5f.workers.dev';
 
-  // Call app.js init
   onAuthReady(profile.first_name, _currentUser.id, _currentUser.email);
 }
 
@@ -189,7 +190,7 @@ async function signOut() {
 
 // ── Enter key support ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
-  ['auth-email', 'auth-password'].forEach(function(id) {
+  ['auth-email', 'auth-password', 'beta-code'].forEach(function(id) {
     const el = document.getElementById(id);
     if (el) el.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') authSubmit();
