@@ -321,8 +321,7 @@ function injectProfitBars() {
       '<div class="profit-left">' +
         '<div class="profit-net ' + tier + '">' + (net >= 0 ? '' : '-') + fmt(net) + ' net</div>' +
         '<div class="profit-detail">After fuel ' + fmt(fuelCost) + ' · ' + fmt(rate / miles) + '/mi loaded</div>' +
-      '</div>' +
-      '<span class="profit-verdict verdict-' + tier + '">' + verdictText + '</span>';
+      '</div>';
     const actions = card.querySelector('.load-actions');
     card.insertBefore(bar, actions);
   });
