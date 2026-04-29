@@ -876,3 +876,104 @@ body.night-mode {
 .auth-error { background:var(--red-dim); border:1px solid rgba(255,126,126,.35); border-radius:3px; padding:.6rem .9rem; font-size:.82rem; color:var(--red); margin-bottom:.8rem; display:none; }
 .auth-error.show { display:block; }
 .auth-beta-badge { background:var(--amber-dim); border:1px solid rgba(255,208,77,.35); color:var(--amber); font-size:.72rem; padding:.3rem .8rem; border-radius:100px; text-align:center; margin-bottom:1rem; font-weight:bold; letter-spacing:.06em; }
+
+/* ── MORE DRAWER ─────────────────────────────────────────── */
+.more-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 89;
+}
+.more-overlay.open { display: block; }
+
+.more-drawer {
+  position: fixed;
+  bottom: -100%;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--green-border);
+  border-radius: 16px 16px 0 0;
+  z-index: 90;
+  padding: 0 1rem 2rem;
+  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.more-drawer.open { bottom: 60px; }
+
+.more-drawer-handle {
+  width: 40px;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  margin: 12px auto 0;
+}
+
+.more-drawer-title {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  padding: .6rem 0 1rem;
+}
+
+.more-drawer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+}
+
+.more-drawer-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .4rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .9rem .5rem;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  min-height: 72px;
+}
+.more-drawer-btn:active {
+  background: var(--green-dim);
+  border-color: var(--green-border);
+}
+
+.more-drawer-icon { font-size: 1.4rem; }
+.more-drawer-label {
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+/* ── AI DISCLAIMER ───────────────────────────────────────── */
+.ai-disclaimer {
+  font-size: .68rem;
+  color: #b8c8b8;
+  opacity: .8;
+  font-style: italic;
+  margin-top: .3rem;
+  padding: .2rem 0;
+}
+
+/* ── EMPTY STATES ────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+}
+.empty-state-icon {
+  font-size: 2.5rem;
+  margin-bottom: .8rem;
+  opacity: .6;
+}
+.empty-state-msg {
+  font-size: .9rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
