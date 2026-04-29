@@ -1,5 +1,32 @@
 /* RoadCommand — app.js */
 
+// ── DISCLAIMER CONSTANTS ─────────────────────────────────────
+var AI_DISCLAIMER = '<div class="ai-disclaimer">Estimates only. Verify rates and costs independently before booking.</div>';
+var HOS_DISCLAIMER = '<div class="ai-disclaimer">Always verify your actual hours with your ELD before accepting a load.</div>';
+var AI_SCRIPT_DISCLAIMER = '<div class="ai-disclaimer">AI-generated script. Use as a starting point — adjust for your situation and market conditions.</div>';
+
+// ── MORE DRAWER ───────────────────────────────────────────────
+function toggleMoreDrawer(e) {
+  if (e) e.stopPropagation();
+  var drawer = document.getElementById('more-drawer');
+  var overlay = document.getElementById('more-overlay');
+  var moreBtn = document.getElementById('more-nav-btn');
+  if (!drawer) return;
+  var isOpen = drawer.classList.contains('open');
+  drawer.classList.toggle('open', !isOpen);
+  if (overlay) overlay.classList.toggle('open', !isOpen);
+  if (moreBtn) moreBtn.classList.toggle('active', !isOpen);
+}
+
+function closeMoreDrawer() {
+  var drawer = document.getElementById('more-drawer');
+  var overlay = document.getElementById('more-overlay');
+  var moreBtn = document.getElementById('more-nav-btn');
+  if (drawer) drawer.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+  if (moreBtn) moreBtn.classList.remove('active');
+}
+
 // ══════════════════════════════════════════════════════════════
 // AUTH & SUPABASE INTEGRATION
 // ══════════════════════════════════════════════════════════════
@@ -53,7 +80,7 @@ function submitFeedback() {
   if (!msg) { alert('Please describe your feedback before submitting.'); return; }
   var subject = encodeURIComponent('[RoadCommand ' + type + '] Feedback');
   var body    = encodeURIComponent(msg + '\n\n— ' + (window._rcUserEmail || 'user'));
-  window.location.href = 'mailto:levi@roadcommand.co?subject=' + subject + '&body=' + body;
+  window.location.href = 'mailto:admin@roadcommand.co?subject=' + subject + '&body=' + body;
   document.getElementById('feedback-msg').value = '';
   alert('Thanks! Your feedback is on its way.');
 }
@@ -71,6 +98,11 @@ let stateData = [
 
 function renderStates(data) {
   const list = document.getElementById('state-list');
+  if (!list) return;
+  if (!data || !data.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🗺️</div><div class="empty-state-msg">No state data yet.<br>Log a load to start tracking volume by state.</div></div>';
+    return;
+  }
   const maxVol = Math.max(...data.map(s => s.volume));
   list.innerHTML = data.map((s, i) => {
     const pct = Math.round((s.volume / maxVol) * 100);
@@ -135,29 +167,29 @@ function addStateData() {
 
 function callBroker(phone, name) {
   const clean = phone.replace(/[^0-9+]/g,'');
-  if (confirm(`Call ${name}?\n${phone}`)) {
+  if (confirm('Call ' + name + '?\n' + phone)) {
     window.location.href = 'tel:' + clean;
   }
 }
 
 function showScreen(id, btn) {
+  closeMoreDrawer();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('screen-' + id).classList.add('active');
+  var screen = document.getElementById('screen-' + id);
+  if (screen) screen.classList.add('active');
   if (btn) btn.classList.add('active');
+  // Keep the More button active if navigating to a drawer screen
+  var drawerScreens = ['negotiate','tools','states','params','log','maint','settings'];
+  if (drawerScreens.indexOf(id) >= 0) {
+    var moreBtn = document.getElementById('more-nav-btn');
+    if (moreBtn) moreBtn.classList.add('active');
+  }
   track('tab_opened', { tab: id });
 }
 
 function goToSettings() {
-  var btns = document.querySelectorAll('.nav-btn');
-  var settingsBtn = null;
-  btns.forEach(function(b) {
-    if (b.textContent.indexOf('Settings') >= 0) settingsBtn = b;
-  });
-  showScreen('settings', settingsBtn);
-  if (settingsBtn) {
-    settingsBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }
+  showScreen('settings', null);
 }
 
 function watchLoad(btn) {
@@ -185,7 +217,7 @@ function showAddRun() {
 function saveRun() { alert('Run logged!'); document.getElementById('add-run-form').style.display = 'none'; }
 
 function calcLoad(rate, miles) {
-  showScreen('calc', document.querySelectorAll('.nav-btn')[2]);
+  showScreen('calc', null);
   document.getElementById('calc-rate').value = rate;
   document.getElementById('calc-miles').value = miles;
   calculateProfit();
@@ -223,6 +255,11 @@ function calculateProfit() {
   document.getElementById('r-verdict').style.color = color;
   document.getElementById('r-total-row').className = net >= 0 ? 'calc-row total' : 'calc-row total loss';
   document.getElementById('calc-result').style.display = 'block';
+  // Add disclaimer after verdict if not already present
+  var calcResult = document.getElementById('calc-result');
+  if (calcResult && !calcResult.querySelector('.ai-disclaimer')) {
+    calcResult.insertAdjacentHTML('beforeend', AI_DISCLAIMER);
+  }
 }
 
 function saveParams() {
@@ -280,12 +317,12 @@ function injectProfitBars() {
     if (existing) existing.remove();
     const bar = document.createElement('div');
     bar.className = 'load-profit ' + tier;
-    bar.innerHTML = `
-      <div class="profit-left">
-        <div class="profit-net ${tier}">${net >= 0 ? '' : '-'}${fmt(net)} net</div>
-        <div class="profit-detail">After fuel ${fmt(fuelCost)} · ${fmt(rate / miles)}/mi loaded</div>
-      </div>
-      <span class="profit-verdict verdict-${tier}">${verdictText}</span>`;
+    bar.innerHTML =
+      '<div class="profit-left">' +
+        '<div class="profit-net ' + tier + '">' + (net >= 0 ? '' : '-') + fmt(net) + ' net</div>' +
+        '<div class="profit-detail">After fuel ' + fmt(fuelCost) + ' · ' + fmt(rate / miles) + '/mi loaded</div>' +
+      '</div>' +
+      '<span class="profit-verdict verdict-' + tier + '">' + verdictText + '</span>';
     const actions = card.querySelector('.load-actions');
     card.insertBefore(bar, actions);
   });
@@ -299,12 +336,11 @@ const TUTORIAL_STEPS = [
   { icon: '📊', title: 'Dashboard', desc: 'Your command center. Live GPS location, real diesel price for your region, weekly revenue and RPM stats, estimated fuel cost, and hot loads matching your parameters — all updating automatically.', tip: '<strong>Tap the diesel price box</strong> to report what you actually paid at the pump.' },
   { icon: '⛽', title: 'Crowdsourced Fuel Prices', desc: 'Every time you fuel up, tap the diesel box on the dashboard and enter what you paid. Your report is averaged with other RoadCommand drivers within 100 miles.', tip: '<strong>The more drivers report, the more accurate it gets.</strong>' },
   { icon: '🚛', title: 'Loads Tab', desc: 'All your loads — Hot, Watching, and Booked. Every card shows auto profit calculated from your real local diesel price.', tip: '<strong>Deadhead cost uses your Empty MPG</strong> — set in Settings.' },
-  { icon: '🤝', title: 'Negotiate Tab', desc: 'Three weapons in one tab: Broker Scorecard, Rate Coach, and AI Script that generates a word-for-word phone script.', tip: '<strong>Use AI Script before every negotiation call.</strong>' },
+  { icon: '🤝', title: 'Dispatcher Tab', desc: 'Your full negotiation and tools hub. Broker Scorecard, Rate Coach, AI Script, Lane Planner, HOS Checker, and Load Doc Tracker — all in one place.', tip: '<strong>Use AI Script before every negotiation call.</strong>' },
   { icon: '🏦', title: 'Broker Vault', desc: 'Your permanent broker network. Add every broker you work with. Every invoice links to their profile.', tip: '<strong>Upload Rate Confirmations and BOLs</strong> directly to each invoice.' },
   { icon: '💵', title: 'Money Tab', desc: 'Your full invoice tracker. Outstanding and overdue totals at the top. Every invoice color-coded.', tip: '<strong>Log invoices the day you deliver.</strong> Mark Paid to move them out of your active view.' },
-  { icon: '🛠️', title: 'Tools Tab', desc: 'Lane Planner, HOS Checker, and Load Doc Tracker.', tip: '<strong>Always run Lane Planner before accepting a load.</strong>' },
   { icon: '🔧', title: 'Maintenance Tab', desc: 'Track every service item on your truck. Cost per mile feeds directly into profit calculations.', tip: '<strong>Your real maintenance cost per mile</strong> is used in every profit calculation.' },
-  { icon: '⚙️', title: 'Settings Tab', desc: 'Set your loaded MPG and empty MPG separately. Adjust text size and display mode.', tip: '<strong>Set Empty MPG accurately.</strong> It affects deadhead fuel cost calculations.' },
+  { icon: '⚙️', title: 'Settings Tab', desc: 'Set your loaded MPG and empty MPG separately. Adjust text size and display mode. Access all additional tools from the More menu.', tip: '<strong>Set Empty MPG accurately.</strong> It affects deadhead fuel cost calculations.' },
 ];
 
 let currentStep = 0;
@@ -313,16 +349,15 @@ function renderTutorialStep(step) {
   const s = TUTORIAL_STEPS[step];
   const total = TUTORIAL_STEPS.length;
   document.getElementById('t-step-count').textContent = 'Step ' + (step+1) + ' of ' + total;
-  document.getElementById('t-body').innerHTML = `
-    <div class="tutorial-icon">${s.icon}</div>
-    <div class="tutorial-screen-title">${s.title}</div>
-    <div class="tutorial-desc">${s.desc}</div>
-    <div class="tutorial-tip">${s.tip}</div>
-  `;
+  document.getElementById('t-body').innerHTML =
+    '<div class="tutorial-icon">' + s.icon + '</div>' +
+    '<div class="tutorial-screen-title">' + s.title + '</div>' +
+    '<div class="tutorial-desc">' + s.desc + '</div>' +
+    '<div class="tutorial-tip">' + s.tip + '</div>';
   const dotsEl = document.getElementById('t-dots');
-  dotsEl.innerHTML = TUTORIAL_STEPS.map((_,i) => `<div class="t-dot ${i===step?'active':''}"></div>`).join('');
+  dotsEl.innerHTML = TUTORIAL_STEPS.map((_,i) => '<div class="t-dot ' + (i===step?'active':'') + '"></div>').join('');
   const nextBtn = document.getElementById('t-next-btn');
-  nextBtn.textContent = step === total-1 ? "Lets Go! 🚛" : "Tap anywhere →";
+  nextBtn.textContent = step === total-1 ? 'Lets Go! 🚛' : 'Tap anywhere →';
   var backBtn = document.getElementById('t-back-btn');
   if (backBtn) backBtn.style.display = step === 0 ? 'none' : 'inline-block';
 }
@@ -339,7 +374,7 @@ function skipTutorial() {
   try { localStorage.setItem('rc-tutorialdone-v8', '1'); } catch(e) {}
 }
 function startTutorial() {
-  tutorialSeen = false; currentStep = 0; renderTutorialStep(0);
+  currentStep = 0; renderTutorialStep(0);
   document.getElementById('tutorial-overlay').style.display = 'flex';
 }
 function checkFirstTime() {
@@ -367,7 +402,7 @@ function showHelp(toolId) {
   if (!h) return;
   document.getElementById('help-modal-title-text').textContent = h.title;
   document.getElementById('help-modal-body').innerHTML = h.steps.map((s,i) =>
-    `<div class="help-step"><div class="help-step-num">${i+1}</div><div>${s}</div></div>`
+    '<div class="help-step"><div class="help-step-num">' + (i+1) + '</div><div>' + s + '</div></div>'
   ).join('');
   document.getElementById('help-modal-overlay').classList.remove('hidden');
 }
@@ -561,7 +596,7 @@ function findNearestLoads() {
   container.innerHTML = filtered.map(function(l) {
     var net = Math.round(l.rate - (l.miles / defaults.mpg) * defaults.fuelPrice);
     return '<div class="return-card ' + (l.rpm >= 2.30 ? 'good' : '') + '"><div class="return-top"><div class="return-route">' + l.route + '</div><div class="return-rate">$' + l.rate.toLocaleString() + '</div></div><div class="return-stats"><span>Miles: <strong>' + l.miles + '</strong></span><span>RPM: <strong>$' + l.rpm.toFixed(2) + '</strong></span><span>Est. Net: <strong>$' + net.toLocaleString() + '</strong></span></div></div>';
-  }).join("");
+  }).join("") + AI_DISCLAIMER;
 }
 
 function planLane() {
@@ -583,6 +618,11 @@ function planLane() {
   }).join("");
   document.getElementById("lane-advice").innerHTML = "Outbound: <strong>" + origin + " to " + dest + "</strong> · $" + rate.toLocaleString() + " · $" + outRpm + "/mi · Est. net $" + outNet.toLocaleString() + "<br>Lock a return load from <strong>" + dest + "</strong> before you deliver the outbound.";
   document.getElementById("lane-result").style.display = "block";
+  // Add disclaimer after result
+  var laneResult = document.getElementById("lane-result");
+  if (laneResult && !laneResult.querySelector('.ai-disclaimer')) {
+    laneResult.insertAdjacentHTML('beforeend', AI_DISCLAIMER);
+  }
 }
 
 function checkHOS() {
@@ -596,9 +636,10 @@ function checkHOS() {
   var totalNeeded = driveTime + pickup;
   var buffer = hours - totalNeeded;
   var legal = buffer >= 0;
-  container.innerHTML = legal
+  container.innerHTML = (legal
     ? '<div class="hos-pass"><div class="hos-title">✅ Legal — You Can Make This Load</div><div class="hos-detail">Drive time: <strong>' + driveTime.toFixed(1) + ' hrs</strong> at ' + speed + ' mph<br>Pickup window: <strong>' + pickup + ' hrs</strong><br>Total needed: <strong>' + totalNeeded.toFixed(1) + ' hrs</strong><br>Your available: <strong>' + hours + ' hrs</strong><br>Buffer: <strong>' + buffer.toFixed(1) + ' hrs</strong> to spare</div></div>'
-    : '<div class="hos-fail"><div class="hos-title">❌ Illegal — Do Not Accept This Load</div><div class="hos-detail">You need <strong>' + totalNeeded.toFixed(1) + ' hours</strong> but only have <strong>' + hours + ' hours</strong>.<br>You are short <strong>' + Math.abs(buffer).toFixed(1) + ' hours</strong>.<br><br>Options: Reset your clock, negotiate a later pickup, or pass on this load.</div></div>';
+    : '<div class="hos-fail"><div class="hos-title">❌ Illegal — Do Not Accept This Load</div><div class="hos-detail">You need <strong>' + totalNeeded.toFixed(1) + ' hours</strong> but only have <strong>' + hours + ' hours</strong>.<br>You are short <strong>' + Math.abs(buffer).toFixed(1) + ' hours</strong>.<br><br>Options: Reset your clock, negotiate a later pickup, or pass on this load.</div></div>')
+    + HOS_DISCLAIMER;
   container.style.display = "block";
 }
 
@@ -712,7 +753,6 @@ function updateMoneyTotals() {
   if (mv) mv.textContent = "$" + overdue.toLocaleString();
 }
 
-// ── RENDER INVOICES — active unpaid + collapsible paid this month ──
 function renderInvoices() {
   var list = document.getElementById("invoice-list");
   if (!list) return;
@@ -722,7 +762,7 @@ function renderInvoices() {
   var paidThisMonth  = invoices.filter(function(inv) { return inv.status === "paid" && new Date(inv.date) >= thisMonthStart; });
 
   if (!invoices.length) {
-    list.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">📋</div><div>No invoices logged yet. Add your first invoice above to start tracking payments.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💵</div><div class="empty-state-msg">Your first load is out there. Book it and log the invoice here — tap Add Invoice above after you deliver.</div></div>';
     updateMoneyTotals();
     return;
   }
@@ -819,7 +859,14 @@ function recalcPanel(panelId, rate, miles) {
   var npmEl = document.getElementById("npm_" + panelId);
   if (npmEl) { npmEl.textContent = "$" + npm + "/mi"; npmEl.className = "expand-val " + (parseFloat(npm) >= 1.50 ? "green" : "amber"); }
   var verdictEl = document.getElementById("verdict_" + panelId);
-  if (verdictEl) { verdictEl.textContent = verdictText; verdictEl.className = "expand-verdict " + tier; }
+  if (verdictEl) {
+    verdictEl.textContent = verdictText;
+    verdictEl.className = "expand-verdict " + tier;
+    // Add disclaimer after verdict if not already there
+    if (!verdictEl.nextElementSibling || !verdictEl.nextElementSibling.classList.contains('ai-disclaimer')) {
+      verdictEl.insertAdjacentHTML('afterend', AI_DISCLAIMER);
+    }
+  }
   checkDeadhead(panelId, rate, miles);
   if (window._rcAIWorker || window._rcAnthropicKey) {
     var ve = document.getElementById('verdict_' + panelId);
@@ -897,6 +944,7 @@ function addReturnLoad(route, miles, rate) {
         '<div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">' + miles + '</div></div>' +
       '</div>' +
       '<div class="expand-verdict ' + tier + '" id="verdict_' + panelId + '">' + verdict + '</div>' +
+      AI_DISCLAIMER +
       '<div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div><div class="expand-notes-text" id="notes_' + panelId + '">Return load added from Loadback.</div></div>' +
     '</div>' +
     '<div class="load-actions">' +
@@ -907,8 +955,7 @@ function addReturnLoad(route, miles, rate) {
   if (firstCard) loadsScreen.insertBefore(newCard, firstCard);
   else loadsScreen.appendChild(newCard);
   closeLoadbackDirect();
-  var loadsBtn = null;
-  document.querySelectorAll(".nav-btn").forEach(function(b) { if (b.textContent.indexOf("Loads") >= 0) loadsBtn = b; });
+  var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
   showScreen("loads", loadsBtn);
 }
 
@@ -919,9 +966,7 @@ function reopenLoadback() {
 
 function goToInvoice() {
   closeLoadbackDirect();
-  var moneyBtn = null;
-  document.querySelectorAll(".nav-btn").forEach(function(b) { if (b.textContent.indexOf("Money") >= 0) moneyBtn = b; });
-  showScreen("money", moneyBtn);
+  showScreen("money", document.querySelector('.nav-btn[data-screen="money"]'));
   var invCard = document.querySelector("#screen-money .card");
   if (invCard) {
     invCard.style.borderColor = "var(--green)";
@@ -1161,7 +1206,7 @@ async function fetchFuelPrice(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
@@ -1365,15 +1410,16 @@ function showLoadback(origin, dest, rate, miles, broker, phone) {
     '</div>' +
     '<div class="loadback-arrival">🕐 Estimated arrival at <strong>' + dest + '</strong>: <strong>' + arrivalStr + '</strong><br>' +
       '<span style="font-size:.78rem;opacity:.8;">' + miles + ' mi · ' + driveOnlyHrs + ' hrs drive · ' + hosNote + '</span><br>' +
-      '<span style="font-size:.75rem;opacity:.65;color:#ffd04d;">HOS: 11hr drive / 14hr window / 10hr reset rule applied</span></div>' +
+      '<span style="font-size:.75rem;opacity:.65;color:#ffd04d;">HOS: 11hr drive / 14hr window / 10hr reset rule applied</span><br>' +
+      HOS_DISCLAIMER + '</div>' +
     '<div class="loadback-section-title">Return Loads Available From ' + dest + '</div>' +
-    loadsHtml +
+    loadsHtml + AI_DISCLAIMER +
     '<button class="btn btn-green" onclick="goToInvoice()" style="margin-top:.5rem;">📋 Log Invoice in Money Tab →</button><div style="height:1rem;"></div>';
   panel.classList.add("open");
 }
 
 // ══════════════════════════════════════════════════════════════
-// BROKER VAULT — Supabase backed, 15-day filter + search
+// BROKER VAULT — Supabase backed
 // ══════════════════════════════════════════════════════════════
 var _brokers = [], _brokerInvoices = {}, _brokerSearchQuery = '';
 
@@ -1416,7 +1462,6 @@ async function loadBrokers() {
   } catch(err) { console.error('Error loading brokers:', err); }
 }
 
-// ── Search brokers ────────────────────────────────────────────
 function searchBrokers() {
   var input = document.getElementById('broker-vault-search');
   _brokerSearchQuery = input ? input.value.trim().toLowerCase() : '';
@@ -1430,13 +1475,12 @@ function clearBrokerSearch() {
   renderBrokers();
 }
 
-// ── Render broker list — 15-day filter + always show unpaid ──
 function renderBrokers() {
   var list = document.getElementById('broker-list');
   if (!list) return;
 
   if (!_brokers.length) {
-    list.innerHTML = '<div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">🏦</div><div>No brokers added yet. Add your first broker above.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏦</div><div class="empty-state-msg">No brokers yet. Add your first broker above — every broker you haul for belongs in your vault.</div></div>';
     return;
   }
 
@@ -1454,26 +1498,21 @@ function renderBrokers() {
   if (outEl) outEl.textContent = '$' + totalOutstanding.toLocaleString();
   if (ovEl)  ovEl.textContent  = '$' + totalOverdue.toLocaleString();
 
-  // Filter brokers by 15-day activity OR search query
   var filteredBrokers = _brokers.filter(function(b) {
-    // Search mode — show all matching
     if (_brokerSearchQuery) {
       return b.name.toLowerCase().indexOf(_brokerSearchQuery) >= 0 ||
              (b.mc_number && b.mc_number.toLowerCase().indexOf(_brokerSearchQuery) >= 0);
     }
-    // Default — always show if has unpaid invoices
     var hasUnpaid = invoices.some(function(i) {
       return i.broker && i.broker.toLowerCase() === b.name.toLowerCase() && i.status !== 'paid';
     });
     if (hasUnpaid) return true;
-    // Show if any invoice activity in last 15 days
     return invoices.some(function(i) {
       if (!i.broker || i.broker.toLowerCase() !== b.name.toLowerCase()) return false;
       return new Date(i.date) >= fifteenDaysAgo;
     });
   });
 
-  // Count info line
   var countInfo = '';
   if (!_brokerSearchQuery) {
     var hiddenCount = _brokers.length - filteredBrokers.length;
@@ -1483,7 +1522,7 @@ function renderBrokers() {
   }
 
   if (!filteredBrokers.length) {
-    list.innerHTML = countInfo + '<div class="alert alert-amber" style="margin-top:.3rem;"><div class="alert-icon">🔍</div><div>' + (_brokerSearchQuery ? 'No brokers found matching "' + _brokerSearchQuery + '"' : 'No brokers with activity in the last 15 days. Use search to find any broker.') + '</div></div>';
+    list.innerHTML = countInfo + '<div class="alert alert-amber" style="margin-top:.3rem;"><div class="alert-icon">🔍</div><div>' + (_brokerSearchQuery ? 'No brokers found matching "' + _brokerSearchQuery + '"' : 'No brokers with recent activity. Use the search box above to find any broker.') + '</div></div>';
     return;
   }
 
@@ -1507,7 +1546,6 @@ function renderBrokers() {
   }).join('');
 }
 
-// ── Broker Detail Panel — last 12 months invoice history ──
 function openBrokerDetail(brokerId) {
   var broker = _brokers.find(function(b) { return b.id === brokerId; });
   if (!broker) return;
@@ -1653,7 +1691,7 @@ async function exportMonthlyTax(year, month) {
       var inv = monthInvoices[i]; totalAmount += inv.amount; if (inv.status === 'paid') paidAmount += inv.amount;
       csvLines.push([inv.date, '"' + (inv.broker||'') + '"', '"' + (inv.ref||'') + '"', inv.amount, inv.dueDate, inv.status, '"' + (inv.notes||'') + '"'].join(','));
       var safeBroker = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-');
-      var invFolder = monthFolder.folder('Invoice-' + safeBroker + '-' + (inv.date||'nodate'));
+      var invFolder = monthFolder.folder('Invoice-' + safeBroker + '-' + (inv.date||'nodate') + '-' + (inv.ref||'noref'));
       invFolder.file('invoice-summary.txt',
         'ROADCOMMAND INVOICE RECORD\n==========================\n' +
         'Broker:       ' + (inv.broker||'—') + '\nReference:    ' + (inv.ref||'—') + '\nAmount:       $' + inv.amount.toLocaleString() +
@@ -1780,6 +1818,13 @@ document.addEventListener("click", function(e) {
   if (aiBtn) { getLoadDecision(aiBtn.dataset.panelId, parseFloat(aiBtn.dataset.rate), parseFloat(aiBtn.dataset.miles), aiBtn.dataset.broker, aiBtn.dataset.pickup); return; }
   var removeBtn = e.target.closest(".remove-invoice-btn");
   if (removeBtn && removeBtn.dataset.invId) removeInvoice(removeBtn.dataset.invId);
+  // Close more drawer on outside click
+  var moreDrawer = document.getElementById('more-drawer');
+  if (moreDrawer && moreDrawer.classList.contains('open')) {
+    if (!e.target.closest('#more-drawer') && !e.target.closest('#more-nav-btn')) {
+      closeMoreDrawer();
+    }
+  }
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -1874,11 +1919,19 @@ async function generateNegScript() {
     var response = await fetch(aiEndpoint, { method: "POST", headers: aiHeaders, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 400, messages: [{ role: "user", content: prompt }] }) });
     var data = await response.json();
     if (data.content && data.content[0] && data.content[0].text) {
-      aiOutput.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;"><div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">🤖 AI-Generated Script — Read This Word for Word</div><div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + data.content[0].text + '</div><div style="margin-top:.8rem;display:flex;gap:.5rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button><button class="btn btn-sm btn-outline" onclick="generateNegScript()">🔄 Regenerate</button></div></div>';
+      aiOutput.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;">' +
+        '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">🤖 AI-Generated Script — Read This Word for Word</div>' +
+        '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + data.content[0].text + '</div>' +
+        AI_SCRIPT_DISCLAIMER +
+        '<div style="margin-top:.8rem;display:flex;gap:.5rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button><button class="btn btn-sm btn-outline" onclick="generateNegScript()">🔄 Regenerate</button></div></div>';
     } else if (data.error) throw new Error(data.error.message || "API error");
   } catch(err) {
     var fallbackScript = buildFallbackScript(origin, dest, offer, miles, broker, marketRpm, marketTotal, gap);
-    aiOutput.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--amber-dim);border-radius:4px;padding:1rem;"><div style="font-size:.7rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">📋 Negotiation Script</div><div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + fallbackScript + '</div><div style="margin-top:.8rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button></div></div>';
+    aiOutput.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--amber-dim);border-radius:4px;padding:1rem;">' +
+      '<div style="font-size:.7rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">📋 Negotiation Script</div>' +
+      '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + fallbackScript + '</div>' +
+      AI_SCRIPT_DISCLAIMER +
+      '<div style="margin-top:.8rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button></div></div>';
   }
   _aiScriptGenerating = false;
 }
@@ -1897,7 +1950,7 @@ function copyNegScript() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// AI FEATURES — callAI, briefing, load decision, chase, summary, route intel
+// AI FEATURES
 // ══════════════════════════════════════════════════════════════
 async function callAI(prompt, maxTokens) {
   maxTokens = maxTokens || 300;
@@ -1919,15 +1972,21 @@ async function showDailyBriefing() {
   var overdue = invoices.filter(function(i) { return i.status !== 'paid' && new Date(i.dueDate) < new Date(); }).reduce(function(sum, i) { return sum + i.amount; }, 0);
   var maintDue = maintItems.filter(function(m) { return (m.currentOdo - m.lastOdo) >= (m.interval * 0.85); }).map(function(m) { return m.name; }).join(', ');
   var prompt = "You are RoadCommand, a dispatcher assistant for an owner-operator trucker. Generate a brief, friendly morning dispatch briefing in 2-3 sentences max. Be direct and practical.\n\nContext:\n- Driver: " + (window._rcUserFirstName||'Driver') + "\n- Location: " + (currentCity||'Unknown') + ", " + (currentState||'') + "\n- Current diesel price: $" + (defaults.fuelPrice?defaults.fuelPrice.toFixed(3):'?') + "/gal\n- Outstanding invoices: $" + outstanding.toLocaleString() + (overdue > 0 ? " ($" + overdue.toLocaleString() + " overdue)" : "") + (maintDue ? "\n- Maintenance due soon: " + maintDue : "") + "\n- Current region: " + (currentRegion||'Unknown') + "\n\nGenerate a morning briefing. Mention any overdue invoices or maintenance issues if present. End with one piece of tactical advice for today.";
-  try { var text = await callAI(prompt, 150); showBriefingBanner(text); try { localStorage.setItem('rc-briefing-date', today); } catch(e) {} }
-  catch(e) { console.log('Daily briefing unavailable:', e.message); }
+  try {
+    var text = await callAI(prompt, 150);
+    showBriefingBanner(text);
+    try { localStorage.setItem('rc-briefing-date', today); } catch(e) {}
+  } catch(e) { console.log('Daily briefing unavailable:', e.message); }
 }
 
 function showBriefingBanner(text) {
   var existing = document.getElementById('daily-briefing-banner'); if (existing) existing.remove();
   var banner = document.createElement('div'); banner.id = 'daily-briefing-banner';
   banner.style.cssText = 'background:var(--surface);border:1px solid var(--green-border);border-radius:4px;padding:.9rem 1rem;margin-bottom:.8rem;position:relative;';
-  banner.innerHTML = '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem;">🤖 Morning Briefing</div><div style="font-size:.85rem;line-height:1.7;color:var(--text);">' + text + '</div><button onclick="this.parentElement.remove()" style="position:absolute;top:.5rem;right:.5rem;background:none;border:none;color:#b8c8b8;cursor:pointer;font-size:1rem;">✕</button>';
+  banner.innerHTML = '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem;">🤖 Morning Briefing</div>' +
+    '<div style="font-size:.85rem;line-height:1.7;color:var(--text);">' + text + '</div>' +
+    '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.4rem;font-style:italic;">AI-generated · Verify details before making decisions</div>' +
+    '<button onclick="this.parentElement.remove()" style="position:absolute;top:.5rem;right:.5rem;background:none;border:none;color:#b8c8b8;cursor:pointer;font-size:1rem;">✕</button>';
   var dashScreen = document.getElementById('screen-dash'), firstCard = dashScreen ? dashScreen.querySelector('.card,.weather-strip,.live-bar') : null;
   if (firstCard) dashScreen.insertBefore(banner, firstCard);
 }
@@ -1944,7 +2003,8 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     var resultEl = document.getElementById('ai-decide-result-' + panelId);
     if (resultEl) {
       var isTake = text.toUpperCase().includes('TAKE');
-      resultEl.innerHTML = '<div style="padding:.5rem .7rem;border-radius:3px;font-size:.82rem;margin-top:.4rem;background:' + (isTake ? 'var(--green-dim)' : 'var(--red-dim)') + ';border:1px solid ' + (isTake ? 'var(--green-border)' : 'rgba(255,126,126,.35)') + ';color:' + (isTake ? 'var(--green)' : 'var(--red)') + ';">🤖 ' + text + '</div>';
+      resultEl.innerHTML = '<div style="padding:.5rem .7rem;border-radius:3px;font-size:.82rem;margin-top:.4rem;background:' + (isTake ? 'var(--green-dim)' : 'var(--red-dim)') + ';border:1px solid ' + (isTake ? 'var(--green-border)' : 'rgba(255,126,126,.35)') + ';color:' + (isTake ? 'var(--green)' : 'var(--red)') + ';">🤖 ' + text + '</div>' +
+        '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.25rem;font-style:italic;">AI estimate · Verify costs before booking</div>';
       resultEl.style.display = 'block';
     }
   } catch(e) { if (btn) btn.textContent = 'AI unavailable'; }
@@ -1959,7 +2019,7 @@ async function draftChaseMessage(invoiceId) {
   try {
     var text = await callAI(prompt, 200);
     var modal = document.createElement('div'); modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:950;display:flex;align-items:flex-end;padding:1rem;';
-    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:8px;width:100%;max-width:480px;margin:0 auto;padding:1.5rem;"><div style="font-size:.85rem;font-weight:bold;color:var(--green);margin-bottom:.8rem;">📨 Collection Message Draft</div><div style="font-size:.85rem;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:4px;padding:.8rem;margin-bottom:1rem;">' + text + '</div><div style="display:flex;gap:.5rem;"><button class="btn btn-green copy-chase-btn" style="flex:1;">📋 Copy</button><button class="btn btn-outline close-chase-modal" style="flex:1;">Close</button></div></div>';
+    modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:8px;width:100%;max-width:480px;margin:0 auto;padding:1.5rem;"><div style="font-size:.85rem;font-weight:bold;color:var(--green);margin-bottom:.8rem;">📨 Collection Message Draft</div><div style="font-size:.85rem;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:4px;padding:.8rem;margin-bottom:1rem;">' + text + '</div><div style="font-size:.68rem;color:#b8c8b8;margin-bottom:.8rem;font-style:italic;">AI-generated draft — review and edit before sending</div><div style="display:flex;gap:.5rem;"><button class="btn btn-green copy-chase-btn" style="flex:1;">📋 Copy</button><button class="btn btn-outline close-chase-modal" style="flex:1;">Close</button></div></div>';
     document.body.appendChild(modal);
   } catch(e) { alert('AI unavailable. Try again later.'); }
   if (btn) { btn.textContent = '📨 Draft Chase Message'; btn.disabled = false; }
@@ -1976,7 +2036,14 @@ async function generateWeeklySummary() {
   try {
     var text = await callAI(prompt, 200);
     var output = document.getElementById('weekly-summary-output');
-    if (output) { output.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.8rem;"><div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">📊 Weekly Business Summary</div><div style="font-size:.88rem;line-height:1.8;color:var(--text);">' + text + '</div></div>'; output.style.display = 'block'; }
+    if (output) {
+      output.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.8rem;">' +
+        '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">📊 Weekly Business Summary</div>' +
+        '<div style="font-size:.88rem;line-height:1.8;color:var(--text);">' + text + '</div>' +
+        '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.5rem;font-style:italic;">AI-generated summary based on your invoice data</div>' +
+      '</div>';
+      output.style.display = 'block';
+    }
   } catch(e) { alert('AI unavailable. Try again later.'); }
   if (btn) { btn.textContent = '📊 Generate Weekly Summary'; btn.disabled = false; }
 }
@@ -1993,7 +2060,14 @@ async function getRouteIntel(destination) {
   var prompt = "Give a 3-point tactical briefing for a trucker delivering to " + destination + ". Be specific and practical.\n\nContext:\n- Driver coming from: " + (currentCity||currentState||'Pacific Northwest') + "\n- Best return load in database: " + topReturn + "\n- Current diesel: $" + (defaults.fuelPrice?defaults.fuelPrice.toFixed(3):'?') + "\n\nFormat as exactly 3 numbered points. Each point max 2 sentences. Focus on: (1) rates from that market, (2) best return lane strategy, (3) timing or tactical tip.";
   try {
     var text = await callAI(prompt, 250);
-    if (output) { output.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.8rem;"><div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">🗺️ Route Intel — ' + destination + '</div><div style="font-size:.85rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + text + '</div></div>'; output.style.display = 'block'; }
+    if (output) {
+      output.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.8rem;">' +
+        '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">🗺️ Route Intel — ' + destination + '</div>' +
+        '<div style="font-size:.85rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + text + '</div>' +
+        '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.5rem;font-style:italic;">AI estimate · Market conditions change — verify current rates before booking</div>' +
+      '</div>';
+      output.style.display = 'block';
+    }
   } catch(e) {
     if (output) { output.innerHTML = '<div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">⚠️</div><div>AI unavailable. Check your connection.</div></div>'; output.style.display = 'block'; }
   }
@@ -2004,7 +2078,12 @@ function promptLogRun(origin, dest, rate, miles) {
   var today = new Date().toISOString().split('T')[0], rpm = (rate/miles).toFixed(2);
   if (confirm('Log this as a completed run? ' + origin + ' to ' + dest + ' - $' + rate.toLocaleString() + ' at $' + rpm + '/mi')) {
     var logList = document.getElementById('run-list');
-    if (logList) { var item = document.createElement('div'); item.className = 'run-row'; item.innerHTML = '<div><div class="run-route">' + origin + ' → ' + dest + '</div><div class="run-meta">' + today + ' · ' + miles + ' mi</div></div><div><div class="run-profit">$' + rate.toLocaleString() + '</div><div class="run-rpm">$' + rpm + '/mi</div></div>'; logList.insertBefore(item, logList.firstChild); }
+    if (logList) {
+      var item = document.createElement('div');
+      item.className = 'run-row';
+      item.innerHTML = '<div><div class="run-route">' + origin + ' → ' + dest + '</div><div class="run-meta">' + today + ' · ' + miles + ' mi</div></div><div><div class="run-profit">$' + rate.toLocaleString() + '</div><div class="run-rpm">$' + rpm + '/mi</div></div>';
+      logList.insertBefore(item, logList.firstChild);
+    }
     var ytdRev = document.getElementById('log-ytd-rev'); if (ytdRev) { var current = parseFloat(ytdRev.textContent.replace(/[^0-9.]/g,''))||0; ytdRev.textContent = '$' + (current+rate).toLocaleString(); }
   }
 }
