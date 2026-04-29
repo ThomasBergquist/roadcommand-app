@@ -180,7 +180,7 @@ function showScreen(id, btn) {
   if (screen) screen.classList.add('active');
   if (btn) btn.classList.add('active');
   // Keep the More button active if navigating to a drawer screen
-  var drawerScreens = ['negotiate','tools','states','params','log','maint','settings'];
+  var drawerScreens = ['negotiate','tools','states','params','log','maint','settings','fmcsa'];
   if (drawerScreens.indexOf(id) >= 0) {
     var moreBtn = document.getElementById('more-nav-btn');
     if (moreBtn) moreBtn.classList.add('active');
@@ -2132,3 +2132,418 @@ function renderNWSAlerts(alerts) {
   if (iconEl) iconEl.textContent = icon; if (titleEl) titleEl.textContent = event + ' — NWS Live'; if (subEl) subEl.textContent = desc;
   if (alertsEl) alertsEl.innerHTML = alerts.slice(1).map(function(a) { var cls = (a.properties.severity==='Extreme'||a.properties.severity==='Severe')?'alert':'warning', ic = a.properties.severity==='Extreme'?'🚨':'⚠️', d = (a.properties.description||'').split('.')[0].trim(); return '<div class="weather-row ' + cls + '"><span class="weather-icon">' + ic + '</span><div class="weather-text"><div class="weather-title">' + (a.properties.event||'Alert') + '</div><div class="weather-sub">' + d + '</div></div></div>'; }).join('');
 }
+
+// ══════════════════════════════════════════════════════════════
+// FMCSA AUTHORITY HEALTH
+// ══════════════════════════════════════════════════════════════
+var FMCSA_KEY = 'd766def283f39a89c821a2e8d4a00f58e049f077';
+var _fmcsaData = null;
+
+async function fetchFMCSAProfile(mcNumber) {
+  if (!mcNumber) return null;
+  // Strip MC- prefix if present
+  var mc = mcNumber.toString().replace(/^MC-?/i, '').trim();
+  try {
+    var url = 'https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/' + mc + '?webKey=' + FMCSA_KEY;
+    var res = await fetch(url);
+    if (!res.ok) throw new Error('FMCSA API error: ' + res.status);
+    var data = await res.json();
+    return data;
+  } catch(err) {
+    console.error('FMCSA fetch error:', err);
+    return null;
+  }
+}
+
+async function loadFMCSAProfile() {
+  var mc = window._rcMCNumber || (window._fmcsaData && window._fmcsaData.mc);
+  if (!mc) {
+    // Try to get from settings input
+    var mcInput = document.getElementById('set-mc-number');
+    if (mcInput) mc = mcInput.value.trim();
+  }
+  if (!mc) { renderFMCSACard(null, 'no-mc'); return; }
+  renderFMCSACard(null, 'loading');
+  var data = await fetchFMCSAProfile(mc);
+  if (!data) { renderFMCSACard(null, 'error'); return; }
+  // Parse the carrier object — FMCSA returns content.carrier
+  var carrier = (data.content && data.content.carrier) ? data.content.carrier : data.carrier || data;
+  _fmcsaData = carrier;
+  window._fmcsaData = carrier;
+  // Save to Supabase profile
+  if (window._rcUserId && window._supabaseReady) {
+    try {
+      await _supabase.from('profiles').update({ mc_number: mc }).eq('user_id', window._rcUserId);
+    } catch(e) {}
+  }
+  renderFMCSACard(carrier, 'loaded');
+  renderFMCSADashCard(carrier);
+  track('fmcsa_profile_loaded', { mc: mc });
+}
+
+function calcAuthorityScore(carrier) {
+  if (!carrier) return { score: 0, tier: 'unknown', color: '#b8c8b8' };
+  var score = 100;
+  var issues = [];
+  // Authority status
+  var authStatus = (carrier.allowedToOperate || '').toUpperCase();
+  if (authStatus === 'N') { score -= 40; issues.push('Not authorized to operate'); }
+  // Safety rating
+  var safetyRating = (carrier.safetyRating || '').toLowerCase();
+  if (safetyRating === 'unsatisfactory') { score -= 35; issues.push('Unsatisfactory safety rating'); }
+  else if (safetyRating === 'conditional') { score -= 15; issues.push('Conditional safety rating'); }
+  // Insurance
+  var hasInsurance = carrier.bipdInsuranceOnFile === 'Y' || carrier.cargoInsuranceOnFile === 'Y';
+  if (!hasInsurance) { score -= 25; issues.push('Insurance not on file'); }
+  // OOS rate — if available
+  var oosRate = parseFloat(carrier.oosRate || 0);
+  if (oosRate > 30) { score -= 15; issues.push('High out-of-service rate'); }
+  else if (oosRate > 20) { score -= 8; }
+  score = Math.max(0, Math.min(100, score));
+  var tier, color, label;
+  if (score >= 85)      { tier = 'strong'; color = 'var(--green)'; label = 'Strong'; }
+  else if (score >= 65) { tier = 'stable'; color = '#7ab8ff'; label = 'Stable'; }
+  else if (score >= 40) { tier = 'watch';  color = 'var(--amber)'; label = 'Watch'; }
+  else                  { tier = 'critical'; color = 'var(--red)'; label = 'Critical'; }
+  return { score, tier, color, label, issues };
+}
+
+function renderFMCSADashCard(carrier) {
+  var card = document.getElementById('authority-health-card');
+  if (!card) return;
+  if (!carrier) { card.style.display = 'none'; return; }
+  var { score, tier, color, label } = calcAuthorityScore(carrier);
+  var authStatus = (carrier.allowedToOperate || '').toUpperCase() === 'Y' ? '✅ Active' : '❌ Inactive';
+  var safetyRating = carrier.safetyRating || 'Not Rated';
+  var safetyColor = safetyRating.toLowerCase() === 'satisfactory' ? 'var(--green)' : safetyRating.toLowerCase() === 'conditional' ? 'var(--amber)' : safetyRating.toLowerCase() === 'unsatisfactory' ? 'var(--red)' : '#b8c8b8';
+  card.style.display = 'block';
+  card.innerHTML =
+    '<div class="card-header" onclick="showScreen(\'fmcsa\',null)" style="cursor:pointer;">' +
+      '<div class="card-title">🛡️ Authority Health</div>' +
+      '<span style="font-size:.75rem;color:#b8c8b8;">Tap for full profile →</span>' +
+    '</div>' +
+    '<div class="card-body" style="padding:.8rem 1rem;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;">' +
+        '<div>' +
+          '<div style="font-family:Georgia,serif;font-size:2.5rem;font-weight:bold;color:' + color + ';line-height:1;">' + score + '</div>' +
+          '<div style="font-size:.72rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.1em;">Authority Score</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          '<div style="font-size:.95rem;font-weight:bold;color:' + color + ';">' + label + '</div>' +
+          '<div style="font-size:.78rem;color:#b8c8b8;margin-top:.2rem;">' + (carrier.legalName || carrier.dbaName || '') + '</div>' +
+          '<div style="font-size:.72rem;color:#b8c8b8;">MC-' + (carrier.dotNumber || '') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:var(--surface2);border-radius:100px;height:6px;margin-bottom:.8rem;overflow:hidden;">' +
+        '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + score + '%;transition:width .5s;"></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">' +
+        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;">' +
+          '<div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Authority</div>' +
+          '<div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;">' + authStatus + '</div>' +
+        '</div>' +
+        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;">' +
+          '<div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Safety</div>' +
+          '<div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;color:' + safetyColor + ';">' + safetyRating + '</div>' +
+        '</div>' +
+        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;">' +
+          '<div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Power Units</div>' +
+          '<div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;">' + (carrier.totalPowerUnits || '—') + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderFMCSACard(carrier, state) {
+  var screen = document.getElementById('screen-fmcsa');
+  if (!screen) return;
+  if (state === 'loading') {
+    screen.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--green);">🔄 Loading your FMCSA profile...</div>';
+    return;
+  }
+  if (state === 'no-mc') {
+    screen.innerHTML = '<div class="section-head"><div class="section-label">— Authority Health</div><div class="section-title">FMCSA Profile</div></div>' +
+      '<div class="alert alert-amber"><div class="alert-icon">⚠️</div><div>Enter your MC number in Settings to load your FMCSA profile.</div></div>' +
+      '<button class="btn btn-green" onclick="showScreen(\'settings\',null)">Go to Settings →</button>';
+    return;
+  }
+  if (state === 'error' || !carrier) {
+    screen.innerHTML = '<div class="section-head"><div class="section-label">— Authority Health</div><div class="section-title">FMCSA Profile</div></div>' +
+      '<div class="alert alert-amber"><div class="alert-icon">⚠️</div><div>Could not load FMCSA data. Check your MC number in Settings or try again.</div></div>' +
+      '<button class="btn btn-outline" onclick="loadFMCSAProfile()" style="margin-top:.5rem;">🔄 Retry</button>';
+    return;
+  }
+  var { score, tier, color, label, issues } = calcAuthorityScore(carrier);
+  var authStatus   = (carrier.allowedToOperate || '').toUpperCase() === 'Y';
+  var hasInsurance = carrier.bipdInsuranceOnFile === 'Y' || carrier.cargoInsuranceOnFile === 'Y';
+  var safetyRating = carrier.safetyRating || 'Not Rated';
+  var safetyColor  = safetyRating.toLowerCase() === 'satisfactory' ? 'var(--green)' : safetyRating.toLowerCase() === 'conditional' ? 'var(--amber)' : safetyRating.toLowerCase() === 'unsatisfactory' ? 'var(--red)' : '#b8c8b8';
+  var oosRate = carrier.oosRate ? parseFloat(carrier.oosRate).toFixed(1) + '%' : 'N/A';
+  var nationalOOS = '20.7%'; // national average vehicle OOS rate
+
+  screen.innerHTML =
+    '<div class="section-head"><div class="section-label">— Authority Health</div><div class="section-title">FMCSA Carrier Profile</div></div>' +
+
+    // SCORE CARD
+    '<div class="card" style="border-color:' + color + ';margin-bottom:.8rem;">' +
+      '<div class="card-body">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">' +
+          '<div>' +
+            '<div style="font-family:Georgia,serif;font-size:3.5rem;font-weight:bold;color:' + color + ';line-height:1;">' + score + '</div>' +
+            '<div style="font-size:.72rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.12em;margin-top:.2rem;">Authority Score / 100</div>' +
+            '<div style="display:inline-block;margin-top:.5rem;padding:.25rem .8rem;background:rgba(0,0,0,.3);border:1px solid ' + color + ';border-radius:100px;font-size:.8rem;font-weight:bold;color:' + color + ';">' + label + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:.95rem;font-weight:bold;color:var(--text);">' + (carrier.legalName || carrier.dbaName || 'Your Company') + '</div>' +
+            (carrier.dbaName && carrier.legalName ? '<div style="font-size:.78rem;color:#b8c8b8;">DBA: ' + carrier.dbaName + '</div>' : '') +
+            '<div style="font-size:.78rem;color:var(--green);margin-top:.2rem;">MC-' + (carrier.dotNumber || '') + '</div>' +
+            '<div style="font-size:.72rem;color:#b8c8b8;">' + (carrier.phyCity || '') + (carrier.phyCity && carrier.phyState ? ', ' : '') + (carrier.phyState || '') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:var(--surface2);border-radius:100px;height:8px;margin-bottom:1rem;overflow:hidden;">' +
+          '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + score + '%;transition:width .6s;"></div>' +
+        '</div>' +
+        (issues.length > 0 ? '<div style="background:rgba(255,126,126,.1);border:1px solid rgba(255,126,126,.3);border-radius:4px;padding:.7rem .9rem;margin-bottom:.5rem;">' +
+          '<div style="font-size:.72rem;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem;">⚠️ Issues Affecting Your Score</div>' +
+          issues.map(function(i) { return '<div style="font-size:.82rem;color:#b8c8b8;padding:.2rem 0;">• ' + i + '</div>'; }).join('') +
+        '</div>' : '') +
+      '</div>' +
+    '</div>' +
+
+    // BROKER VIEW
+    '<div class="card" style="margin-bottom:.8rem;">' +
+      '<div class="card-header"><div class="card-title">👁️ What Brokers See</div></div>' +
+      '<div class="card-body">' +
+        '<div style="font-size:.78rem;color:#b8c8b8;margin-bottom:.8rem;font-style:italic;">This is your public FMCSA record. Every broker pulls this before booking a load with you.</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">' +
+          fmcsaStatBox('Authority', authStatus ? '✅ Active' : '❌ Inactive', authStatus ? 'var(--green)' : 'var(--red)') +
+          fmcsaStatBox('Safety Rating', safetyRating, safetyColor) +
+          fmcsaStatBox('Insurance on File', hasInsurance ? '✅ Yes' : '❌ No', hasInsurance ? 'var(--green)' : 'var(--red)') +
+          fmcsaStatBox('Operating Status', carrier.operatingStatus || 'Unknown', '#b8c8b8') +
+          fmcsaStatBox('Power Units', carrier.totalPowerUnits || '—', 'var(--text)') +
+          fmcsaStatBox('Drivers', carrier.totalDrivers || '—', 'var(--text)') +
+          fmcsaStatBox('OOS Rate', oosRate, parseFloat(carrier.oosRate||0) > 20 ? 'var(--amber)' : 'var(--green)') +
+          fmcsaStatBox('National OOS Avg', nationalOOS, '#b8c8b8') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // AUTHORITY DETAILS
+    '<div class="card" style="margin-bottom:.8rem;">' +
+      '<div class="card-header"><div class="card-title">📋 Authority Details</div></div>' +
+      '<div class="card-body">' +
+        fmcsaDetailRow('Legal Name', carrier.legalName || '—') +
+        fmcsaDetailRow('DBA Name', carrier.dbaName || '—') +
+        fmcsaDetailRow('DOT Number', carrier.dotNumber || '—') +
+        fmcsaDetailRow('MC Number', carrier.docketNumber || '—') +
+        fmcsaDetailRow('Entity Type', carrier.entityType || '—') +
+        fmcsaDetailRow('Phone', carrier.telephone || '—') +
+        fmcsaDetailRow('State', carrier.phyState || '—') +
+        fmcsaDetailRow('BIPD Insurance', carrier.bipdInsuranceOnFile === 'Y' ? '✅ On File' : '❌ Not on File') +
+        fmcsaDetailRow('Cargo Insurance', carrier.cargoInsuranceOnFile === 'Y' ? '✅ On File' : '❌ Not on File') +
+        fmcsaDetailRow('Bond/Trust', carrier.bondInsuranceOnFile === 'Y' ? '✅ On File' : '❌ Not on File') +
+      '</div>' +
+    '</div>' +
+
+    // WHAT THIS MEANS
+    '<div class="alert alert-green" style="margin-bottom:1rem;">' +
+      '<div class="alert-icon">💡</div>' +
+      '<div style="font-size:.82rem;line-height:1.7;">' +
+        '<strong>Why this matters:</strong> Brokers check your FMCSA record before every load. ' +
+        (authStatus && hasInsurance && safetyRating !== 'Unsatisfactory'
+          ? 'Your record looks clean. Brokers will book you with confidence.'
+          : 'Some items need attention. Fix these to avoid being passed over for loads.') +
+      '</div>' +
+    '</div>' +
+
+    '<button class="btn btn-outline" onclick="loadFMCSAProfile()" style="margin-bottom:1rem;">🔄 Refresh Profile</button>';
+}
+
+function fmcsaStatBox(label, value, color) {
+  return '<div style="background:var(--surface2);border-radius:4px;padding:.7rem .8rem;">' +
+    '<div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem;">' + label + '</div>' +
+    '<div style="font-size:.88rem;font-weight:bold;color:' + color + ';">' + value + '</div>' +
+  '</div>';
+}
+
+function fmcsaDetailRow(label, value) {
+  return '<div style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.82rem;">' +
+    '<span style="color:#b8c8b8;">' + label + '</span>' +
+    '<span style="color:var(--text);font-weight:bold;text-align:right;max-width:60%;">' + value + '</span>' +
+  '</div>';
+}
+
+async function saveMCNumber() {
+  var input = document.getElementById('set-mc-number');
+  if (!input || !input.value.trim()) { alert('Enter your MC number first.'); return; }
+  var mc = input.value.trim().replace(/^MC-?/i, '');
+  window._rcMCNumber = mc;
+  try {
+    if (window._rcUserId) {
+      await _supabase.from('profiles').update({ mc_number: mc }).eq('user_id', window._rcUserId);
+    }
+    localStorage.setItem('rc-mc-number', mc);
+  } catch(e) {}
+  await loadFMCSAProfile();
+  alert('MC number saved. Loading your FMCSA profile...');
+}
+
+function loadSavedMCNumber() {
+  try {
+    var mc = localStorage.getItem('rc-mc-number');
+    if (mc) {
+      window._rcMCNumber = mc;
+      var input = document.getElementById('set-mc-number');
+      if (input) input.value = 'MC-' + mc;
+      // Auto-load FMCSA on startup if MC is saved
+      setTimeout(function() { loadFMCSAProfile(); }, 2000);
+    }
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// LIVE DASHBOARD STATS from Supabase
+// ══════════════════════════════════════════════════════════════
+function updateDashboardStats() {
+  if (!invoices || !invoices.length) return;
+  var now = new Date();
+  var weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Week revenue — paid invoices in last 7 days
+  var weekRevenue = invoices
+    .filter(function(i) { return i.status === 'paid' && new Date(i.date) >= weekAgo; })
+    .reduce(function(sum, i) { return sum + i.amount; }, 0);
+
+  // Outstanding total
+  var outstanding = invoices
+    .filter(function(i) { return i.status !== 'paid'; })
+    .reduce(function(sum, i) { return sum + i.amount; }, 0);
+
+  // Month revenue
+  var monthRevenue = invoices
+    .filter(function(i) { return i.status === 'paid' && new Date(i.date) >= monthStart; })
+    .reduce(function(sum, i) { return sum + i.amount; }, 0);
+
+  // Update dash metric cards if they exist
+  var weekRevEl = document.querySelector('#screen-dash .metric-val');
+  var metricCards = document.querySelectorAll('#screen-dash .metric');
+
+  // Find and update each metric card by label
+  metricCards.forEach(function(card) {
+    var label = card.querySelector('.metric-label');
+    var val   = card.querySelector('.metric-val');
+    if (!label || !val) return;
+    var labelText = label.textContent.toLowerCase();
+    if (labelText.includes('week revenue')) {
+      val.textContent = '$' + weekRevenue.toLocaleString();
+      val.className = 'metric-val' + (weekRevenue > 0 ? '' : ' red');
+    }
+    if (labelText.includes('outstanding')) {
+      val.textContent = '$' + outstanding.toLocaleString();
+      val.className = 'metric-val' + (outstanding > 0 ? ' amber' : '');
+    }
+    if (labelText.includes('month revenue') || labelText.includes('this month')) {
+      val.textContent = '$' + monthRevenue.toLocaleString();
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// SURVIVAL SCORE (like SmartPlan but better — uses real data)
+// ══════════════════════════════════════════════════════════════
+function calcSurvivalScore() {
+  var score = 50; // base
+  var factors = [];
+
+  // Invoice health — are they getting paid?
+  var totalInvoiced = invoices.reduce(function(s, i) { return s + i.amount; }, 0);
+  var totalPaid     = invoices.filter(function(i) { return i.status === 'paid'; }).reduce(function(s, i) { return s + i.amount; }, 0);
+  var payRate = totalInvoiced > 0 ? (totalPaid / totalInvoiced) : 0;
+  if (payRate >= 0.9)      { score += 15; factors.push({ t: 'good', m: 'Strong payment collection rate' }); }
+  else if (payRate >= 0.7) { score += 5;  factors.push({ t: 'warn', m: 'Some outstanding invoices — follow up' }); }
+  else if (payRate < 0.5)  { score -= 10; factors.push({ t: 'bad',  m: 'Low collection rate — chase overdue invoices' }); }
+
+  // Overdue invoices
+  var today   = new Date();
+  var overdue = invoices.filter(function(i) { return i.status !== 'paid' && new Date(i.dueDate) < today; });
+  if (overdue.length === 0)      { score += 10; factors.push({ t: 'good', m: 'No overdue invoices' }); }
+  else if (overdue.length <= 2)  { score -= 5;  factors.push({ t: 'warn', m: overdue.length + ' overdue invoice(s) — collect now' }); }
+  else                           { score -= 15; factors.push({ t: 'bad',  m: overdue.length + ' overdue invoices — critical' }); }
+
+  // FMCSA authority health
+  if (_fmcsaData) {
+    var { score: authScore } = calcAuthorityScore(_fmcsaData);
+    if (authScore >= 85)      { score += 15; factors.push({ t: 'good', m: 'Strong FMCSA authority profile' }); }
+    else if (authScore >= 65) { score += 5;  factors.push({ t: 'warn', m: 'FMCSA profile needs attention' }); }
+    else                      { score -= 15; factors.push({ t: 'bad',  m: 'FMCSA issues — fix before they cost you loads' }); }
+  }
+
+  // Broker diversity — not relying on one broker
+  var brokerCounts = {};
+  invoices.forEach(function(i) { if (i.broker) brokerCounts[i.broker] = (brokerCounts[i.broker] || 0) + 1; });
+  var brokerCount = Object.keys(brokerCounts).length;
+  if (brokerCount >= 5)      { score += 10; factors.push({ t: 'good', m: 'Good broker diversity (' + brokerCount + ' brokers)' }); }
+  else if (brokerCount >= 3) { score += 5;  factors.push({ t: 'warn', m: 'Limited broker diversity — add more brokers' }); }
+  else if (brokerCount > 0)  { score -= 5;  factors.push({ t: 'bad',  m: 'Over-reliant on too few brokers' }); }
+
+  score = Math.max(0, Math.min(100, score));
+  var tier, color, label;
+  if (score >= 85)      { tier = 'strong';   color = 'var(--green)'; label = 'Strong'; }
+  else if (score >= 65) { tier = 'stable';   color = '#7ab8ff'; label = 'Stable'; }
+  else if (score >= 40) { tier = 'watch';    color = 'var(--amber)'; label = 'Watch'; }
+  else                  { tier = 'critical'; color = 'var(--red)'; label = 'Critical'; }
+
+  return { score, tier, color, label, factors };
+}
+
+function renderSurvivalScore() {
+  var card = document.getElementById('survival-score-card');
+  if (!card) return;
+  var { score, color, label, factors } = calcSurvivalScore();
+  card.innerHTML =
+    '<div class="card-header" style="cursor:pointer;" onclick="toggleSurvivalDetail()">' +
+      '<div class="card-title">📈 Carrier Survival Score</div>' +
+      '<span style="font-size:.75rem;color:#b8c8b8;">Tap for details ▼</span>' +
+    '</div>' +
+    '<div class="card-body" style="padding:.8rem 1rem;">' +
+      '<div style="display:flex;align-items:center;gap:1rem;margin-bottom:.8rem;">' +
+        '<div style="font-family:Georgia,serif;font-size:3rem;font-weight:bold;color:' + color + ';line-height:1;">' + score + '</div>' +
+        '<div>' +
+          '<div style="font-size:1rem;font-weight:bold;color:' + color + ';">' + label + '</div>' +
+          '<div style="font-size:.72rem;color:#b8c8b8;">out of 100 · updated live</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:var(--surface2);border-radius:100px;height:6px;overflow:hidden;margin-bottom:.8rem;">' +
+        '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + score + '%;transition:width .5s;"></div>' +
+      '</div>' +
+      '<div id="survival-detail" style="display:none;">' +
+        factors.map(function(f) {
+          var ic = f.t === 'good' ? '✅' : f.t === 'warn' ? '⚠️' : '❌';
+          var fc = f.t === 'good' ? 'var(--green)' : f.t === 'warn' ? 'var(--amber)' : 'var(--red)';
+          return '<div style="display:flex;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.8rem;">' +
+            '<span>' + ic + '</span><span style="color:' + fc + ';">' + f.m + '</span></div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+}
+
+function toggleSurvivalDetail() {
+  var d = document.getElementById('survival-detail');
+  if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
+
+// Hook into existing onAuthReady to load MC and refresh dashboard
+var _origOnAuthReady = onAuthReady;
+onAuthReady = function(firstName, userId, email) {
+  _origOnAuthReady(firstName, userId, email);
+  setTimeout(loadSavedMCNumber, 1500);
+  setTimeout(function() { updateDashboardStats(); renderSurvivalScore(); }, 3000);
+};
+
+// Also refresh survival score when invoices load
+var _origLoadInvoices = loadInvoices;
+loadInvoices = async function() {
+  await _origLoadInvoices();
+  setTimeout(function() { updateDashboardStats(); renderSurvivalScore(); }, 500);
+};

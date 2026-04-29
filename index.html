@@ -91,6 +91,12 @@
         <div style="font-size:.62rem;color:var(--green);opacity:.7;margin-top:.15rem;">⛽ Tap to report pump price</div>
       </div>
     </div>
+    <!-- AUTHORITY HEALTH CARD -->
+    <div class="card" id="authority-health-card" style="display:none;margin-bottom:.8rem;border-color:var(--green-border);"></div>
+
+    <!-- SURVIVAL SCORE CARD -->
+    <div class="card" id="survival-score-card" style="margin-bottom:.8rem;"></div>
+
     <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
       <input class="form-input" id="dash-odometer" type="number" placeholder="Odometer (miles)" style="width:70%;font-size:.82rem;">
       <button class="btn btn-outline" onclick="updateOdometer()" style="width:28%;white-space:nowrap;font-size:.75rem;">Update Odo</button>
@@ -616,6 +622,11 @@
     </div>
   </div>
 
+  <!-- FMCSA AUTHORITY HEALTH SCREEN -->
+  <div class="screen" id="screen-fmcsa">
+    <!-- Populated by JS -->
+  </div>
+
   <!-- TOOLS SCREEN (kept for backward compat, mirrors Dispatcher) -->
   <div class="screen" id="screen-tools">
     <div class="section-head"><div class="section-label">— Operations Tools</div><div class="section-title">Plan Smart. Stay Legal.</div></div>
@@ -716,7 +727,15 @@
           <div class="form-group"><label class="form-label">Truck Year</label><input class="form-input" id="set-year" placeholder="2018" value=""></div>
           <div class="form-group"><label class="form-label">Truck Model</label><input class="form-input" id="set-model" placeholder="Peterbilt 579" value=""></div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">MC Number</label>
+            <input class="form-input" id="set-mc-number" placeholder="MC-123456" value="">
+            <div class="form-hint">Used to load your FMCSA authority profile</div>
+          </div>
+        </div>
         <button class="btn btn-green" onclick="saveTruckInfo()">Save Truck Info</button>
+        <button class="btn btn-outline" onclick="saveMCNumber()" style="margin-top:.5rem;">🛡️ Load FMCSA Profile</button>
       </div>
     </div>
     <div class="card">
@@ -834,6 +853,7 @@
   <div class="more-drawer-title">More Tools</div>
   <div class="more-drawer-grid">
     <button class="more-drawer-btn" onclick="showScreen('negotiate',this)"><span class="more-drawer-icon">🤝</span><span class="more-drawer-label">Dispatcher</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('fmcsa',this)"><span class="more-drawer-icon">🛡️</span><span class="more-drawer-label">Authority</span></button>
     <button class="more-drawer-btn" onclick="showScreen('states',this)"><span class="more-drawer-icon">🗺️</span><span class="more-drawer-label">States</span></button>
     <button class="more-drawer-btn" onclick="showScreen('params',this)"><span class="more-drawer-icon">⚙️</span><span class="more-drawer-label">Params</span></button>
     <button class="more-drawer-btn" onclick="showScreen('log',this)"><span class="more-drawer-icon">📋</span><span class="more-drawer-label">Log</span></button>
