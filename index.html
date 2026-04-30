@@ -94,13 +94,20 @@
     <!-- AUTHORITY HEALTH CARD -->
     <div class="card" id="authority-health-card" style="display:none;margin-bottom:.8rem;border-color:var(--green-border);"></div>
 
-    <!-- SURVIVAL SCORE CARD -->
+    <!-- COMMAND SCORE CARD -->
     <div class="card" id="command-score-card" style="margin-bottom:.8rem;"></div>
 
     <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
       <input class="form-input" id="dash-odometer" type="number" placeholder="Odometer (miles)" style="width:70%;font-size:.82rem;">
       <button class="btn btn-outline" onclick="updateOdometer()" style="width:28%;white-space:nowrap;font-size:.75rem;">Update Odo</button>
     </div>
+
+    <!-- HOS HOURS INPUT — Change 1 -->
+    <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
+      <input class="form-input" id="dash-hos-hours" type="number" min="0" max="11" step="0.5" placeholder="My available HOS hours (0–11)" style="flex:1;font-size:.82rem;">
+      <button class="btn btn-outline" id="hos-save-btn" onclick="saveHOSHours()" style="white-space:nowrap;font-size:.75rem;">Save</button>
+    </div>
+
     <div class="dash-grid">
       <div class="metric"><div class="metric-val">$4,820</div><div class="metric-label">Week Revenue</div></div>
       <div class="metric"><div class="metric-val amber">$1.94</div><div class="metric-label">RPM This Week</div></div>
@@ -109,70 +116,12 @@
     </div>
     <div class="card">
       <div class="card-header">
-        <div class="card-title">🔥 Hot Loads Matching Parameters</div><button class="tool-help-btn" onclick="showHelp('loads')">? How</button>
+        <div class="card-title">🔥 Live Loads Near You</div><button class="btn-outline" onclick="refreshLoads()" style="font-size:.7rem;padding:.2rem .5rem;border-radius:3px;">🔄 Refresh</button>
         <span class="load-tag tag-hot">2 New</span>
       </div>
-      <div style="padding:.5rem .8rem;">
-        <div class="load-card hot" data-rate="1850" data-miles="801">
-          <div class="load-top load-card-clickable" onclick="toggleExpand('d_panel_1850_801')">
-            <div><div class="load-route"><span class="expand-arrow" id="arrow_d_panel_1850_801">▼</span>Moses Lake, WA <span>→</span> Pasco, WA</div><div style="margin-top:.3rem;"><span class="load-tag tag-hot">Matches Parameters</span></div></div>
-            <div><div class="load-rate">$1,850</div><div class="load-rate-sub">$2.31/mi</div></div>
-          </div>
-          <div class="broker-info" onclick="toggleExpand('d_panel_1850_801')" style="cursor:pointer;"><span class="broker-name">CH Robinson:</span><span class="broker-phone">📞 (509) 555-0142</span></div>
-          <div class="load-meta" onclick="toggleExpand('d_panel_1850_801')" style="cursor:pointer;">
-            <div><div class="lm-label">Miles</div><div class="lm-val">801</div></div>
-            <div><div class="lm-label">Weight</div><div class="lm-val">42,000 lb</div></div>
-            <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 7</div></div>
-          </div>
-          <div class="load-expand-panel" id="d_panel_1850_801" data-pickup="Moses Lake, WA" data-rate="1850" data-miles="801">
-            <div class="expand-profit-grid">
-              <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$1,850</div></div>
-              <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_d_panel_1850_801">-$524</div></div>
-              <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_d_panel_1850_801">$1,326</div></div>
-              <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val green" id="npm_d_panel_1850_801">$1.66/mi</div></div>
-              <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.31/mi</div></div>
-              <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">801</div></div>
-            </div>
-            <div class="expand-verdict strong" id="verdict_d_panel_1850_801">✅ Strong — Take It</div>
-            <div class="deadhead-alert" id="dh_d_panel_1850_801"></div>
-            <div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div><div class="expand-notes-text" id="notes_d_panel_1850_801">Truckstop notes will appear here when API is connected.</div></div>
-          </div>
-          <div class="load-actions">
-            <button class="load-action-btn call-btn" onclick="callBroker('(509) 555-0142','CH Robinson')"><span class="btn-icon">📞</span>Call</button>
-            <button class="load-action-btn book-btn" onclick="bookLoad(this,'Moses Lake, WA','Pasco, WA',1850,801,'CH Robinson','(509) 555-0142')"><span class="btn-icon">✓</span>Book</button>
-            <button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>
-          </div>
-        </div>
-        <div class="load-card hot" data-rate="2100" data-miles="963">
-          <div class="load-top load-card-clickable" onclick="toggleExpand('d_panel_2100_963')">
-            <div><div class="load-route"><span class="expand-arrow" id="arrow_d_panel_2100_963">▼</span>Yakima, WA <span>→</span> Boise, ID</div><div style="margin-top:.3rem;"><span class="load-tag tag-hot">Matches Parameters</span></div></div>
-            <div><div class="load-rate">$2,100</div><div class="load-rate-sub">$2.18/mi</div></div>
-          </div>
-          <div class="broker-info" onclick="toggleExpand('d_panel_2100_963')" style="cursor:pointer;"><span class="broker-name">Echo Global:</span><span class="broker-phone">📞 (509) 555-0287</span></div>
-          <div class="load-meta" onclick="toggleExpand('d_panel_2100_963')" style="cursor:pointer;">
-            <div><div class="lm-label">Miles</div><div class="lm-val">963</div></div>
-            <div><div class="lm-label">Weight</div><div class="lm-val">38,500 lb</div></div>
-            <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 8</div></div>
-          </div>
-          <div class="load-expand-panel" id="d_panel_2100_963" data-pickup="Yakima, WA" data-rate="2100" data-miles="963">
-            <div class="expand-profit-grid">
-              <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$2,100</div></div>
-              <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_d_panel_2100_963">-$630</div></div>
-              <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_d_panel_2100_963">$1,470</div></div>
-              <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val amber" id="npm_d_panel_2100_963">$1.53/mi</div></div>
-              <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.18/mi</div></div>
-              <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">963</div></div>
-            </div>
-            <div class="expand-verdict ok" id="verdict_d_panel_2100_963">⚠️ Acceptable — Meets Minimum</div>
-            <div class="deadhead-alert" id="dh_d_panel_2100_963"></div>
-            <div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div><div class="expand-notes-text" id="notes_d_panel_2100_963">Truckstop notes will appear here when API is connected.</div></div>
-          </div>
-          <div class="load-actions">
-            <button class="load-action-btn call-btn" onclick="callBroker('(509) 555-0287','Echo Global')"><span class="btn-icon">📞</span>Call</button>
-            <button class="load-action-btn book-btn" onclick="bookLoad(this,'Yakima, WA','Boise, ID',2100,963,'Echo Global','(509) 555-0287')"><span class="btn-icon">✓</span>Book</button>
-            <button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>
-          </div>
-        </div>
+      <div style="padding:.5rem .8rem;" id="dash-live-loads">
+        <!-- Live loads injected by fetchTruckstopLoads() -->
+        <div style="padding:1rem;text-align:center;color:var(--green);font-size:.85rem;">🔄 Getting GPS location to find loads near you...</div>
       </div>
     </div>
     <div class="card">
@@ -207,97 +156,10 @@
       <button class="btn btn-outline btn-sm" onclick="filterLoads('watch')" id="filter-watch">👁 Watching</button>
       <button class="btn btn-outline btn-sm" onclick="filterLoads('booked')" id="filter-booked">✓ Booked</button>
     </div>
-    <div class="load-card hot" data-rate="1850" data-miles="801">
-      <div class="load-top load-card-clickable" onclick="toggleExpand('l_panel_1850_801')">
-        <div><div class="load-route">Moses Lake, WA <span>→</span> Pasco, WA</div><div style="margin-top:.3rem;"><span class="load-tag tag-hot">Hot</span></div></div>
-        <div><div class="load-rate">$1,850</div><div class="load-rate-sub">$2.31/mi · 801 mi</div></div>
-      </div>
-      <div class="broker-info" onclick="toggleExpand('l_panel_1850_801')" style="cursor:pointer;"><span class="broker-name">CH Robinson:</span><span class="broker-phone">📞 (509) 555-0142</span></div>
-      <div class="load-meta" onclick="toggleExpand('l_panel_1850_801')" style="cursor:pointer;">
-        <div><div class="lm-label">Miles</div><div class="lm-val">801</div></div>
-        <div><div class="lm-label">Weight</div><div class="lm-val">42,000 lb</div></div>
-        <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 7</div></div>
-      </div>
-      <div class="load-expand-panel" id="l_panel_1850_801" data-pickup="Moses Lake, WA" data-rate="1850" data-miles="801">
-        <div class="expand-profit-grid">
-          <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$1,850</div></div>
-          <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_l_panel_1850_801">-$524</div></div>
-          <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_l_panel_1850_801">$1,326</div></div>
-          <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val green" id="npm_l_panel_1850_801">$1.66/mi</div></div>
-          <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.31/mi</div></div>
-          <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">801</div></div>
-        </div>
-        <div class="expand-verdict strong" id="verdict_l_panel_1850_801">✅ Strong — Take It</div>
-        <div class="deadhead-alert" id="dh_l_panel_1850_801"></div>
-        <div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div><div class="expand-notes-text" id="notes_l_panel_1850_801">Truckstop notes will appear here when API is connected.</div></div>
-      </div>
-      <div class="load-actions">
-        <button class="load-action-btn call-btn" onclick="callBroker('(509) 555-0142','CH Robinson')"><span class="btn-icon">📞</span>Call</button>
-        <button class="load-action-btn book-btn" onclick="bookLoad(this,'Moses Lake, WA','Pasco, WA',1850,801,'CH Robinson','(509) 555-0142')"><span class="btn-icon">✓</span>Book</button>
-        <button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>
-      </div>
+    <!-- Live loads injected here by renderLiveLoadCards() -->
+    <div id="loads-screen-live" style="min-height:200px;">
     </div>
-    <div class="load-card watch" data-rate="3200" data-miles="1560">
-      <div class="load-top load-card-clickable" onclick="toggleExpand('l_panel_3200_1560')">
-        <div><div class="load-route">Spokane, WA <span>→</span> Portland, OR</div><div style="margin-top:.3rem;"><span class="load-tag tag-watch">Watching</span></div></div>
-        <div><div class="load-rate">$3,200</div><div class="load-rate-sub">$2.05/mi · 1,560 mi</div></div>
-      </div>
-      <div class="broker-info" onclick="toggleExpand('l_panel_3200_1560')" style="cursor:pointer;"><span class="broker-name">Coyote Logistics:</span><span class="broker-phone">📞 (800) 555-0391</span></div>
-      <div class="load-meta" onclick="toggleExpand('l_panel_3200_1560')" style="cursor:pointer;">
-        <div><div class="lm-label">Miles</div><div class="lm-val">1,560</div></div>
-        <div><div class="lm-label">Weight</div><div class="lm-val">44,000 lb</div></div>
-        <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 9</div></div>
-      </div>
-      <div class="load-expand-panel" id="l_panel_3200_1560" data-pickup="Spokane, WA" data-rate="3200" data-miles="1560">
-        <div class="expand-profit-grid">
-          <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$3,200</div></div>
-          <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_l_panel_3200_1560">-$1,020</div></div>
-          <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_l_panel_3200_1560">$2,180</div></div>
-          <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val amber" id="npm_l_panel_3200_1560">$1.4/mi</div></div>
-          <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.05/mi</div></div>
-          <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">1,560</div></div>
-        </div>
-        <div class="expand-verdict ok" id="verdict_l_panel_3200_1560">⚠️ Acceptable — Meets Minimum</div>
-        <div class="deadhead-alert" id="dh_l_panel_3200_1560"></div>
-        <div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div><div class="expand-notes-text" id="notes_l_panel_3200_1560">Truckstop notes will appear here when API is connected.</div></div>
-      </div>
-      <div class="load-actions">
-        <button class="load-action-btn call-btn" onclick="callBroker('(800) 555-0391','Coyote Logistics')"><span class="btn-icon">📞</span>Call</button>
-        <button class="load-action-btn book-btn" onclick="bookLoad(this,'Spokane, WA','Portland, OR',3200,1560,'Coyote Logistics','(800) 555-0391')"><span class="btn-icon">✓</span>Book</button>
-        <button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>
-      </div>
-    </div>
-    <div class="load-card booked" data-rate="2750" data-miles="1298">
-      <div class="load-top load-card-clickable" onclick="toggleExpand('l_panel_2750_1298')">
-        <div><div class="load-route">Kennewick, WA <span>→</span> Salt Lake City, UT</div><div style="margin-top:.3rem;"><span class="load-tag tag-booked">Booked</span></div></div>
-        <div><div class="load-rate">$2,750</div><div class="load-rate-sub">$2.12/mi · 1,298 mi</div></div>
-      </div>
-      <div class="broker-info" onclick="toggleExpand('l_panel_2750_1298')" style="cursor:pointer;"><span class="broker-name">XPO Logistics:</span><span class="broker-phone">📞 (877) 555-0211</span></div>
-      <div class="load-meta" onclick="toggleExpand('l_panel_2750_1298')" style="cursor:pointer;">
-        <div><div class="lm-label">Miles</div><div class="lm-val">1,298</div></div>
-        <div><div class="lm-label">Weight</div><div class="lm-val">44,000 lb</div></div>
-        <div><div class="lm-label">Pickup</div><div class="lm-val">Apr 6</div></div>
-      </div>
-      <div class="load-expand-panel" id="l_panel_2750_1298" data-pickup="Kennewick, WA" data-rate="2750" data-miles="1298">
-        <div class="expand-profit-grid">
-          <div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$2,750</div></div>
-          <div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_l_panel_2750_1298">-$849</div></div>
-          <div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_l_panel_2750_1298">$1,901</div></div>
-          <div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val amber" id="npm_l_panel_2750_1298">$1.46/mi</div></div>
-          <div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">$2.12/mi</div></div>
-          <div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">1,298</div></div>
-        </div>
-        <div class="expand-verdict ok" id="verdict_l_panel_2750_1298">⚠️ Acceptable — Meets Minimum</div>
-        <div class="deadhead-alert" id="dh_l_panel_2750_1298"></div>
-        <div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div><div class="expand-notes-text" id="notes_l_panel_2750_1298">Truckstop notes will appear here when API is connected.</div></div>
-      </div>
-      <div class="load-actions">
-        <button class="load-action-btn call-btn" onclick="callBroker('(877) 555-0211','XPO Logistics')"><span class="btn-icon">📞</span>Call</button>
-        <button class="load-action-btn book-btn" onclick="bookLoad(this,'Kennewick, WA','Salt Lake City, UT',2750,1298,'XPO Logistics','(877) 555-0211')"><span class="btn-icon">✓</span>Book</button>
-        <button class="load-action-btn skip-btn"><span class="btn-icon">✕</span>Cancel</button>
-      </div>
-    </div>
-    <button class="btn btn-outline" style="margin-top:.5rem;" onclick="showAddLoad()">+ Add Load Manually</button>
+        <button class="btn btn-outline" style="margin-top:.5rem;" onclick="showAddLoad()">+ Add Load Manually</button>
     <div id="add-load-form" style="display:none;margin-top:1rem;">
       <div class="card">
         <div class="card-header"><div class="card-title">Add New Load</div></div>
@@ -475,7 +337,10 @@
     </div>
   </div>
 
-  <!-- DISPATCHER SCREEN (was Negotiate + Tools) -->
+  <!-- DISPATCHER SCREEN — Changes 3 and 5 applied
+       REMOVED: Lane Planner, Nearest Load Finder, Load Document Tracker, ai-script-section
+       CHANGED: Rate Coach button → getScript(), output div → neg-script-output
+  -->
   <div class="screen" id="screen-negotiate">
     <div class="section-head"><div class="section-label">— Dispatcher</div><div class="section-title">Your Dispatcher Brain</div></div>
     <div class="alert alert-green"><div class="alert-icon">🧠</div><div>Enter any load details to get broker intel, market rate data, and a word-for-word negotiation script before you dial.</div></div>
@@ -503,9 +368,9 @@
       </div>
     </div>
 
-    <!-- RATE NEGOTIATION COACH -->
+    <!-- RATE NEGOTIATION COACH — merged with AI Script (Change 3) -->
     <div class="card">
-      <div class="card-header"><div class="card-title">📈 Rate Negotiation Coach</div><button class="tool-help-btn" onclick="showHelp('negotiate')">? How</button></div>
+      <div class="card-header"><div class="card-title">📈 Rate Coach + Get Script</div><button class="tool-help-btn" onclick="showHelp('negotiate')">? How</button></div>
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Origin State</label><select class="form-select" id="neg-origin"><option value="">Select</option><option>WA</option><option>OR</option><option>ID</option><option>MT</option><option>WY</option><option>UT</option><option>NV</option><option>CA</option><option>CO</option><option>AZ</option><option>TX</option><option>OK</option><option>NM</option><option>KS</option><option>NE</option></select></div>
@@ -518,31 +383,10 @@
         <div class="form-row" style="margin-bottom:.8rem;">
           <div class="form-group"><label class="form-label">Broker Name (optional)</label><input class="form-input" id="neg-broker-name" placeholder="CH Robinson"></div>
         </div>
-        <button class="btn btn-green" onclick="generateNegScript()">🤖 AI Negotiation Script</button>
-        <div id="neg-result" style="display:none;margin-top:.9rem;">
-          <div class="divider"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:.8rem;">
-            <div class="metric" style="padding:.7rem;"><div class="metric-val" id="neg-market" style="font-size:1.1rem;">—</div><div class="metric-label">Market Rate</div></div>
-            <div class="metric" style="padding:.7rem;"><div class="metric-val amber" id="neg-offer-rpm" style="font-size:1.1rem;">—</div><div class="metric-label">Offer RPM</div></div>
-            <div class="metric" style="padding:.7rem;"><div class="metric-val" id="neg-counter" style="font-size:1.1rem;color:var(--green);">—</div><div class="metric-label">Counter At</div></div>
-          </div>
-          <div class="alert alert-green" style="margin-bottom:0;" id="neg-script"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- NEAREST LOAD FINDER -->
-    <div class="card">
-      <div class="card-header"><div class="card-title">📍 Nearest Load Finder</div><button class="tool-help-btn" onclick="showHelp('deadhead')">? How</button></div>
-      <div class="card-body">
-        <div class="alert alert-amber" style="margin-bottom:.8rem;"><div class="alert-icon">💡</div><div>Enter your drop city to find the closest available loads. Minimizes empty miles after delivery.</div></div>
-        <div class="form-group"><label class="form-label">I am Dropping In</label><input class="form-input" id="drop-city" placeholder="e.g. Salt Lake City, UT"></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Max Deadhead (mi)</label><input class="form-input" id="drop-dead" type="number" value="150"></div>
-          <div class="form-group"><label class="form-label">Min Rate/Mile ($)</label><input class="form-input" id="drop-rpm" type="number" value="2.00" step="0.05"></div>
-        </div>
-        <button class="btn btn-green" onclick="findNearestLoads()">Find Nearby Loads</button>
-        <div id="nearest-results" style="margin-top:.8rem;"></div>
+        <!-- Single button replaces two-step flow -->
+        <button class="btn btn-green" onclick="getScript()">🤖 Get Script</button>
+        <!-- Combined output — market summary + AI script in one div -->
+        <div id="neg-script-output" style="display:none;margin-top:.9rem;"></div>
       </div>
     </div>
 
@@ -557,33 +401,11 @@
       </div>
     </div>
 
-    <!-- LANE PLANNER -->
-    <div class="card" style="margin-top:.8rem;">
-      <div class="card-header"><div class="card-title">🗺️ Lane Planner</div><button class="tool-help-btn" onclick="showHelp('lanner')">? How</button></div>
-      <div class="card-body">
-        <div class="alert alert-green" style="margin-bottom:.8rem;"><div class="alert-icon">🔄</div><div>Enter your outbound load to see what return loads are available from your destination before you accept.</div></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Outbound Origin</label><input class="form-input" id="lp-origin" placeholder="Moses Lake, WA"></div>
-          <div class="form-group"><label class="form-label">Outbound Destination</label><input class="form-input" id="lp-dest" placeholder="Salt Lake City, UT"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Outbound Rate ($)</label><input class="form-input" id="lp-rate" type="number" placeholder="2500"></div>
-          <div class="form-group"><label class="form-label">Outbound Miles</label><input class="form-input" id="lp-miles" type="number" placeholder="800"></div>
-        </div>
-        <button class="btn btn-green" onclick="planLane()">Plan Round Trip</button>
-        <div id="lane-result" style="display:none;margin-top:.9rem;">
-          <div class="divider"></div>
-          <div class="section-label" style="margin-bottom:.5rem;">Return Load Options from Destination</div>
-          <div id="return-loads"></div>
-          <div class="alert alert-amber" style="margin-top:.7rem;"><div class="alert-icon">💡</div><div id="lane-advice"></div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- HOS CHECKER -->
+    <!-- HOS CHECKER — kept standalone for edge cases -->
     <div class="card" style="margin-top:.8rem;">
       <div class="card-header"><div class="card-title">⏱️ HOS Load Checker</div><button class="tool-help-btn" onclick="showHelp('hos')">? How</button></div>
       <div class="card-body">
+        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.6rem;">Set your available hours on the Dashboard for auto-verdicts on every load card. Use this tool for specific pickup-window calculations.</div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">My Available Hours</label><input class="form-input" id="hos-hours" type="number" placeholder="8" step="0.5"></div>
           <div class="form-group"><label class="form-label">Miles to Deliver</label><input class="form-input" id="hos-miles" type="number" placeholder="600"></div>
@@ -596,30 +418,6 @@
         <div id="hos-result" style="display:none;margin-top:.9rem;"></div>
       </div>
     </div>
-
-    <!-- DOCUMENT TRACKER -->
-    <div class="card" style="margin-top:.8rem;">
-      <div class="card-header"><div class="card-title">📄 Load Document Tracker</div><button class="tool-help-btn" onclick="showHelp('docs')">? How</button></div>
-      <div class="card-body">
-        <div class="form-group"><label class="form-label">Load Reference / BOL #</label><input class="form-input" id="doc-bol" placeholder="e.g. BOL-2026-04-001"></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Rate Confirmation #</label><input class="form-input" id="doc-rc" placeholder="RC number"></div>
-          <div class="form-group"><label class="form-label">Broker</label><input class="form-input" id="doc-broker" placeholder="Broker name"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Load Amount ($)</label><input class="form-input" id="doc-amount" type="number" placeholder="2500"></div>
-          <div class="form-group"><label class="form-label">Delivery Date</label><input class="form-input" id="doc-date" type="date"></div>
-        </div>
-        <div class="form-group"><label class="form-label">Notes / Issues</label><textarea class="form-textarea" id="doc-notes" placeholder="Any delivery issues, detention, lumper fees..."></textarea></div>
-        <button class="btn btn-green" onclick="saveDoc()">Save Load Record</button>
-        <div id="doc-list" style="margin-top:.9rem;"></div>
-      </div>
-    </div>
-
-    <!-- AI Script Output -->
-    <div id="ai-script-section" style="display:none;margin-top:.8rem;padding:0 0 1rem;">
-      <div id="ai-script-output"></div>
-    </div>
   </div>
 
   <!-- FMCSA AUTHORITY HEALTH SCREEN -->
@@ -627,7 +425,7 @@
     <!-- Populated by JS -->
   </div>
 
-  <!-- TOOLS SCREEN (kept for backward compat, mirrors Dispatcher) -->
+  <!-- TOOLS SCREEN -->
   <div class="screen" id="screen-tools">
     <div class="section-head"><div class="section-label">— Operations Tools</div><div class="section-title">Plan Smart. Stay Legal.</div></div>
     <div class="alert alert-green"><div class="alert-icon">👆</div><div>These tools are also available in the <strong>Dispatcher</strong> tab from the More menu.</div></div>
@@ -862,7 +660,7 @@
   </div>
 </div>
 
-<!-- BOTTOM NAV - 5 primary tabs -->
+<!-- BOTTOM NAV -->
 <nav class="bottom-nav" style="display:none;" id="bottom-nav">
   <button class="nav-btn active" data-screen="dash" onclick="showScreen('dash',this)"><span class="nav-icon">📊</span>Dash</button>
   <button class="nav-btn" data-screen="loads" onclick="showScreen('loads',this)"><span class="nav-icon">🚛</span>Loads</button>

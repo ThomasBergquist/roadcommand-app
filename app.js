@@ -179,7 +179,6 @@ function showScreen(id, btn) {
   var screen = document.getElementById('screen-' + id);
   if (screen) screen.classList.add('active');
   if (btn) btn.classList.add('active');
-  // Keep the More button active if navigating to a drawer screen
   var drawerScreens = ['negotiate','tools','states','params','log','maint','settings','fmcsa'];
   if (drawerScreens.indexOf(id) >= 0) {
     var moreBtn = document.getElementById('more-nav-btn');
@@ -188,9 +187,7 @@ function showScreen(id, btn) {
   track('tab_opened', { tab: id });
 }
 
-function goToSettings() {
-  showScreen('settings', null);
-}
+function goToSettings() { showScreen('settings', null); }
 
 function watchLoad(btn) {
   const card = btn.closest('.load-card');
@@ -255,7 +252,6 @@ function calculateProfit() {
   document.getElementById('r-verdict').style.color = color;
   document.getElementById('r-total-row').className = net >= 0 ? 'calc-row total' : 'calc-row total loss';
   document.getElementById('calc-result').style.display = 'block';
-  // Add disclaimer after verdict if not already present
   var calcResult = document.getElementById('calc-result');
   if (calcResult && !calcResult.querySelector('.ai-disclaimer')) {
     calcResult.insertAdjacentHTML('beforeend', AI_DISCLAIMER);
@@ -328,14 +324,83 @@ function injectProfitBars() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// HOS — PERSISTENT AVAILABLE HOURS (Change 1)
+// ══════════════════════════════════════════════════════════════
+
+function saveHOSHours() {
+  var input = document.getElementById('dash-hos-hours');
+  if (!input) return;
+  var hrs = parseFloat(input.value);
+  if (isNaN(hrs) || hrs < 0 || hrs > 11) { alert('Enter your available driving hours (0 to 11).'); return; }
+  window._hosAvailable = hrs;
+  try { localStorage.setItem('rc-hos-hours', hrs); } catch(e) {}
+  document.querySelectorAll('.load-expand-panel.open').forEach(function(p) {
+    var pid = p.id, r = parseInt(p.dataset.rate || 0), m = parseInt(p.dataset.miles || 0);
+    if (r && m) recalcPanel(pid, r, m);
+  });
+  var btn = document.getElementById('hos-save-btn');
+  if (btn) { btn.textContent = '✓ Saved'; setTimeout(function() { btn.textContent = 'Save'; }, 1500); }
+}
+
+function loadSavedHOS() {
+  try {
+    var saved = localStorage.getItem('rc-hos-hours');
+    if (saved) {
+      window._hosAvailable = parseFloat(saved);
+      var input = document.getElementById('dash-hos-hours');
+      if (input) input.value = window._hosAvailable;
+    }
+  } catch(e) {}
+}
+
+function calcHOSVerdict(miles) {
+  var hosAvail = window._hosAvailable;
+  if (!hosAvail || hosAvail <= 0) return '';
+  var speed = parseFloat((document.getElementById('set-speed') && document.getElementById('set-speed').value) || 55);
+  var driveTime = miles / speed;
+  var breakNeeded = driveTime > 8 ? 0.5 : 0;
+  var totalNeeded = driveTime + breakNeeded;
+  var buffer = hosAvail - totalNeeded;
+  if (buffer >= 0) {
+    return '<div class="hos-inline ' + (buffer < 1 ? 'warn' : 'ok') + '">' +
+      '⏱️ HOS: ' + driveTime.toFixed(1) + 'h drive · ' +
+      (buffer < 1 ? '⚠️ Tight (' + buffer.toFixed(1) + 'h buffer)' : '✅ Legal (' + buffer.toFixed(1) + 'h to spare)') +
+      '</div>';
+  } else {
+    return '<div class="hos-inline danger">' +
+      '⏱️ HOS: ❌ Short ' + Math.abs(buffer).toFixed(1) + 'h — reset or negotiate later pickup' +
+      '</div>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// BROKER BADGE — auto-inject on expand (Change 2)
+// ══════════════════════════════════════════════════════════════
+
+function getBrokerBadgeHTML(brokerName) {
+  if (!brokerName) return '';
+  var q = brokerName.toLowerCase().trim();
+  var match = null;
+  var keys = Object.keys(BROKER_DB);
+  for (var k = 0; k < keys.length; k++) {
+    if (q.indexOf(keys[k]) >= 0 || keys[k].indexOf(q) >= 0) { match = BROKER_DB[keys[k]]; break; }
+  }
+  if (!match) return '<span class="broker-badge unknown">? Not in DB</span>';
+  var scoreColor = match.score.indexOf('A') === 0 ? 'green' : match.score.indexOf('B') === 0 ? 'amber' : 'red';
+  var daysColor  = match.days <= 28 ? 'green' : match.days <= 35 ? 'amber' : 'red';
+  return '<span class="broker-badge score-' + scoreColor + '">' + match.score + '</span>' +
+         '<span class="broker-badge days-' + daysColor + '">' + match.days + 'd pay</span>';
+}
+
+// ══════════════════════════════════════════════════════════════
 // TUTORIAL SYSTEM
 // ══════════════════════════════════════════════════════════════
 const TUTORIAL_STEPS = [
   { icon: '👋', title: 'Welcome, ' + (window._rcUserFirstName || 'Driver'), desc: 'RoadCommand is your personal dispatcher — built by a trucker, for truckers. Every feature eliminates a cost or puts more money in your pocket.', tip: '<strong>This tutorial walks you through every feature.</strong> Takes about 3 minutes. Re-run it anytime from Settings.' },
-  { icon: '📊', title: 'Dashboard', desc: 'Your command center. Live GPS location, real diesel price for your region, weekly revenue and RPM stats, estimated fuel cost, and hot loads matching your parameters — all updating automatically.', tip: '<strong>Tap the diesel price box</strong> to report what you actually paid at the pump.' },
+  { icon: '📊', title: 'Dashboard', desc: 'Your command center. Live GPS location, real diesel price for your region, weekly revenue and RPM stats, estimated fuel cost, and hot loads — all updating automatically.', tip: '<strong>Set your available HOS hours on the dashboard</strong> — every load card will auto-show whether you can legally run it.' },
   { icon: '⛽', title: 'Crowdsourced Fuel Prices', desc: 'Every time you fuel up, tap the diesel box on the dashboard and enter what you paid. Your report is averaged with other RoadCommand drivers within 100 miles.', tip: '<strong>The more drivers report, the more accurate it gets.</strong>' },
-  { icon: '🚛', title: 'Loads Tab', desc: 'All your loads — Hot, Watching, and Booked. Every card shows auto profit calculated from your real local diesel price.', tip: '<strong>Deadhead cost uses your Empty MPG</strong> — set in Settings.' },
-  { icon: '🤝', title: 'Dispatcher Tab', desc: 'Your full negotiation and tools hub. Broker Scorecard, Rate Coach, AI Script, Lane Planner, HOS Checker, and Load Doc Tracker — all in one place.', tip: '<strong>Use AI Script before every negotiation call.</strong>' },
+  { icon: '🚛', title: 'Loads Tab', desc: 'All your loads — Hot, Watching, and Booked. Broker credit score and HOS verdict show automatically when you expand a card.', tip: '<strong>Everything you need to say yes or no is in the expand panel.</strong>' },
+  { icon: '🤝', title: 'Dispatcher Tab', desc: 'Broker Scorecard, Rate Coach, and Get Script in one. Enter load details and tap Get Script — market rate, counter-offer, and word-for-word script all at once.', tip: '<strong>Use Get Script before every negotiation call.</strong>' },
   { icon: '🏦', title: 'Broker Vault', desc: 'Your permanent broker network. Add every broker you work with. Every invoice links to their profile.', tip: '<strong>Upload Rate Confirmations and BOLs</strong> directly to each invoice.' },
   { icon: '💵', title: 'Money Tab', desc: 'Your full invoice tracker. Outstanding and overdue totals at the top. Every invoice color-coded.', tip: '<strong>Log invoices the day you deliver.</strong> Mark Paid to move them out of your active view.' },
   { icon: '🔧', title: 'Maintenance Tab', desc: 'Track every service item on your truck. Cost per mile feeds directly into profit calculations.', tip: '<strong>Your real maintenance cost per mile</strong> is used in every profit calculation.' },
@@ -385,15 +450,11 @@ function checkFirstTime() {
 // TOOL HELP SYSTEM
 // ══════════════════════════════════════════════════════════════
 const HELP_CONTENT = {
-  loads:    { title: '🚛 How to Use the Loads Tab', steps: ['Tap any load card to see full details.','Tap 📞 Call to dial the broker directly.','Tap 👁 Watch to save a load you are considering.','Tap ✕ Skip to remove a load from your view.','The colored profit bar shows estimated net after fuel automatically.','Tap + Add Load Manually to enter any load from Truckstop or DAT.'] },
+  loads:    { title: '🚛 How to Use the Loads Tab', steps: ['Tap any load card to see full details including broker badge and HOS verdict.','Tap 📞 Call to dial the broker directly.','Tap 👁 Watch to save a load you are considering.','Tap ✕ Skip to remove a load from your view.','The colored profit bar shows estimated net after fuel automatically.','Tap + Add Load Manually to enter any load from Truckstop or DAT.'] },
   broker:   { title: '🏦 How to Use Broker Scorecard', steps: ['Type the broker name in the search box.','Tap Check to see credit rating, average days to pay, and red flags.','Green flags mean reliable. Amber means caution. Red means high risk.','Always get a signed rate confirmation before loading for unknown brokers.'] },
-  negotiate:{ title: '📈 How to Use Rate Negotiation Coach', steps: ['Select origin and destination state.','Enter the broker offer and miles.','Tap AI Negotiation Script to generate a word-for-word phone script.','Use it on the phone — most brokers have $100–200 flex on spot loads.'] },
-  deadhead: { title: '📍 How to Use Nearest Load Finder', steps: ['Enter the city where you are dropping your current load.','Set your maximum deadhead miles.','Set your minimum rate per mile.','Tap Find Nearby Loads to see available loads near your drop point.'] },
-  lanner:   { title: '🗺️ How to Use Lane Planner', steps: ['Enter your outbound load details.','Tap Plan Round Trip to see return loads from your destination.','Green cards are the strongest return options.','Always plan your return before accepting the outbound load.'] },
-  hos:      { title: '⏱️ How to Use HOS Load Checker', steps: ['Enter your available driving hours.','Enter the total miles to deliver.','Enter the pickup window in hours.','Tap Check If Legal to get an instant verdict.'] },
-  docs:     { title: '📄 How to Use Load Document Tracker', steps: ['Enter the BOL number.','Enter the Rate Confirmation number.','Enter broker name, load amount, and delivery date.','Tap Save Load Record — the entry appears below for future reference.'] },
+  negotiate:{ title: '📈 How to Use the Dispatcher', steps: ['Select origin and destination state.','Enter the broker offer and miles.','Tap Get Script to get market rate data AND a word-for-word phone script in one step.','Use it on the phone — most brokers have $100 to $200 flex on spot loads.'] },
   invoice:  { title: '💵 How to Use Invoice Tracker', steps: ['After delivering, enter broker name, amount, and reference number.','Select payment terms and add broker phone number.','Tap Add Invoice — it appears color-coded by status.','When payment arrives tap Mark Paid — it moves to Paid This Month.'] },
-  calc:     { title: '💰 How to Use Profit Calculator', steps: ['Enter the gross rate and total miles.','Fuel price and MPG are pre-filled from Settings.','Enter deadhead miles if applicable.','Results update instantly. Green = take it. Red = walk away.'] },
+  calc:     { title: '💰 How to Use Profit Calculator', steps: ['Enter the gross rate and total miles.','Fuel price and MPG are pre-filled from Settings.','Enter deadhead miles if applicable.','Results update instantly. Green = strong. Red = below minimum.'] },
 };
 
 function showHelp(toolId) {
@@ -485,6 +546,7 @@ function loadSavedPreferences() {
       if (truckEl && t.year && t.model) truckEl.innerHTML = '<strong>' + t.year + ' ' + t.model + '</strong>' + t.name + (t.codriver ? ' & ' + t.codriver : '');
     }
   } catch(e) {}
+  loadSavedHOS();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -493,7 +555,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ══════════════════════════════════════════════════════════════
-// BROKER DATABASE (scorecard lookup)
+// BROKER DATABASE
 // ══════════════════════════════════════════════════════════════
 var BROKER_DB = {
   "ch robinson":   { score:"A+", days:22, flags:[{t:"good",i:"✅",m:"Pays consistently on time"},{t:"good",i:"✅",m:"Top credit rating"},{t:"warn",i:"⚠️",m:"Large volume broker — negotiate hard"}], rec:"Solid broker. Book with confidence. Push for $0.15 to $0.25 above first offer." },
@@ -547,28 +609,106 @@ var LANE_RATES = {
   "KS-TX":1.90,"KS-CO":2.00,"KS-OK":1.80,
 };
 
-function runNegCoach() {
-  var origin = document.getElementById("neg-origin").value;
-  var dest   = document.getElementById("neg-dest").value;
-  var offer  = parseFloat(document.getElementById("neg-offer").value);
-  var miles  = parseFloat(document.getElementById("neg-miles").value);
-  if (!origin || !dest || !offer || !miles) { alert("Fill in all fields first."); return; }
+// ══════════════════════════════════════════════════════════════
+// GET SCRIPT — merged Rate Coach + AI Script (Change 3)
+// ══════════════════════════════════════════════════════════════
+var _aiScriptGenerating = false;
+
+async function getScript() {
+  if (_aiScriptGenerating) return;
+  var origin  = document.getElementById("neg-origin").value;
+  var dest    = document.getElementById("neg-dest").value;
+  var offer   = parseFloat(document.getElementById("neg-offer").value);
+  var miles   = parseFloat(document.getElementById("neg-miles").value);
+  var broker  = document.getElementById("neg-broker-name") ? document.getElementById("neg-broker-name").value.trim() : "";
+  if (!origin || !dest || !offer || !miles) { alert("Fill in origin, destination, offer, and miles first."); return; }
+  track('negotiation_script_requested', { origin: origin, dest: dest, offer: offer, miles: miles, broker: broker });
+
   var key = origin + "-" + dest, revKey = dest + "-" + origin;
   var marketRpm = LANE_RATES[key] || LANE_RATES[revKey] || 2.15;
   var marketTotal = Math.round(marketRpm * miles);
   var offerRpm = offer / miles;
   var counterRpm = Math.max(marketRpm, offerRpm + 0.15);
   var counterTotal = Math.round(counterRpm * miles);
-  document.getElementById("neg-market").textContent = "$" + marketRpm.toFixed(2) + "/mi";
-  document.getElementById("neg-offer-rpm").textContent = "$" + offerRpm.toFixed(2) + "/mi";
-  document.getElementById("neg-counter").textContent = "$" + counterTotal.toLocaleString();
+  var gap = marketTotal - offer;
   var diff = offerRpm - marketRpm;
-  var assessment, script;
-  if (diff >= 0.15)       { assessment = "✅ Strong Offer — Above Market"; script = "Their offer is above market. Accept or push lightly."; }
-  else if (diff >= -0.10) { assessment = "⚠️ At Market — Push Back Once"; script = "Counter: We are at $" + counterTotal.toLocaleString() + " on this lane based on current market rates. Can you get there?"; }
-  else                    { assessment = "❌ Below Market — Hold Firm"; script = "Their offer is below market by $" + Math.abs(Math.round(diff * miles)) + ". Counter confidently: Current market is running $" + marketRpm.toFixed(2) + " per mile. We need $" + counterTotal.toLocaleString() + " to make it work."; }
-  document.getElementById("neg-script").innerHTML = "<strong>" + assessment + "</strong><br><br>" + script;
-  document.getElementById("neg-result").style.display = "block";
+  var assessment;
+  if (diff >= 0.15)       { assessment = "✅ Strong Offer — Above Market"; }
+  else if (diff >= -0.10) { assessment = "⚠️ At Market — Push Back Once"; }
+  else                    { assessment = "❌ Below Market — Hold Firm"; }
+
+  var brokerInfo = "", brokerRec = "";
+  if (broker) {
+    var bKey = broker.toLowerCase(), bData = null, keys = Object.keys(BROKER_DB);
+    for (var k = 0; k < keys.length; k++) { if (bKey.indexOf(keys[k]) >= 0 || keys[k].indexOf(bKey) >= 0) { bData = BROKER_DB[keys[k]]; break; } }
+    if (bData) {
+      brokerInfo = "Broker credit score: " + bData.score + ". Average days to pay: " + bData.days + " days. Notes: " + bData.flags.map(function(f) { return f.m; }).join(", ") + ".";
+      brokerRec  = bData.rec;
+    }
+  }
+
+  var output = document.getElementById("neg-script-output");
+  if (!output) return;
+
+  var scoreColor = diff >= 0.15 ? "var(--green)" : diff >= -0.10 ? "var(--amber)" : "var(--red)";
+  output.innerHTML =
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.8rem;margin-bottom:.8rem;">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:.6rem;">' +
+        '<div class="metric" style="padding:.6rem;"><div class="metric-val" style="font-size:1.1rem;">$' + marketRpm.toFixed(2) + '/mi</div><div class="metric-label">Market Rate</div></div>' +
+        '<div class="metric" style="padding:.6rem;"><div class="metric-val amber" style="font-size:1.1rem;">$' + offerRpm.toFixed(2) + '/mi</div><div class="metric-label">Offer RPM</div></div>' +
+        '<div class="metric" style="padding:.6rem;"><div class="metric-val" style="font-size:1.1rem;color:var(--green);">$' + counterTotal.toLocaleString() + '</div><div class="metric-label">Counter At</div></div>' +
+      '</div>' +
+      '<div style="font-size:.82rem;font-weight:bold;color:' + scoreColor + ';margin-bottom:.3rem;">' + assessment + '</div>' +
+      (brokerRec ? '<div style="font-size:.78rem;color:#b8c8b8;font-style:italic;">💡 ' + brokerRec + '</div>' : '') +
+    '</div>' +
+    '<div id="neg-ai-output"><div style="color:var(--green);font-size:.85rem;padding:.5rem 0;">🤖 Building your script...</div></div>';
+  output.style.display = "block";
+  _aiScriptGenerating = true;
+
+  var prompt = "You are an expert freight broker negotiation coach helping an owner-operator trucker get the best rate. Generate a word-for-word phone script for this situation:\n\nLoad details:\n- Origin: " + origin + "\n- Destination: " + dest + "\n- Miles: " + miles + "\n- Broker offer: $" + offer + " ($" + offerRpm.toFixed(2) + "/mile)\n- Market rate for this lane: $" + marketTotal + " ($" + marketRpm.toFixed(2) + "/mile)\n- Gap: $" + Math.abs(gap) + " " + (gap > 0 ? "below market" : "above market") + (broker ? "\n- Broker name: " + broker : "") + (brokerInfo ? "\n- " + brokerInfo : "") + "\n\nGenerate a confident, natural-sounding phone script that:\n1. Acknowledges the offer professionally\n2. Uses market data as leverage\n3. Makes a specific counter-offer at market rate\n4. Includes a psychological close\n5. Has a fallback position if they push back\n\nFormat as: [Opening] then [Counter] then [Close] then [If they push back]. Keep it conversational, confident, and under 150 words total.";
+
+  var aiOutputEl = document.getElementById("neg-ai-output");
+  try {
+    var aiWorkerUrl = window._rcAIWorker, aiEndpoint = aiWorkerUrl || "https://api.anthropic.com/v1/messages";
+    var aiHeaders = aiWorkerUrl ? { "Content-Type": "application/json" } : { "Content-Type": "application/json", "x-api-key": window._rcAnthropicKey || "", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+    var response = await fetch(aiEndpoint, { method: "POST", headers: aiHeaders, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 400, messages: [{ role: "user", content: prompt }] }) });
+    var data = await response.json();
+    if (data.content && data.content[0] && data.content[0].text) {
+      aiOutputEl.innerHTML =
+        '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;">' +
+          '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">🤖 Word-for-Word Script</div>' +
+          '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + data.content[0].text + '</div>' +
+          AI_SCRIPT_DISCLAIMER +
+          '<div style="margin-top:.8rem;display:flex;gap:.5rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy</button><button class="btn btn-sm btn-outline" onclick="getScript()">🔄 Regenerate</button></div>' +
+        '</div>';
+    } else if (data.error) throw new Error(data.error.message || "API error");
+  } catch(err) {
+    var fallbackScript = buildFallbackScript(origin, dest, offer, miles, broker, marketRpm, marketTotal, gap);
+    aiOutputEl.innerHTML =
+      '<div style="background:var(--surface2);border:1px solid var(--amber-dim);border-radius:4px;padding:1rem;">' +
+        '<div style="font-size:.7rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">📋 Negotiation Script</div>' +
+        '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + fallbackScript + '</div>' +
+        AI_SCRIPT_DISCLAIMER +
+        '<div style="margin-top:.8rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy</button></div>' +
+      '</div>';
+  }
+  _aiScriptGenerating = false;
+}
+
+// Alias — keeps any old references working
+async function generateNegScript() { return getScript(); }
+
+function buildFallbackScript(origin, dest, offer, miles, broker, marketRpm, marketTotal, gap) {
+  var brokerName = broker || "there", counterTotal = marketTotal, softCounter = Math.round(marketTotal * 0.97);
+  if (gap <= 0) return "Hey " + brokerName + ", I appreciate you reaching out on this one. Your offer of $" + offer.toLocaleString() + " on the " + origin + " to " + dest + " lane looks solid — that is right at market for me. Let me get my paperwork in order and we can get this booked. Send over the rate con and I will sign it today.";
+  else if (gap <= 100) return "Hey " + brokerName + ", thanks for thinking of me on this " + origin + " to " + dest + " load. I am looking at your offer of $" + offer.toLocaleString() + " — I am just a little short of where I need to be. Market on this lane is running $" + marketRpm.toFixed(2) + " a mile right now. If you can get me to $" + counterTotal.toLocaleString() + " I can have wheels rolling today. Can you make that work?\n\nIf they push back: I can meet you at $" + softCounter.toLocaleString() + " but that is my floor on this one.";
+  else return "Hey " + brokerName + ", I appreciate the call on this " + origin + " to " + dest + " load. I have to be honest — $" + offer.toLocaleString() + " is pretty far from where the market is sitting right now. I am seeing $" + marketRpm.toFixed(2) + " a mile on this lane consistently, which puts us at $" + counterTotal.toLocaleString() + ". That is what I need to make this work.\n\nIf they push back: My absolute floor is $" + softCounter.toLocaleString() + " — below that I am better off waiting for the next load. What can you do?\n\nIf they still push back: I appreciate your time. Let me know if your market changes — I would love to work with you on the next one.";
+}
+
+function copyNegScript() {
+  var output = document.getElementById("neg-script-output"); if (!output) return;
+  var text = output.querySelector("div[style*='pre-wrap']"); if (!text) return;
+  navigator.clipboard.writeText(text.textContent).then(function() { alert("Script copied to clipboard!"); }).catch(function() { var range = document.createRange(); range.selectNodeContents(text); window.getSelection().removeAllRanges(); window.getSelection().addRange(range); });
 }
 
 var NEARBY_LOADS = {
@@ -582,237 +722,8 @@ var NEARBY_LOADS = {
   "default":[{route:"Nearby → Moses Lake, WA",miles:200,rate:480,rpm:2.40},{route:"Nearby → Spokane, WA",miles:250,rate:575,rpm:2.30},{route:"Nearby → Portland, OR",miles:350,rate:805,rpm:2.30}]
 };
 
-function findNearestLoads() {
-  var city = document.getElementById("drop-city").value.trim().toLowerCase();
-  var minRpm = parseFloat(document.getElementById("drop-rpm").value) || 2.00;
-  var container = document.getElementById("nearest-results");
-  var loads = null;
-  var keys = Object.keys(NEARBY_LOADS);
-  for (var k = 0; k < keys.length; k++) { if (city.indexOf(keys[k]) >= 0) { loads = NEARBY_LOADS[keys[k]]; break; } }
-  if (!loads) loads = NEARBY_LOADS["default"];
-  var filtered = loads.filter(function(l) { return l.rpm >= minRpm; });
-  if (!filtered.length) { container.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">⚠️</div><div>No loads found at that minimum rate. Try lowering your minimum or a different city.</div></div>'; return; }
-  container.innerHTML = filtered.map(function(l) {
-    var net = Math.round(l.rate - (l.miles / defaults.mpg) * defaults.fuelPrice);
-    return '<div class="return-card ' + (l.rpm >= 2.30 ? 'good' : '') + '"><div class="return-top"><div class="return-route">' + l.route + '</div><div class="return-rate">$' + l.rate.toLocaleString() + '</div></div><div class="return-stats"><span>Miles: <strong>' + l.miles + '</strong></span><span>RPM: <strong>$' + l.rpm.toFixed(2) + '</strong></span><span>Est. Net: <strong>$' + net.toLocaleString() + '</strong></span></div></div>';
-  }).join("") + AI_DISCLAIMER;
-}
-
-function planLane() {
-  var origin = document.getElementById("lp-origin").value.trim();
-  var dest   = document.getElementById("lp-dest").value.trim();
-  var rate   = parseFloat(document.getElementById("lp-rate").value) || 0;
-  var miles  = parseFloat(document.getElementById("lp-miles").value) || 0;
-  if (!origin || !dest) { alert("Enter origin and destination."); return; }
-  var destKey = dest.toLowerCase().split(",")[0].trim();
-  var returnLoads = null;
-  var keys = Object.keys(NEARBY_LOADS);
-  for (var k = 0; k < keys.length; k++) { if (destKey.indexOf(keys[k]) >= 0) { returnLoads = NEARBY_LOADS[keys[k]]; break; } }
-  if (!returnLoads) returnLoads = NEARBY_LOADS["default"];
-  var outRpm = miles > 0 ? (rate / miles).toFixed(2) : "--";
-  var outNet = rate > 0 && miles > 0 ? Math.round(rate - (miles / defaults.mpg) * defaults.fuelPrice) : 0;
-  document.getElementById("return-loads").innerHTML = returnLoads.slice(0,3).map(function(l) {
-    var roundNet = outNet + Math.round(l.rate - (l.miles / defaults.mpg) * defaults.fuelPrice);
-    return '<div class="return-card ' + (l.rpm >= 2.20 ? 'good' : '') + '"><div class="return-top"><div class="return-route">' + l.route + '</div><div class="return-rate">$' + l.rate.toLocaleString() + '</div></div><div class="return-stats"><span>Miles: <strong>' + l.miles + '</strong></span><span>RPM: <strong>$' + l.rpm.toFixed(2) + '</strong></span><span>Round Trip Net: <strong>$' + roundNet.toLocaleString() + '</strong></span></div></div>';
-  }).join("");
-  document.getElementById("lane-advice").innerHTML = "Outbound: <strong>" + origin + " to " + dest + "</strong> · $" + rate.toLocaleString() + " · $" + outRpm + "/mi · Est. net $" + outNet.toLocaleString() + "<br>Lock a return load from <strong>" + dest + "</strong> before you deliver the outbound.";
-  document.getElementById("lane-result").style.display = "block";
-  // Add disclaimer after result
-  var laneResult = document.getElementById("lane-result");
-  if (laneResult && !laneResult.querySelector('.ai-disclaimer')) {
-    laneResult.insertAdjacentHTML('beforeend', AI_DISCLAIMER);
-  }
-}
-
-function checkHOS() {
-  var hours  = parseFloat(document.getElementById("hos-hours").value) || 0;
-  var miles  = parseFloat(document.getElementById("hos-miles").value) || 0;
-  var pickup = parseFloat(document.getElementById("hos-pickup").value) || 1;
-  var speed  = parseFloat(document.getElementById("hos-speed").value) || 55;
-  var container = document.getElementById("hos-result");
-  if (!hours || !miles) { alert("Enter available hours and miles."); return; }
-  var driveTime = miles / speed;
-  var totalNeeded = driveTime + pickup;
-  var buffer = hours - totalNeeded;
-  var legal = buffer >= 0;
-  container.innerHTML = (legal
-    ? '<div class="hos-pass"><div class="hos-title">✅ Legal — You Can Make This Load</div><div class="hos-detail">Drive time: <strong>' + driveTime.toFixed(1) + ' hrs</strong> at ' + speed + ' mph<br>Pickup window: <strong>' + pickup + ' hrs</strong><br>Total needed: <strong>' + totalNeeded.toFixed(1) + ' hrs</strong><br>Your available: <strong>' + hours + ' hrs</strong><br>Buffer: <strong>' + buffer.toFixed(1) + ' hrs</strong> to spare</div></div>'
-    : '<div class="hos-fail"><div class="hos-title">❌ Illegal — Do Not Accept This Load</div><div class="hos-detail">You need <strong>' + totalNeeded.toFixed(1) + ' hours</strong> but only have <strong>' + hours + ' hours</strong>.<br>You are short <strong>' + Math.abs(buffer).toFixed(1) + ' hours</strong>.<br><br>Options: Reset your clock, negotiate a later pickup, or pass on this load.</div></div>')
-    + HOS_DISCLAIMER;
-  container.style.display = "block";
-}
-
-var docRecords = [];
-function saveDoc() {
-  var bol = document.getElementById("doc-bol").value.trim();
-  if (!bol) { alert("BOL number required."); return; }
-  docRecords.unshift({ bol: bol, rc: document.getElementById("doc-rc").value.trim(), broker: document.getElementById("doc-broker").value.trim(), amount: document.getElementById("doc-amount").value, date: document.getElementById("doc-date").value, notes: document.getElementById("doc-notes").value.trim() });
-  renderDocs();
-  ["doc-bol","doc-rc","doc-broker","doc-amount","doc-notes"].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
-}
-function renderDocs() {
-  var list = document.getElementById("doc-list");
-  if (!list || !docRecords.length) return;
-  list.innerHTML = '<div class="section-label" style="margin-bottom:.5rem;">Saved Records</div>' + docRecords.map(function(d) {
-    return '<div class="doc-item"><div class="doc-top"><div class="doc-bol">' + d.bol + '</div><div class="doc-broker">' + (d.broker || '—') + '</div></div><div class="doc-stats">' + (d.rc ? '<span>RC: <strong>' + d.rc + '</strong></span>' : '') + (d.amount ? '<span>$<strong>' + parseFloat(d.amount).toLocaleString() + '</strong></span>' : '') + (d.date ? '<span>Del: <strong>' + d.date + '</strong></span>' : '') + '</div>' + (d.notes ? '<div style="font-size:.75rem;color:#ffd04d;opacity:.8;margin-top:.3rem;">' + d.notes + '</div>' : '') + '</div>';
-  }).join("");
-}
-
 // ══════════════════════════════════════════════════════════════
-// INVOICE SYSTEM — Supabase backed
-// ══════════════════════════════════════════════════════════════
-var invoices = [];
-
-async function loadInvoices() {
-  if (!window._rcUserId) return;
-  try {
-    var { data, error } = await _supabase.from('invoices').select('*').eq('user_id', window._rcUserId).order('created_at', { ascending: false });
-    if (error) throw error;
-    invoices = (data || []).map(function(row) {
-      return { id: row.id, broker: row.broker_name, amount: row.amount, ref: row.ref, date: row.invoice_date, terms: row.terms, phone: row.phone, dueDate: row.due_date, status: row.status, notes: row.notes, broker_id: row.broker_id, supabase: true };
-    });
-    renderInvoices();
-    renderBrokers();
-    updateMoneyTotals();
-    checkDailyBriefing();
-  } catch(err) { console.error('Error loading invoices:', err); }
-}
-
-async function saveInvoiceToSupabase(inv) {
-  if (!window._rcUserId) return inv;
-  try {
-    var { data, error } = await _supabase.from('invoices').insert({ user_id: window._rcUserId, broker_name: inv.broker, amount: inv.amount, ref: inv.ref, phone: inv.phone, invoice_date: inv.date, due_date: inv.dueDate, terms: inv.terms, status: inv.status || 'pending', notes: inv.notes || '' }).select().single();
-    if (error) throw error;
-    return Object.assign({}, inv, { id: data.id, supabase: true });
-  } catch(err) { console.error('Error saving invoice:', err); return inv; }
-}
-
-async function updateInvoiceStatus(id, status) {
-  if (!window._rcUserId) return;
-  try { await _supabase.from('invoices').update({ status: status }).eq('id', id).eq('user_id', window._rcUserId); }
-  catch(err) { console.error('Error updating invoice:', err); }
-}
-
-async function deleteInvoiceFromSupabase(id) {
-  if (!window._rcUserId) return;
-  try { await _supabase.from('invoices').delete().eq('id', id).eq('user_id', window._rcUserId); }
-  catch(err) { console.error('Error deleting invoice:', err); }
-}
-
-function addInvoice() {
-  var broker = document.getElementById("inv-broker").value.trim();
-  var amount = parseFloat(document.getElementById("inv-amount").value);
-  var ref    = document.getElementById("inv-ref").value.trim();
-  var date   = document.getElementById("inv-date").value;
-  var terms  = parseInt(document.getElementById("inv-terms").value);
-  var phone  = document.getElementById("inv-phone").value.trim();
-  if (!broker || !amount || !date) { alert("Broker, amount, and date required."); return; }
-  var invoiceDate = new Date(date);
-  var dueDate = new Date(invoiceDate);
-  dueDate.setDate(dueDate.getDate() + terms);
-  var inv = { broker: broker, amount: amount, ref: ref, date: date, terms: terms, phone: phone, dueDate: dueDate.toISOString().split("T")[0], status: "pending", id: Date.now(), broker_id: window._selectedBrokerId || null };
-  invoices.unshift(inv);
-  renderInvoices();
-  track('invoice_added', { amount: amount, broker: broker, terms: terms });
-  saveInvoiceToSupabase(inv).then(function(saved) {
-    var idx = invoices.findIndex(function(i) { return i.id === inv.id; });
-    if (idx >= 0) invoices[idx] = saved;
-    renderBrokers();
-    window._selectedBrokerId = null;
-  });
-  ["inv-broker","inv-amount","inv-ref","inv-phone"].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
-}
-
-function markPaid(id) {
-  var inv = invoices.find(function(i) { return i.id == id; });
-  if (inv) {
-    inv.status = "paid";
-    updateInvoiceStatus(id, "paid");
-    track('invoice_marked_paid', { amount: inv.amount, broker: inv.broker });
-  }
-  renderInvoices();
-  renderBrokers();
-}
-
-function removeInvoice(id) {
-  deleteInvoiceFromSupabase(id);
-  invoices = invoices.filter(function(i) { return i.id != id; });
-  renderInvoices();
-  renderBrokers();
-}
-
-function updateMoneyTotals() {
-  var today = new Date(), outstanding = 0, overdue = 0;
-  invoices.filter(function(i) { return i.status !== "paid"; }).forEach(function(i) {
-    outstanding += i.amount;
-    if (new Date(i.dueDate) < today) overdue += i.amount;
-  });
-  var mo = document.getElementById("money-outstanding"), mv = document.getElementById("money-overdue");
-  if (mo) mo.textContent = "$" + outstanding.toLocaleString();
-  if (mv) mv.textContent = "$" + overdue.toLocaleString();
-}
-
-function renderInvoices() {
-  var list = document.getElementById("invoice-list");
-  if (!list) return;
-  var today = new Date();
-  var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  var activeInvoices = invoices.filter(function(inv) { return inv.status !== "paid"; });
-  var paidThisMonth  = invoices.filter(function(inv) { return inv.status === "paid" && new Date(inv.date) >= thisMonthStart; });
-
-  if (!invoices.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💵</div><div class="empty-state-msg">Your first load is out there. Book it and log the invoice here — tap Add Invoice above after you deliver.</div></div>';
-    updateMoneyTotals();
-    return;
-  }
-
-  function buildRow(inv) {
-    var due = new Date(inv.dueDate);
-    var daysLeft = Math.ceil((due - today) / (1000*60*60*24));
-    var isOverdue = inv.status === "pending" && daysLeft < 0;
-    var badge = inv.status === "paid" ? '<span class="paid-badge">PAID</span>'
-      : isOverdue ? '<span class="overdue-badge">OVERDUE ' + Math.abs(daysLeft) + 'd</span>'
-      : '<span class="due-badge">DUE IN ' + daysLeft + 'd</span>';
-    return '<div class="invoice-item ' + (inv.status==="paid"?"paid":isOverdue?"overdue":"") + '">' +
-      '<div class="inv-top"><div><div class="inv-broker-name">' + inv.broker + '</div><div style="margin-top:.2rem;">' + badge + '</div></div><div class="inv-amount">$' + inv.amount.toLocaleString() + '</div></div>' +
-      '<div class="inv-meta">' + (inv.ref ? '<span class="inv-stat">Ref: <strong>' + inv.ref + '</strong></span>' : '') + '<span class="inv-stat">Invoiced: <strong>' + inv.date + '</strong></span><span class="inv-stat">Due: <strong>' + inv.dueDate + '</strong></span></div>' +
-      '<div class="inv-actions">' +
-        (inv.phone ? '<button class="inv-btn call" onclick="callBroker(\'' + inv.phone + '\',\'' + inv.broker + '\')">📞 Call</button>' : '') +
-        (inv.status !== "paid" ? '<button class="inv-btn green" onclick="markPaid(\'' + inv.id + '\')">✓ Mark Paid</button>' : '') +
-        '<button class="inv-btn red" onclick="removeInvoice(\'' + inv.id + '\')">✕ Remove</button>' +
-      '</div></div>';
-  }
-
-  var html = activeInvoices.length
-    ? activeInvoices.map(buildRow).join('')
-    : '<div style="padding:.8rem;font-size:.85rem;color:var(--green);text-align:center;">✅ All caught up — no outstanding invoices</div>';
-
-  if (paidThisMonth.length) {
-    var paidTotal = paidThisMonth.reduce(function(sum, i) { return sum + i.amount; }, 0);
-    html += '<div style="margin-top:1rem;">' +
-      '<div onclick="togglePaidSection()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:.6rem .8rem;background:var(--surface2);border-radius:4px;border:1px solid rgba(255,255,255,.08);">' +
-        '<span style="font-size:.75rem;color:var(--green);text-transform:uppercase;letter-spacing:.08em;">✅ Paid This Month (' + paidThisMonth.length + ')</span>' +
-        '<span style="font-size:.8rem;color:var(--green);font-weight:bold;">$' + paidTotal.toLocaleString() + ' <span id="paid-section-arrow" style="color:#b8c8b8;">▼</span></span>' +
-      '</div>' +
-      '<div id="paid-section-body" style="display:none;">' + paidThisMonth.map(buildRow).join('') + '</div>' +
-    '</div>';
-  }
-
-  list.innerHTML = html;
-  updateMoneyTotals();
-}
-
-function togglePaidSection() {
-  var body = document.getElementById('paid-section-body');
-  var arrow = document.getElementById('paid-section-arrow');
-  if (!body) return;
-  var isOpen = body.style.display !== 'none';
-  body.style.display = isOpen ? 'none' : 'block';
-  if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
-}
-
-// ══════════════════════════════════════════════════════════════
-// EXPAND LOAD PANEL
+// EXPAND LOAD PANEL — with auto HOS, broker badge, Route Intel
 // ══════════════════════════════════════════════════════════════
 function toggleExpand(panelId) {
   var panel = document.getElementById(panelId);
@@ -836,6 +747,8 @@ function recalcPanel(panelId, rate, miles) {
   var emptyMpg  = defaults.emptyMpg || 8.0;
   var panel = document.getElementById(panelId);
   var pickupCity = panel ? (panel.dataset.pickup || "") : "";
+  var broker     = panel ? (panel.dataset.broker || "") : "";
+  var dest       = panel ? (panel.dataset.dest   || "") : "";
   var deadMiles = 0;
   if (pickupCity && window._gpsLat) deadMiles = getDeadheadMiles(pickupCity);
   if (!deadMiles) { var dhInput = document.getElementById("drop-dead"); deadMiles = dhInput ? (parseFloat(dhInput.value) || 0) : 0; }
@@ -861,19 +774,55 @@ function recalcPanel(panelId, rate, miles) {
   if (verdictEl) {
     verdictEl.textContent = verdictText;
     verdictEl.className = "expand-verdict " + tier;
-    // Add disclaimer after verdict if not already there
     if (!verdictEl.nextElementSibling || !verdictEl.nextElementSibling.classList.contains('ai-disclaimer')) {
       verdictEl.insertAdjacentHTML('afterend', AI_DISCLAIMER);
     }
   }
+
+  // ── AUTO: Broker badge (Change 2) ──────────────────────────
+  var brokerBadgeEl = document.getElementById("broker-badge_" + panelId);
+  if (brokerBadgeEl && broker) {
+    brokerBadgeEl.innerHTML = getBrokerBadgeHTML(broker);
+  }
+
+  // ── AUTO: HOS verdict (Change 1) ───────────────────────────
+  var hosEl = document.getElementById("hos_" + panelId);
+  if (hosEl) {
+    hosEl.innerHTML = calcHOSVerdict(miles);
+  }
+
   checkDeadhead(panelId, rate, miles);
+
+  // ── Route Intel button (Change 4) — inject once if dest set
+  if (!document.getElementById('route-intel-btn_' + panelId) && dest) {
+    var insertTarget = verdictEl ? verdictEl : (panel ? panel.querySelector('.expand-notes') : null);
+    if (insertTarget) {
+      var riDiv = document.createElement('div');
+      riDiv.style.cssText = 'margin-top:.5rem;';
+      riDiv.innerHTML =
+        '<button class="btn btn-sm btn-outline route-intel-card-btn" ' +
+          'id="route-intel-btn_' + panelId + '" ' +
+          'data-dest="' + dest + '" data-panel="' + panelId + '" ' +
+          'style="font-size:.75rem;color:#7ab8ff;border-color:rgba(122,184,255,.35);">' +
+          '🗺️ Route Intel — ' + dest +
+        '</button>' +
+        '<div id="route-intel-result_' + panelId + '" style="display:none;margin-top:.4rem;"></div>';
+      var disclaimer = verdictEl ? verdictEl.nextElementSibling : null;
+      var insertAfter = (disclaimer && disclaimer.classList && disclaimer.classList.contains('ai-disclaimer')) ? disclaimer : insertTarget;
+      if (insertAfter.parentNode) {
+        insertAfter.parentNode.insertBefore(riDiv, insertAfter.nextSibling);
+      }
+    }
+  }
+
+  // ── AI Decide button ────────────────────────────────────────
   if (window._rcAIWorker || window._rcAnthropicKey) {
     var ve = document.getElementById('verdict_' + panelId);
     var aiBtn = document.getElementById('ai-decide-' + panelId);
     if (ve && !aiBtn) {
       var p2 = document.getElementById(panelId);
-      var pickup = p2 ? (p2.dataset.pickup || '') : '';
-      var broker = p2 ? (p2.dataset.broker || '') : '';
+      var pickup2 = p2 ? (p2.dataset.pickup || '') : '';
+      var broker2 = p2 ? (p2.dataset.broker || '') : '';
       var aiDiv = document.createElement('div');
       aiDiv.style.cssText = 'margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;';
       var aiBtnEl = document.createElement('button');
@@ -884,14 +833,16 @@ function recalcPanel(panelId, rate, miles) {
       aiBtnEl.dataset.panelId = panelId;
       aiBtnEl.dataset.rate = rate;
       aiBtnEl.dataset.miles = miles;
-      aiBtnEl.dataset.broker = broker || '';
-      aiBtnEl.dataset.pickup = pickup || '';
+      aiBtnEl.dataset.broker = broker2 || '';
+      aiBtnEl.dataset.pickup = pickup2 || '';
       var aiResult = document.createElement('div');
       aiResult.id = 'ai-decide-result-' + panelId;
       aiResult.style.cssText = 'display:none;flex:1;min-width:100%;';
       aiDiv.appendChild(aiBtnEl);
       aiDiv.appendChild(aiResult);
-      ve.parentNode.insertBefore(aiDiv, ve.nextSibling);
+      var notesEl = panel ? panel.querySelector('.expand-notes') : null;
+      if (notesEl) panel.insertBefore(aiDiv, notesEl);
+      else if (panel) panel.appendChild(aiDiv);
     }
   }
 }
@@ -929,13 +880,17 @@ function addReturnLoad(route, miles, rate) {
   newCard.setAttribute("data-rate", rate);
   newCard.setAttribute("data-miles", miles);
   newCard.setAttribute("data-pickup", origin);
+  newCard.setAttribute("data-dest", dest);
+  newCard.setAttribute("data-broker", "");
   newCard.innerHTML =
     '<div class="load-top load-card-clickable" onclick="toggleExpand(\'' + panelId + '\')">' +
       '<div><div class="load-route">' + origin + ' <span>→</span> ' + dest + '</div><div style="margin-top:.3rem;"><span class="load-tag tag-hot">Return Load</span></div></div>' +
       '<div><div class="load-rate">$' + rate.toLocaleString() + '</div><div class="load-rate-sub">$' + rpm + '/mi</div></div>' +
     '</div>' +
     '<div class="load-meta"><div><div class="lm-label">Miles</div><div class="lm-val">' + miles + '</div></div><div><div class="lm-label">Rate/Mi</div><div class="lm-val">$' + rpm + '</div></div><div><div class="lm-label">Est. Net</div><div class="lm-val">$' + net.toLocaleString() + '</div></div></div>' +
-    '<div class="load-expand-panel" id="' + panelId + '" data-rate="' + rate + '" data-miles="' + miles + '" data-pickup="' + origin + '">' +
+    '<div class="load-expand-panel" id="' + panelId + '" data-rate="' + rate + '" data-miles="' + miles + '" data-pickup="' + origin + '" data-dest="' + dest + '" data-broker="">' +
+      '<div id="broker-badge_' + panelId + '" style="margin-bottom:.4rem;display:flex;gap:.4rem;flex-wrap:wrap;"></div>' +
+      '<div id="hos_' + panelId + '"></div>' +
       '<div class="expand-profit-grid">' +
         '<div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">$' + rate.toLocaleString() + '</div></div>' +
         '<div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_' + panelId + '">-$' + fuelCost.toLocaleString() + '</div></div>' +
@@ -1477,41 +1432,33 @@ function clearBrokerSearch() {
 function renderBrokers() {
   var list = document.getElementById('broker-list');
   if (!list) return;
-
   if (!_brokers.length) {
     list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏦</div><div class="empty-state-msg">No brokers yet. Add your first broker above — every broker you haul for belongs in your vault.</div></div>';
     return;
   }
-
   var totalOutstanding = 0, totalOverdue = 0;
   var today = new Date(), fifteenDaysAgo = new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000);
-
   invoices.forEach(function(inv) {
     if (inv.status !== 'paid') {
       totalOutstanding += inv.amount;
       if (new Date(inv.dueDate) < today) totalOverdue += inv.amount;
     }
   });
-
   var outEl = document.getElementById('broker-total-outstanding'), ovEl = document.getElementById('broker-total-overdue');
   if (outEl) outEl.textContent = '$' + totalOutstanding.toLocaleString();
   if (ovEl)  ovEl.textContent  = '$' + totalOverdue.toLocaleString();
-
   var filteredBrokers = _brokers.filter(function(b) {
     if (_brokerSearchQuery) {
       return b.name.toLowerCase().indexOf(_brokerSearchQuery) >= 0 ||
              (b.mc_number && b.mc_number.toLowerCase().indexOf(_brokerSearchQuery) >= 0);
     }
-    var hasUnpaid = invoices.some(function(i) {
-      return i.broker && i.broker.toLowerCase() === b.name.toLowerCase() && i.status !== 'paid';
-    });
+    var hasUnpaid = invoices.some(function(i) { return i.broker && i.broker.toLowerCase() === b.name.toLowerCase() && i.status !== 'paid'; });
     if (hasUnpaid) return true;
     return invoices.some(function(i) {
       if (!i.broker || i.broker.toLowerCase() !== b.name.toLowerCase()) return false;
       return new Date(i.date) >= fifteenDaysAgo;
     });
   });
-
   var countInfo = '';
   if (!_brokerSearchQuery) {
     var hiddenCount = _brokers.length - filteredBrokers.length;
@@ -1519,12 +1466,10 @@ function renderBrokers() {
   } else {
     countInfo = '<div style="font-size:.72rem;color:var(--green);padding:.4rem .8rem;margin-bottom:.3rem;">Search results: ' + filteredBrokers.length + ' broker' + (filteredBrokers.length !== 1 ? 's' : '') + ' <button onclick="clearBrokerSearch()" style="background:none;border:none;color:#b8c8b8;cursor:pointer;font-size:.72rem;text-decoration:underline;">Clear</button></div>';
   }
-
   if (!filteredBrokers.length) {
     list.innerHTML = countInfo + '<div class="alert alert-amber" style="margin-top:.3rem;"><div class="alert-icon">🔍</div><div>' + (_brokerSearchQuery ? 'No brokers found matching "' + _brokerSearchQuery + '"' : 'No brokers with recent activity. Use the search box above to find any broker.') + '</div></div>';
     return;
   }
-
   list.innerHTML = countInfo + filteredBrokers.map(function(b) {
     var brokerInvs = invoices.filter(function(i) { return i.broker && i.broker.toLowerCase() === b.name.toLowerCase(); });
     var outstanding = brokerInvs.filter(function(i) { return i.status !== 'paid'; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
@@ -1552,7 +1497,6 @@ function openBrokerDetail(brokerId) {
   var content = document.getElementById('broker-detail-content');
   var nameEl  = document.getElementById('broker-detail-name');
   nameEl.textContent = broker.name;
-
   var twelveMonthsAgo = new Date(); twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
   var brokerInvs = invoices.filter(function(i) {
     if (!i.broker || i.broker.toLowerCase() !== broker.name.toLowerCase()) return false;
@@ -1560,7 +1504,6 @@ function openBrokerDetail(brokerId) {
   });
   var today = new Date(), totalPaid = 0, totalOwed = 0;
   brokerInvs.forEach(function(i) { if (i.status === 'paid') totalPaid += i.amount; else totalOwed += i.amount; });
-
   var invoicesHtml = brokerInvs.length > 0
     ? brokerInvs.map(function(inv) {
         var due = new Date(inv.dueDate), daysLeft = Math.ceil((due-today)/(1000*60*60*24));
@@ -1573,7 +1516,6 @@ function openBrokerDetail(brokerId) {
           '<div style="padding:.2rem 1rem .6rem;">' + getDocUploadHTML(inv.id) + '</div></div>';
       }).join('')
     : '<div style="padding:1rem;font-size:.85rem;color:#b8c8b8;">No invoices in the last 12 months for this broker.</div>';
-
   content.innerHTML =
     '<div class="loadback-summary">' +
       '<div class="loadback-summary-row"><span>MC Number</span><strong>' + (broker.mc_number||'—') + '</strong></div>' +
@@ -1602,7 +1544,6 @@ function openBrokerDetail(brokerId) {
       '</div>' +
       '<button class="btn btn-green" onclick="addInvoiceFromBroker(\'' + broker.id + '\',\'' + broker.name + '\',\'' + (broker.phone||'') + '\')">Add Invoice</button>' +
     '</div><div style="height:2rem;"></div>';
-
   panel.classList.add('open');
   brokerInvs.forEach(function(inv) { loadInvoiceDocs(inv.id); });
 }
@@ -1659,6 +1600,148 @@ function onBrokerSelectChange() {
     if (phoneInput && selected.dataset.phone) phoneInput.value = selected.dataset.phone;
     window._selectedBrokerId = selected.dataset.brokerId || null;
   } else window._selectedBrokerId = null;
+}
+
+// ══════════════════════════════════════════════════════════════
+// INVOICE SYSTEM — Supabase backed
+// ══════════════════════════════════════════════════════════════
+var invoices = [];
+
+async function loadInvoices() {
+  if (!window._rcUserId) return;
+  try {
+    var { data, error } = await _supabase.from('invoices').select('*').eq('user_id', window._rcUserId).order('created_at', { ascending: false });
+    if (error) throw error;
+    invoices = (data || []).map(function(row) {
+      return { id: row.id, broker: row.broker_name, amount: row.amount, ref: row.ref, date: row.invoice_date, terms: row.terms, phone: row.phone, dueDate: row.due_date, status: row.status, notes: row.notes, broker_id: row.broker_id, supabase: true };
+    });
+    renderInvoices();
+    renderBrokers();
+    updateMoneyTotals();
+    checkDailyBriefing();
+  } catch(err) { console.error('Error loading invoices:', err); }
+}
+
+async function saveInvoiceToSupabase(inv) {
+  if (!window._rcUserId) return inv;
+  try {
+    var { data, error } = await _supabase.from('invoices').insert({ user_id: window._rcUserId, broker_name: inv.broker, amount: inv.amount, ref: inv.ref, phone: inv.phone, invoice_date: inv.date, due_date: inv.dueDate, terms: inv.terms, status: inv.status || 'pending', notes: inv.notes || '' }).select().single();
+    if (error) throw error;
+    return Object.assign({}, inv, { id: data.id, supabase: true });
+  } catch(err) { console.error('Error saving invoice:', err); return inv; }
+}
+
+async function updateInvoiceStatus(id, status) {
+  if (!window._rcUserId) return;
+  try { await _supabase.from('invoices').update({ status: status }).eq('id', id).eq('user_id', window._rcUserId); }
+  catch(err) { console.error('Error updating invoice:', err); }
+}
+
+async function deleteInvoiceFromSupabase(id) {
+  if (!window._rcUserId) return;
+  try { await _supabase.from('invoices').delete().eq('id', id).eq('user_id', window._rcUserId); }
+  catch(err) { console.error('Error deleting invoice:', err); }
+}
+
+function addInvoice() {
+  var broker = document.getElementById("inv-broker").value.trim();
+  var amount = parseFloat(document.getElementById("inv-amount").value);
+  var ref    = document.getElementById("inv-ref").value.trim();
+  var date   = document.getElementById("inv-date").value;
+  var terms  = parseInt(document.getElementById("inv-terms").value);
+  var phone  = document.getElementById("inv-phone").value.trim();
+  if (!broker || !amount || !date) { alert("Broker, amount, and date required."); return; }
+  var invoiceDate = new Date(date);
+  var dueDate = new Date(invoiceDate);
+  dueDate.setDate(dueDate.getDate() + terms);
+  var inv = { broker: broker, amount: amount, ref: ref, date: date, terms: terms, phone: phone, dueDate: dueDate.toISOString().split("T")[0], status: "pending", id: Date.now(), broker_id: window._selectedBrokerId || null };
+  invoices.unshift(inv);
+  renderInvoices();
+  track('invoice_added', { amount: amount, broker: broker, terms: terms });
+  saveInvoiceToSupabase(inv).then(function(saved) {
+    var idx = invoices.findIndex(function(i) { return i.id === inv.id; });
+    if (idx >= 0) invoices[idx] = saved;
+    renderBrokers();
+    window._selectedBrokerId = null;
+  });
+  ["inv-broker","inv-amount","inv-ref","inv-phone"].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
+}
+
+function markPaid(id) {
+  var inv = invoices.find(function(i) { return i.id == id; });
+  if (inv) { inv.status = "paid"; updateInvoiceStatus(id, "paid"); track('invoice_marked_paid', { amount: inv.amount, broker: inv.broker }); }
+  renderInvoices(); renderBrokers();
+}
+
+function removeInvoice(id) {
+  deleteInvoiceFromSupabase(id);
+  invoices = invoices.filter(function(i) { return i.id != id; });
+  renderInvoices(); renderBrokers();
+}
+
+function updateMoneyTotals() {
+  var today = new Date(), outstanding = 0, overdue = 0;
+  invoices.filter(function(i) { return i.status !== "paid"; }).forEach(function(i) {
+    outstanding += i.amount;
+    if (new Date(i.dueDate) < today) overdue += i.amount;
+  });
+  var mo = document.getElementById("money-outstanding"), mv = document.getElementById("money-overdue");
+  if (mo) mo.textContent = "$" + outstanding.toLocaleString();
+  if (mv) mv.textContent = "$" + overdue.toLocaleString();
+}
+
+function renderInvoices() {
+  var list = document.getElementById("invoice-list");
+  if (!list) return;
+  var today = new Date();
+  var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  var activeInvoices = invoices.filter(function(inv) { return inv.status !== "paid"; });
+  var paidThisMonth  = invoices.filter(function(inv) { return inv.status === "paid" && new Date(inv.date) >= thisMonthStart; });
+  if (!invoices.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💵</div><div class="empty-state-msg">Your first load is out there. Book it and log the invoice here — tap Add Invoice above after you deliver.</div></div>';
+    updateMoneyTotals(); return;
+  }
+  function buildRow(inv) {
+    var due = new Date(inv.dueDate);
+    var daysLeft = Math.ceil((due - today) / (1000*60*60*24));
+    var isOverdue = inv.status === "pending" && daysLeft < 0;
+    var badge = inv.status === "paid" ? '<span class="paid-badge">PAID</span>'
+      : isOverdue ? '<span class="overdue-badge">OVERDUE ' + Math.abs(daysLeft) + 'd</span>'
+      : '<span class="due-badge">DUE IN ' + daysLeft + 'd</span>';
+    return '<div class="invoice-item ' + (inv.status==="paid"?"paid":isOverdue?"overdue":"") + '">' +
+      '<div class="inv-top"><div><div class="inv-broker-name">' + inv.broker + '</div><div style="margin-top:.2rem;">' + badge + '</div></div><div class="inv-amount">$' + inv.amount.toLocaleString() + '</div></div>' +
+      '<div class="inv-meta">' + (inv.ref ? '<span class="inv-stat">Ref: <strong>' + inv.ref + '</strong></span>' : '') + '<span class="inv-stat">Invoiced: <strong>' + inv.date + '</strong></span><span class="inv-stat">Due: <strong>' + inv.dueDate + '</strong></span></div>' +
+      '<div class="inv-actions">' +
+        (inv.phone ? '<button class="inv-btn call" onclick="callBroker(\'' + inv.phone + '\',\'' + inv.broker + '\')">📞 Call</button>' : '') +
+        (inv.status !== "paid" ? '<button class="inv-btn green" onclick="markPaid(\'' + inv.id + '\')">✓ Mark Paid</button>' : '') +
+        (inv.status !== "paid" ? '<button class="inv-btn" onclick="draftChaseMessage(\'' + inv.id + '\')" id="chase-btn-' + inv.id + '" style="background:none;border:1px solid rgba(122,184,255,.35);color:#7ab8ff;font-size:.72rem;">📨 Chase</button>' : '') +
+        '<button class="inv-btn red" onclick="removeInvoice(\'' + inv.id + '\')">✕ Remove</button>' +
+      '</div></div>';
+  }
+  var html = activeInvoices.length
+    ? activeInvoices.map(buildRow).join('')
+    : '<div style="padding:.8rem;font-size:.85rem;color:var(--green);text-align:center;">✅ All caught up — no outstanding invoices</div>';
+  if (paidThisMonth.length) {
+    var paidTotal = paidThisMonth.reduce(function(sum, i) { return sum + i.amount; }, 0);
+    html += '<div style="margin-top:1rem;">' +
+      '<div onclick="togglePaidSection()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:.6rem .8rem;background:var(--surface2);border-radius:4px;border:1px solid rgba(255,255,255,.08);">' +
+        '<span style="font-size:.75rem;color:var(--green);text-transform:uppercase;letter-spacing:.08em;">✅ Paid This Month (' + paidThisMonth.length + ')</span>' +
+        '<span style="font-size:.8rem;color:var(--green);font-weight:bold;">$' + paidTotal.toLocaleString() + ' <span id="paid-section-arrow" style="color:#b8c8b8;">▼</span></span>' +
+      '</div>' +
+      '<div id="paid-section-body" style="display:none;">' + paidThisMonth.map(buildRow).join('') + '</div>' +
+    '</div>';
+  }
+  list.innerHTML = html;
+  updateMoneyTotals();
+}
+
+function togglePaidSection() {
+  var body = document.getElementById('paid-section-body');
+  var arrow = document.getElementById('paid-section-arrow');
+  if (!body) return;
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1730,13 +1813,13 @@ async function exportYearlyTax(year) {
       if (!mInvs.length) continue;
       var mStr = String(m).padStart(2,'0'), mFolder = yearFolder.folder(year + '-' + mStr + '-' + monthNames[m-1]);
       for (var i = 0; i < mInvs.length; i++) {
-        var inv = mInvs[i]; yearTotal += inv.amount; if (inv.status === 'paid') yearPaid += inv.amount;
-        yearCsvLines.push([monthNames[m-1], '"' + (inv.broker||'') + '"', '"' + (inv.ref||'') + '"', inv.amount, inv.dueDate, inv.status].join(','));
-        var sb = (inv.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-'), iFolder = mFolder.folder('Invoice-' + sb + '-' + (inv.date||'nodate'));
-        iFolder.file('invoice-summary.txt', 'Broker: ' + (inv.broker||'—') + '\nRef: ' + (inv.ref||'—') + '\nAmount: $' + inv.amount.toLocaleString() + '\nDate: ' + (inv.date||'—') + '\nDue: ' + (inv.dueDate||'—') + '\nStatus: ' + (inv.status||'pending').toUpperCase());
-        var docs = _invoiceDocs[inv.id] || {};
-        if (docs.rateCon) { var rcB2 = await fetchDocAsBlob(docs.rateCon); if (rcB2) iFolder.file('rate-confirmation.' + getExtFromUrl(docs.rateCon), rcB2); }
-        if (docs.bol)     { var bolB2 = await fetchDocAsBlob(docs.bol);     if (bolB2) iFolder.file('bill-of-lading.' + getExtFromUrl(docs.bol), bolB2); }
+        var inv2 = mInvs[i]; yearTotal += inv2.amount; if (inv2.status === 'paid') yearPaid += inv2.amount;
+        yearCsvLines.push([monthNames[m-1], '"' + (inv2.broker||'') + '"', '"' + (inv2.ref||'') + '"', inv2.amount, inv2.dueDate, inv2.status].join(','));
+        var sb = (inv2.broker||'Unknown').replace(/[^a-zA-Z0-9]/g, '-'), iFolder = mFolder.folder('Invoice-' + sb + '-' + (inv2.date||'nodate'));
+        iFolder.file('invoice-summary.txt', 'Broker: ' + (inv2.broker||'—') + '\nRef: ' + (inv2.ref||'—') + '\nAmount: $' + inv2.amount.toLocaleString() + '\nDate: ' + (inv2.date||'—') + '\nDue: ' + (inv2.dueDate||'—') + '\nStatus: ' + (inv2.status||'pending').toUpperCase());
+        var docs2 = _invoiceDocs[inv2.id] || {};
+        if (docs2.rateCon) { var rcB2 = await fetchDocAsBlob(docs2.rateCon); if (rcB2) iFolder.file('rate-confirmation.' + getExtFromUrl(docs2.rateCon), rcB2); }
+        if (docs2.bol)     { var bolB2 = await fetchDocAsBlob(docs2.bol);     if (bolB2) iFolder.file('bill-of-lading.' + getExtFromUrl(docs2.bol), bolB2); }
       }
     }
     yearCsvLines.push('', '"YEAR TOTAL","","","' + yearTotal + '","",""', '"YEAR PAID","","","' + yearPaid + '","",""', '"YEAR OUTSTANDING","","","' + (yearTotal-yearPaid) + '","",""');
@@ -1750,7 +1833,7 @@ async function exportYearlyTax(year) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// DOCUMENT VAULT — BOL & Rate Con uploads
+// DOCUMENT VAULT
 // ══════════════════════════════════════════════════════════════
 var _invoiceDocs = {};
 
@@ -1815,14 +1898,14 @@ document.addEventListener("click", function(e) {
   if (closeChase) { var modal = closeChase.closest('[style*="position:fixed"]') || closeChase.closest('[style*="fixed"]'); if (modal) modal.remove(); return; }
   var aiBtn = e.target.closest(".ai-decide-btn");
   if (aiBtn) { getLoadDecision(aiBtn.dataset.panelId, parseFloat(aiBtn.dataset.rate), parseFloat(aiBtn.dataset.miles), aiBtn.dataset.broker, aiBtn.dataset.pickup); return; }
+  // Route Intel on load card — event delegation (Change 4)
+  var riBtn = e.target.closest(".route-intel-card-btn");
+  if (riBtn) { getRouteIntelForCard(riBtn.dataset.dest, riBtn.dataset.panel); return; }
   var removeBtn = e.target.closest(".remove-invoice-btn");
   if (removeBtn && removeBtn.dataset.invId) removeInvoice(removeBtn.dataset.invId);
-  // Close more drawer on outside click
   var moreDrawer = document.getElementById('more-drawer');
   if (moreDrawer && moreDrawer.classList.contains('open')) {
-    if (!e.target.closest('#more-drawer') && !e.target.closest('#more-nav-btn')) {
-      closeMoreDrawer();
-    }
+    if (!e.target.closest('#more-drawer') && !e.target.closest('#more-nav-btn')) { closeMoreDrawer(); }
   }
 });
 
@@ -1884,71 +1967,6 @@ document.addEventListener('touchend', function(e) { var fb = e.target.closest('#
 function closeFuelModal() { var modal = document.getElementById('fuel-report-modal'); if (modal) modal.style.display = 'none'; }
 
 // ══════════════════════════════════════════════════════════════
-// AI NEGOTIATION COACH
-// ══════════════════════════════════════════════════════════════
-var _anthropicKey = null, _aiScriptGenerating = false;
-
-async function generateNegScript() {
-  if (_aiScriptGenerating) return;
-  var origin  = document.getElementById("neg-origin").value;
-  var dest    = document.getElementById("neg-dest").value;
-  var offer   = parseFloat(document.getElementById("neg-offer").value);
-  var miles   = parseFloat(document.getElementById("neg-miles").value);
-  var broker  = document.getElementById("neg-broker-name") ? document.getElementById("neg-broker-name").value.trim() : "";
-  if (!origin || !dest || !offer || !miles) { alert("Fill in origin, destination, offer, and miles first."); return; }
-  track('negotiation_script_requested', { origin: origin, dest: dest, offer: offer, miles: miles, broker: broker });
-  runNegCoach();
-  var marketRpm = LANE_RATES[origin+"-"+dest] || LANE_RATES[dest+"-"+origin] || 2.15;
-  var offerRpm = offer / miles, marketTotal = Math.round(marketRpm * miles), gap = marketTotal - offer;
-  var aiSection = document.getElementById("ai-script-section"), aiOutput = document.getElementById("ai-script-output");
-  if (!aiSection || !aiOutput) return;
-  aiSection.style.display = "block";
-  aiOutput.innerHTML = '<div style="color:var(--green);font-size:.85rem;padding:.5rem 0;">🤖 Generating your script...</div>';
-  _aiScriptGenerating = true;
-  var brokerInfo = "";
-  if (broker) {
-    var bKey = broker.toLowerCase(), bData = null, keys = Object.keys(BROKER_DB);
-    for (var k = 0; k < keys.length; k++) { if (bKey.indexOf(keys[k]) >= 0 || keys[k].indexOf(bKey) >= 0) { bData = BROKER_DB[keys[k]]; break; } }
-    if (bData) brokerInfo = "Broker credit score: " + bData.score + ". Average days to pay: " + bData.days + " days. Notes: " + bData.flags.map(function(f) { return f.m; }).join(", ") + ".";
-  }
-  var prompt = "You are an expert freight broker negotiation coach helping an owner-operator trucker get the best rate. Generate a word-for-word phone script for this situation:\n\nLoad details:\n- Origin: " + origin + "\n- Destination: " + dest + "\n- Miles: " + miles + "\n- Broker offer: $" + offer + " ($" + offerRpm.toFixed(2) + "/mile)\n- Market rate for this lane: $" + marketTotal + " ($" + marketRpm.toFixed(2) + "/mile)\n- Gap: $" + Math.abs(gap) + " " + (gap > 0 ? "below market" : "above market") + (broker ? "\n- Broker name: " + broker : "") + (brokerInfo ? "\n- " + brokerInfo : "") + "\n\nGenerate a confident, natural-sounding phone script that:\n1. Acknowledges the offer professionally\n2. Uses market data as leverage\n3. Makes a specific counter-offer at market rate\n4. Includes a psychological close\n5. Has a fallback position if they push back\n\nFormat as: [Opening] then [Counter] then [Close] then [If they push back]. Keep it conversational, confident, and under 150 words total.";
-  try {
-    var aiWorkerUrl = window._rcAIWorker, aiEndpoint = aiWorkerUrl || "https://api.anthropic.com/v1/messages";
-    var aiHeaders = aiWorkerUrl ? { "Content-Type": "application/json" } : { "Content-Type": "application/json", "x-api-key": window._rcAnthropicKey || "", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
-    var response = await fetch(aiEndpoint, { method: "POST", headers: aiHeaders, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 400, messages: [{ role: "user", content: prompt }] }) });
-    var data = await response.json();
-    if (data.content && data.content[0] && data.content[0].text) {
-      aiOutput.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;">' +
-        '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">🤖 AI-Generated Script — Read This Word for Word</div>' +
-        '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + data.content[0].text + '</div>' +
-        AI_SCRIPT_DISCLAIMER +
-        '<div style="margin-top:.8rem;display:flex;gap:.5rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button><button class="btn btn-sm btn-outline" onclick="generateNegScript()">🔄 Regenerate</button></div></div>';
-    } else if (data.error) throw new Error(data.error.message || "API error");
-  } catch(err) {
-    var fallbackScript = buildFallbackScript(origin, dest, offer, miles, broker, marketRpm, marketTotal, gap);
-    aiOutput.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--amber-dim);border-radius:4px;padding:1rem;">' +
-      '<div style="font-size:.7rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">📋 Negotiation Script</div>' +
-      '<div style="font-size:.88rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + fallbackScript + '</div>' +
-      AI_SCRIPT_DISCLAIMER +
-      '<div style="margin-top:.8rem;"><button class="btn btn-sm btn-outline" onclick="copyNegScript()">📋 Copy Script</button></div></div>';
-  }
-  _aiScriptGenerating = false;
-}
-
-function buildFallbackScript(origin, dest, offer, miles, broker, marketRpm, marketTotal, gap) {
-  var brokerName = broker || "there", counterTotal = marketTotal, softCounter = Math.round(marketTotal * 0.97);
-  if (gap <= 0) return "Hey " + brokerName + ", I appreciate you reaching out on this one. Your offer of $" + offer.toLocaleString() + " on the " + origin + " to " + dest + " lane looks solid — that is right at market for me. Let me get my paperwork in order and we can get this booked. Send over the rate con and I will sign it today.";
-  else if (gap <= 100) return "Hey " + brokerName + ", thanks for thinking of me on this " + origin + " to " + dest + " load. I am looking at your offer of $" + offer.toLocaleString() + " — I am just a little short of where I need to be. Market on this lane is running $" + marketRpm.toFixed(2) + " a mile right now. If you can get me to $" + counterTotal.toLocaleString() + " I can have wheels rolling today. Can you make that work?\n\nIf they push back: I can meet you at $" + softCounter.toLocaleString() + " but that is my floor on this one.";
-  else return "Hey " + brokerName + ", I appreciate the call on this " + origin + " to " + dest + " load. I have to be honest — $" + offer.toLocaleString() + " is pretty far from where the market is sitting right now. I am seeing $" + marketRpm.toFixed(2) + " a mile on this lane consistently, which puts us at $" + counterTotal.toLocaleString() + ". That is what I need to make this work.\n\nIf they push back: My absolute floor is $" + softCounter.toLocaleString() + " — below that I am better off waiting for the next load. What can you do?\n\nIf they still push back: I appreciate your time. Let me know if your market changes — I would love to work with you on the next one.";
-}
-
-function copyNegScript() {
-  var output = document.getElementById("ai-script-output"); if (!output) return;
-  var text = output.querySelector("div[style*='pre-wrap']"); if (!text) return;
-  navigator.clipboard.writeText(text.textContent).then(function() { alert("Script copied to clipboard!"); }).catch(function() { var range = document.createRange(); range.selectNodeContents(text); window.getSelection().removeAllRanges(); window.getSelection().addRange(range); });
-}
-
-// ══════════════════════════════════════════════════════════════
 // AI FEATURES
 // ══════════════════════════════════════════════════════════════
 async function callAI(prompt, maxTokens) {
@@ -1960,8 +1978,6 @@ async function callAI(prompt, maxTokens) {
   if (data.content && data.content[0]) return data.content[0].text;
   throw new Error(data.error ? data.error.message : "AI unavailable");
 }
-
-var _briefingShownToday = false;
 
 async function showDailyBriefing() {
   var today = new Date().toDateString(), lastShown = '';
@@ -2021,7 +2037,7 @@ async function draftChaseMessage(invoiceId) {
     modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:8px;width:100%;max-width:480px;margin:0 auto;padding:1.5rem;"><div style="font-size:.85rem;font-weight:bold;color:var(--green);margin-bottom:.8rem;">📨 Collection Message Draft</div><div style="font-size:.85rem;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:4px;padding:.8rem;margin-bottom:1rem;">' + text + '</div><div style="font-size:.68rem;color:#b8c8b8;margin-bottom:.8rem;font-style:italic;">AI-generated draft — review and edit before sending</div><div style="display:flex;gap:.5rem;"><button class="btn btn-green copy-chase-btn" style="flex:1;">📋 Copy</button><button class="btn btn-outline close-chase-modal" style="flex:1;">Close</button></div></div>';
     document.body.appendChild(modal);
   } catch(e) { alert('AI unavailable. Try again later.'); }
-  if (btn) { btn.textContent = '📨 Draft Chase Message'; btn.disabled = false; }
+  if (btn) { btn.textContent = '📨 Chase'; btn.disabled = false; }
 }
 
 async function generateWeeklySummary() {
@@ -2047,30 +2063,69 @@ async function generateWeeklySummary() {
   if (btn) { btn.textContent = '📊 Generate Weekly Summary'; btn.disabled = false; }
 }
 
-async function getRouteIntel(destination) {
-  if (!destination) { destination = document.getElementById('route-intel-dest') ? document.getElementById('route-intel-dest').value.trim() : ''; }
-  if (!destination) { alert('Enter a destination city first.'); return; }
-  track('route_intel_requested', { destination: destination });
-  var btn = document.getElementById('route-intel-btn'), output = document.getElementById('route-intel-output');
-  if (btn) { btn.textContent = 'Analyzing...'; btn.disabled = true; }
+// ══════════════════════════════════════════════════════════════
+// ROUTE INTEL — standalone + load card (Change 4)
+// ══════════════════════════════════════════════════════════════
+
+// Shared core logic — called by both standalone and card versions
+async function _fetchRouteIntel(destination) {
   var destKey = destination.toLowerCase().split(',')[0].trim();
   var returnLoads = RETURN_LOADS[destKey] || NEARBY_LOADS[destKey] || [];
   var topReturn = returnLoads.length > 0 ? returnLoads[0].route + " at $" + returnLoads[0].rpm.toFixed(2) + "/mi" : "limited return data in database";
   var prompt = "Give a 3-point tactical briefing for a trucker delivering to " + destination + ". Be specific and practical.\n\nContext:\n- Driver coming from: " + (currentCity||currentState||'Pacific Northwest') + "\n- Best return load in database: " + topReturn + "\n- Current diesel: $" + (defaults.fuelPrice?defaults.fuelPrice.toFixed(3):'?') + "\n\nFormat as exactly 3 numbered points. Each point max 2 sentences. Focus on: (1) rates from that market, (2) best return lane strategy, (3) timing or tactical tip.";
   try {
     var text = await callAI(prompt, 250);
-    if (output) {
-      output.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.8rem;">' +
-        '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">🗺️ Route Intel — ' + destination + '</div>' +
-        '<div style="font-size:.85rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + text + '</div>' +
-        '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.5rem;font-style:italic;">AI estimate · Market conditions change — verify current rates before booking</div>' +
-      '</div>';
-      output.style.display = 'block';
-    }
+    return '<div style="background:var(--surface2);border:1px solid var(--green-border);border-radius:4px;padding:1rem;margin-top:.5rem;">' +
+      '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">🗺️ Route Intel — ' + destination + '</div>' +
+      '<div style="font-size:.85rem;line-height:1.8;color:var(--text);white-space:pre-wrap;">' + text + '</div>' +
+      '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.5rem;font-style:italic;">AI estimate · Market conditions change — verify current rates before booking</div>' +
+    '</div>';
   } catch(e) {
-    if (output) { output.innerHTML = '<div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">⚠️</div><div>AI unavailable. Check your connection.</div></div>'; output.style.display = 'block'; }
+    return '<div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">⚠️</div><div>AI unavailable. Check your connection.</div></div>';
   }
+}
+
+// Standalone — Dispatcher tab
+async function getRouteIntel(destination) {
+  if (!destination) { destination = document.getElementById('route-intel-dest') ? document.getElementById('route-intel-dest').value.trim() : ''; }
+  if (!destination) { alert('Enter a destination city first.'); return; }
+  track('route_intel_requested', { destination: destination });
+  var btn = document.getElementById('route-intel-btn'), output = document.getElementById('route-intel-output');
+  if (btn) { btn.textContent = 'Analyzing...'; btn.disabled = true; }
+  var result = await _fetchRouteIntel(destination);
+  if (output) { output.innerHTML = result; output.style.display = 'block'; }
   if (btn) { btn.textContent = '🗺️ Get Route Intel'; btn.disabled = false; }
+}
+
+// Load card — pre-populated with destination from card data-dest attribute
+async function getRouteIntelForCard(destination, panelId) {
+  if (!destination) return;
+  track('route_intel_requested', { destination: destination, source: 'load_card' });
+  var btn = document.getElementById('route-intel-btn_' + panelId);
+  var output = document.getElementById('route-intel-result_' + panelId);
+  if (btn) { btn.textContent = '🗺️ Loading...'; btn.disabled = true; }
+  var result = await _fetchRouteIntel(destination);
+  if (output) { output.innerHTML = result; output.style.display = 'block'; }
+  if (btn) { btn.textContent = '🗺️ Route Intel — ' + destination; btn.disabled = false; }
+}
+
+// Standalone HOS checker (kept in Dispatcher tab)
+function checkHOS() {
+  var hours  = parseFloat(document.getElementById("hos-hours").value) || 0;
+  var miles  = parseFloat(document.getElementById("hos-miles").value) || 0;
+  var pickup = parseFloat(document.getElementById("hos-pickup").value) || 1;
+  var speed  = parseFloat(document.getElementById("hos-speed").value) || 55;
+  var container = document.getElementById("hos-result");
+  if (!hours || !miles) { alert("Enter available hours and miles."); return; }
+  var driveTime = miles / speed;
+  var totalNeeded = driveTime + pickup;
+  var buffer = hours - totalNeeded;
+  var legal = buffer >= 0;
+  container.innerHTML = (legal
+    ? '<div class="hos-pass"><div class="hos-title">✅ Legal — You Can Make This Load</div><div class="hos-detail">Drive time: <strong>' + driveTime.toFixed(1) + ' hrs</strong> at ' + speed + ' mph<br>Pickup window: <strong>' + pickup + ' hrs</strong><br>Total needed: <strong>' + totalNeeded.toFixed(1) + ' hrs</strong><br>Your available: <strong>' + hours + ' hrs</strong><br>Buffer: <strong>' + buffer.toFixed(1) + ' hrs</strong> to spare</div></div>'
+    : '<div class="hos-fail"><div class="hos-title">❌ Illegal — Do Not Accept This Load</div><div class="hos-detail">You need <strong>' + totalNeeded.toFixed(1) + ' hours</strong> but only have <strong>' + hours + ' hours</strong>.<br>You are short <strong>' + Math.abs(buffer).toFixed(1) + ' hours</strong>.<br><br>Options: Reset your clock, negotiate a later pickup, or pass on this load.</div></div>')
+    + HOS_DISCLAIMER;
+  container.style.display = "block";
 }
 
 function promptLogRun(origin, dest, rate, miles) {
@@ -2140,7 +2195,6 @@ var _fmcsaData = null;
 
 async function fetchFMCSAProfile(mcNumber) {
   if (!mcNumber) return null;
-  // Strip MC- prefix if present
   var mc = mcNumber.toString().replace(/^MC-?/i, '').trim();
   try {
     var url = 'https://mobile.fmcsa.dot.gov/qc/services/carriers/docket-number/' + mc + '?webKey=' + FMCSA_KEY;
@@ -2148,41 +2202,24 @@ async function fetchFMCSAProfile(mcNumber) {
     if (!res.ok) throw new Error('FMCSA API error: ' + res.status);
     var data = await res.json();
     return data;
-  } catch(err) {
-    console.error('FMCSA fetch error:', err);
-    return null;
-  }
+  } catch(err) { console.error('FMCSA fetch error:', err); return null; }
 }
 
 async function loadFMCSAProfile() {
   var mc = window._rcMCNumber || (window._fmcsaData && window._fmcsaData.mc);
-  if (!mc) {
-    // Try to get from settings input
-    var mcInput = document.getElementById('set-mc-number');
-    if (mcInput) mc = mcInput.value.trim();
-  }
+  if (!mc) { var mcInput = document.getElementById('set-mc-number'); if (mcInput) mc = mcInput.value.trim(); }
   if (!mc) { renderFMCSACard(null, 'no-mc'); return; }
   renderFMCSACard(null, 'loading');
   var data = await fetchFMCSAProfile(mc);
   if (!data) { renderFMCSACard(null, 'error'); return; }
-  // Parse the carrier object — FMCSA returns content as an array: content[0].carrier
   var carrier = null;
-  if (data.content && Array.isArray(data.content) && data.content[0] && data.content[0].carrier) {
-    carrier = data.content[0].carrier;
-  } else if (data.content && data.content.carrier) {
-    carrier = data.content.carrier;
-  } else if (data.carrier) {
-    carrier = data.carrier;
-  } else {
-    carrier = data;
-  }
-  _fmcsaData = carrier;
-  window._fmcsaData = carrier;
-  // Save to Supabase profile
+  if (data.content && Array.isArray(data.content) && data.content[0] && data.content[0].carrier) { carrier = data.content[0].carrier; }
+  else if (data.content && data.content.carrier) { carrier = data.content.carrier; }
+  else if (data.carrier) { carrier = data.carrier; }
+  else { carrier = data; }
+  _fmcsaData = carrier; window._fmcsaData = carrier;
   if (window._rcUserId && window._supabaseReady) {
-    try {
-      await _supabase.from('profiles').update({ mc_number: mc }).eq('user_id', window._rcUserId);
-    } catch(e) {}
+    try { await _supabase.from('profiles').update({ mc_number: mc }).eq('user_id', window._rcUserId); } catch(e) {}
   }
   renderFMCSACard(carrier, 'loaded');
   renderFMCSADashCard(carrier);
@@ -2191,20 +2228,15 @@ async function loadFMCSAProfile() {
 
 function calcAuthorityScore(carrier) {
   if (!carrier) return { score: 0, tier: 'unknown', color: '#b8c8b8' };
-  var score = 100;
-  var issues = [];
-  // Authority status
+  var score = 100, issues = [];
   var authStatus = (carrier.allowedToOperate || '').toUpperCase();
   if (authStatus === 'N') { score -= 40; issues.push('Not authorized to operate'); }
-  // Safety rating
   var safetyRating = (carrier.safetyRating || '').toLowerCase();
   if (safetyRating === 'unsatisfactory') { score -= 35; issues.push('Unsatisfactory safety rating'); }
   else if (safetyRating === 'conditional') { score -= 15; issues.push('Conditional safety rating'); }
-  // Insurance — bipdInsuranceOnFile returns a dollar amount string e.g. "1000" meaning $1M
   var bipdAmt = parseFloat(carrier.bipdInsuranceOnFile || 0);
   var hasInsurance = bipdAmt > 0;
   if (!hasInsurance) { score -= 25; issues.push('BIPD insurance not on file — fix immediately'); }
-  // Driver OOS rate
   var driverOos = parseFloat(carrier.driverOosRate || 0);
   var vehicleOos = parseFloat(carrier.vehicleOosRate || 0);
   if (driverOos > 25) { score -= 15; issues.push('Driver OOS rate ' + driverOos.toFixed(1) + '% — national avg 5.51%'); }
@@ -2250,18 +2282,9 @@ function renderFMCSADashCard(carrier) {
         '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + score + '%;transition:width .5s;"></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">' +
-        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;">' +
-          '<div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Authority</div>' +
-          '<div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;">' + authStatus + '</div>' +
-        '</div>' +
-        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;">' +
-          '<div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Safety</div>' +
-          '<div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;color:' + safetyColor + ';">' + safetyRating + '</div>' +
-        '</div>' +
-        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;">' +
-          '<div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Power Units</div>' +
-          '<div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;">' + (carrier.totalPowerUnits || '—') + '</div>' +
-        '</div>' +
+        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;"><div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Authority</div><div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;">' + authStatus + '</div></div>' +
+        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;"><div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Safety</div><div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;color:' + safetyColor + ';">' + safetyRating + '</div></div>' +
+        '<div style="text-align:center;padding:.4rem;background:var(--surface2);border-radius:3px;"><div style="font-size:.65rem;color:#b8c8b8;text-transform:uppercase;letter-spacing:.06em;">Power Units</div><div style="font-size:.78rem;font-weight:bold;margin-top:.1rem;">' + (carrier.totalPowerUnits || '—') + '</div></div>' +
       '</div>' +
     '</div>';
 }
@@ -2269,10 +2292,7 @@ function renderFMCSADashCard(carrier) {
 function renderFMCSACard(carrier, state) {
   var screen = document.getElementById('screen-fmcsa');
   if (!screen) return;
-  if (state === 'loading') {
-    screen.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--green);">🔄 Loading your FMCSA profile...</div>';
-    return;
-  }
+  if (state === 'loading') { screen.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--green);">🔄 Loading your FMCSA profile...</div>'; return; }
   if (state === 'no-mc') {
     screen.innerHTML = '<div class="section-head"><div class="section-label">— Authority Health</div><div class="section-title">FMCSA Profile</div></div>' +
       '<div class="alert alert-amber"><div class="alert-icon">⚠️</div><div>Enter your MC number in Settings to load your FMCSA profile.</div></div>' +
@@ -2298,11 +2318,8 @@ function renderFMCSACard(carrier, state) {
   var vehicleOos   = carrier.vehicleOosRate ? parseFloat(carrier.vehicleOosRate).toFixed(1) + '%' : 'N/A';
   var driverOosAvg = carrier.driverOosRateNationalAverage || '5.51';
   var vehicleOosAvg= carrier.vehicleOosRateNationalAverage || '20.72';
-
   screen.innerHTML =
     '<div class="section-head"><div class="section-label">— Authority Health</div><div class="section-title">FMCSA Carrier Profile</div></div>' +
-
-    // SCORE CARD
     '<div class="card" style="border-color:' + color + ';margin-bottom:.8rem;">' +
       '<div class="card-body">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">' +
@@ -2327,8 +2344,6 @@ function renderFMCSACard(carrier, state) {
         '</div>' : '') +
       '</div>' +
     '</div>' +
-
-    // BROKER VIEW
     '<div class="card" style="margin-bottom:.8rem;">' +
       '<div class="card-header"><div class="card-title">👁️ What Brokers See</div></div>' +
       '<div class="card-body">' +
@@ -2345,8 +2360,6 @@ function renderFMCSACard(carrier, state) {
         '</div>' +
       '</div>' +
     '</div>' +
-
-    // AUTHORITY DETAILS
     '<div class="card" style="margin-bottom:.8rem;">' +
       '<div class="card-header"><div class="card-title">📋 Authority Details</div></div>' +
       '<div class="card-body">' +
@@ -2365,12 +2378,10 @@ function renderFMCSACard(carrier, state) {
         fmcsaDetailRow('Fatal Crashes', carrier.fatalCrash !== undefined ? carrier.fatalCrash : '—') +
       '</div>' +
     '</div>' +
-
-    // OOS DETAIL
     '<div class="card" style="margin-bottom:.8rem;">' +
       '<div class="card-header"><div class="card-title">🔍 Out of Service Detail</div></div>' +
       '<div class="card-body">' +
-        '<div style="font-size:.78rem;color:#b8c8b8;margin-bottom:.8rem;">High OOS rates flag your carrier profile to brokers and FMCSA auditors. Work to get these below national averages.</div>' +
+        '<div style="font-size:.78rem;color:#b8c8b8;margin-bottom:.8rem;">High OOS rates flag your carrier profile to brokers and FMCSA auditors.</div>' +
         fmcsaDetailRow('Driver Inspections', carrier.driverInsp || '0') +
         fmcsaDetailRow('Driver OOS', carrier.driverOosInsp || '0') +
         fmcsaDetailRow('Driver OOS Rate', driverOos) +
@@ -2381,18 +2392,14 @@ function renderFMCSACard(carrier, state) {
         fmcsaDetailRow('Vehicle OOS Avg', vehicleOosAvg + '%') +
       '</div>' +
     '</div>' +
-
-    // WHAT THIS MEANS
     '<div class="alert ' + (authStatus && hasInsurance ? 'alert-green' : 'alert-amber') + '" style="margin-bottom:1rem;">' +
       '<div class="alert-icon">💡</div>' +
-      '<div style="font-size:.82rem;line-height:1.7;">' +
-        '<strong>Why this matters:</strong> Brokers check your FMCSA record before every load. ' +
+      '<div style="font-size:.82rem;line-height:1.7;"><strong>Why this matters:</strong> Brokers check your FMCSA record before every load. ' +
         (authStatus && hasInsurance && safetyRating.toLowerCase() !== 'unsatisfactory'
           ? 'Your authority is active and insurance is confirmed. Brokers will book you with confidence.'
           : 'Some items need attention. Fix these to avoid being passed over for loads.') +
       '</div>' +
     '</div>' +
-
     '<button class="btn btn-outline" onclick="loadFMCSAProfile()" style="margin-bottom:1rem;">🔄 Refresh Profile</button>';
 }
 
@@ -2416,9 +2423,7 @@ async function saveMCNumber() {
   var mc = input.value.trim().replace(/^MC-?/i, '');
   window._rcMCNumber = mc;
   try {
-    if (window._rcUserId) {
-      await _supabase.from('profiles').update({ mc_number: mc }).eq('user_id', window._rcUserId);
-    }
+    if (window._rcUserId) { await _supabase.from('profiles').update({ mc_number: mc }).eq('user_id', window._rcUserId); }
     localStorage.setItem('rc-mc-number', mc);
   } catch(e) {}
   await loadFMCSAProfile();
@@ -2432,105 +2437,68 @@ function loadSavedMCNumber() {
       window._rcMCNumber = mc;
       var input = document.getElementById('set-mc-number');
       if (input) input.value = 'MC-' + mc;
-      // Auto-load FMCSA on startup if MC is saved
       setTimeout(function() { loadFMCSAProfile(); }, 2000);
     }
   } catch(e) {}
 }
 
 // ══════════════════════════════════════════════════════════════
-// LIVE DASHBOARD STATS from Supabase
+// LIVE DASHBOARD STATS
 // ══════════════════════════════════════════════════════════════
 function updateDashboardStats() {
   if (!invoices || !invoices.length) return;
   var now = new Date();
   var weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  // Week revenue — paid invoices in last 7 days
-  var weekRevenue = invoices
-    .filter(function(i) { return i.status === 'paid' && new Date(i.date) >= weekAgo; })
-    .reduce(function(sum, i) { return sum + i.amount; }, 0);
-
-  // Outstanding total
-  var outstanding = invoices
-    .filter(function(i) { return i.status !== 'paid'; })
-    .reduce(function(sum, i) { return sum + i.amount; }, 0);
-
-  // Month revenue
-  var monthRevenue = invoices
-    .filter(function(i) { return i.status === 'paid' && new Date(i.date) >= monthStart; })
-    .reduce(function(sum, i) { return sum + i.amount; }, 0);
-
-  // Update dash metric cards if they exist
-  var weekRevEl = document.querySelector('#screen-dash .metric-val');
+  var weekRevenue = invoices.filter(function(i) { return i.status === 'paid' && new Date(i.date) >= weekAgo; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var outstanding = invoices.filter(function(i) { return i.status !== 'paid'; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var monthRevenue = invoices.filter(function(i) { return i.status === 'paid' && new Date(i.date) >= monthStart; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
   var metricCards = document.querySelectorAll('#screen-dash .metric');
-
-  // Find and update each metric card by label
   metricCards.forEach(function(card) {
     var label = card.querySelector('.metric-label');
     var val   = card.querySelector('.metric-val');
     if (!label || !val) return;
     var labelText = label.textContent.toLowerCase();
-    if (labelText.includes('week revenue')) {
-      val.textContent = '$' + weekRevenue.toLocaleString();
-      val.className = 'metric-val' + (weekRevenue > 0 ? '' : ' red');
-    }
-    if (labelText.includes('outstanding')) {
-      val.textContent = '$' + outstanding.toLocaleString();
-      val.className = 'metric-val' + (outstanding > 0 ? ' amber' : '');
-    }
-    if (labelText.includes('month revenue') || labelText.includes('this month')) {
-      val.textContent = '$' + monthRevenue.toLocaleString();
-    }
+    if (labelText.includes('week revenue')) { val.textContent = '$' + weekRevenue.toLocaleString(); val.className = 'metric-val' + (weekRevenue > 0 ? '' : ' red'); }
+    if (labelText.includes('outstanding'))  { val.textContent = '$' + outstanding.toLocaleString(); val.className = 'metric-val' + (outstanding > 0 ? ' amber' : ''); }
+    if (labelText.includes('month revenue') || labelText.includes('this month')) { val.textContent = '$' + monthRevenue.toLocaleString(); }
   });
 }
 
 // ══════════════════════════════════════════════════════════════
-// COMMAND SCORE — carrier business health calculated from real data
+// COMMAND SCORE
 // ══════════════════════════════════════════════════════════════
 function calcCommandScore() {
-  var score = 50; // base
-  var factors = [];
-
-  // Invoice health — are they getting paid?
+  var score = 50, factors = [];
   var totalInvoiced = invoices.reduce(function(s, i) { return s + i.amount; }, 0);
   var totalPaid     = invoices.filter(function(i) { return i.status === 'paid'; }).reduce(function(s, i) { return s + i.amount; }, 0);
   var payRate = totalInvoiced > 0 ? (totalPaid / totalInvoiced) : 0;
   if (payRate >= 0.9)      { score += 15; factors.push({ t: 'good', m: 'Strong payment collection rate' }); }
   else if (payRate >= 0.7) { score += 5;  factors.push({ t: 'warn', m: 'Some outstanding invoices — follow up' }); }
   else if (payRate < 0.5)  { score -= 10; factors.push({ t: 'bad',  m: 'Low collection rate — chase overdue invoices' }); }
-
-  // Overdue invoices
   var today   = new Date();
   var overdue = invoices.filter(function(i) { return i.status !== 'paid' && new Date(i.dueDate) < today; });
   if (overdue.length === 0)      { score += 10; factors.push({ t: 'good', m: 'No overdue invoices' }); }
   else if (overdue.length <= 2)  { score -= 5;  factors.push({ t: 'warn', m: overdue.length + ' overdue invoice(s) — collect now' }); }
   else                           { score -= 15; factors.push({ t: 'bad',  m: overdue.length + ' overdue invoices — critical' }); }
-
-  // FMCSA authority health
   if (_fmcsaData) {
     var { score: authScore } = calcAuthorityScore(_fmcsaData);
     if (authScore >= 85)      { score += 15; factors.push({ t: 'good', m: 'Strong FMCSA authority profile' }); }
     else if (authScore >= 65) { score += 5;  factors.push({ t: 'warn', m: 'FMCSA profile needs attention' }); }
     else                      { score -= 15; factors.push({ t: 'bad',  m: 'FMCSA issues — fix before they cost you loads' }); }
   }
-
-  // Broker diversity — not relying on one broker
   var brokerCounts = {};
   invoices.forEach(function(i) { if (i.broker) brokerCounts[i.broker] = (brokerCounts[i.broker] || 0) + 1; });
   var brokerCount = Object.keys(brokerCounts).length;
   if (brokerCount >= 5)      { score += 10; factors.push({ t: 'good', m: 'Good broker diversity (' + brokerCount + ' brokers)' }); }
   else if (brokerCount >= 3) { score += 5;  factors.push({ t: 'warn', m: 'Limited broker diversity — add more brokers' }); }
   else if (brokerCount > 0)  { score -= 5;  factors.push({ t: 'bad',  m: 'Over-reliant on too few brokers' }); }
-
   score = Math.max(0, Math.min(100, score));
   var tier, color, label;
   if (score >= 85)      { tier = 'strong';   color = 'var(--green)'; label = 'Strong'; }
   else if (score >= 65) { tier = 'stable';   color = '#7ab8ff'; label = 'Stable'; }
   else if (score >= 40) { tier = 'watch';    color = 'var(--amber)'; label = 'Watch'; }
   else                  { tier = 'critical'; color = 'var(--red)'; label = 'Critical'; }
-
   return { score, tier, color, label, factors };
 }
 
@@ -2546,10 +2514,7 @@ function renderCommandScore() {
     '<div class="card-body" style="padding:.8rem 1rem;">' +
       '<div style="display:flex;align-items:center;gap:1rem;margin-bottom:.8rem;">' +
         '<div style="font-family:Georgia,serif;font-size:3rem;font-weight:bold;color:' + color + ';line-height:1;">' + score + '</div>' +
-        '<div>' +
-          '<div style="font-size:1rem;font-weight:bold;color:' + color + ';">' + label + '</div>' +
-          '<div style="font-size:.72rem;color:#b8c8b8;">out of 100 · updated live</div>' +
-        '</div>' +
+        '<div><div style="font-size:1rem;font-weight:bold;color:' + color + ';">' + label + '</div><div style="font-size:.72rem;color:#b8c8b8;">out of 100 · updated live</div></div>' +
       '</div>' +
       '<div style="background:var(--surface2);border-radius:100px;height:6px;overflow:hidden;margin-bottom:.8rem;">' +
         '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + score + '%;transition:width .5s;"></div>' +
@@ -2570,7 +2535,7 @@ function toggleCommandDetail() {
   if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
 }
 
-// Hook into existing onAuthReady to load MC and refresh dashboard
+// Hook into onAuthReady and loadInvoices
 var _origOnAuthReady = onAuthReady;
 onAuthReady = function(firstName, userId, email) {
   _origOnAuthReady(firstName, userId, email);
@@ -2578,9 +2543,449 @@ onAuthReady = function(firstName, userId, email) {
   setTimeout(function() { updateDashboardStats(); renderCommandScore(); }, 3000);
 };
 
-// Also refresh command score when invoices load
 var _origLoadInvoices = loadInvoices;
 loadInvoices = async function() {
   await _origLoadInvoices();
   setTimeout(function() { updateDashboardStats(); renderCommandScore(); }, 500);
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// TRUCKSTOP LIVE LOAD INTEGRATION
+// ══════════════════════════════════════════════════════════════════════════
+
+var _tsWorkerUrl = 'https://truckstop-search.wild-sunset-1d5f.workers.dev';
+var _liveLoadsCache = [];
+var _liveLoadsFetching = false;
+var _liveLoadsLastFetch = 0;
+
+// ── Fetch live loads from Truckstop via Worker ────────────────────────────
+async function fetchTruckstopLoads(forceRefresh) {
+  if (_liveLoadsFetching) return;
+  var now = Date.now();
+  // Cache for 3 minutes unless forced
+  if (!forceRefresh && _liveLoadsLastFetch && (now - _liveLoadsLastFetch) < 180000) {
+    return _liveLoadsCache;
+  }
+
+  var state = currentState || 'WA';
+  var maxDead = defaults.maxDeadhead || 150;
+  var minRpm  = defaults.minRpm || 2.00;
+  var equipType = window._rcEquipmentType || 'V';
+
+  _liveLoadsFetching = true;
+  showLoadingState();
+
+  try {
+    var url = _tsWorkerUrl + '/search' +
+      '?originState=' + encodeURIComponent(state) +
+      '&equipmentType=' + encodeURIComponent(equipType) +
+      '&hoursOld=24' +
+      '&pageSize=50' +
+      '&originRange=' + maxDead;
+
+    var res = await fetch(url);
+    var data = await res.json();
+
+    if (data.success && data.loads && data.loads.length > 0) {
+      _liveLoadsCache = data.loads;
+      _liveLoadsLastFetch = now;
+      renderLiveLoadCards(data.loads, minRpm);
+      track('live_loads_fetched', { count: data.loads.length, state: state });
+    } else {
+      showNoLoadsState(state);
+    }
+  } catch(err) {
+    console.error('Truckstop fetch error:', err);
+    showNoLoadsState(state);
+  }
+
+  _liveLoadsFetching = false;
+}
+
+// ── Render live load cards into both dash and loads screens ───────────────
+function renderLiveLoadCards(loads, minRpm) {
+  minRpm = minRpm || defaults.minRpm || 2.00;
+
+  // Sort: hot loads (meets min RPM) first, then by RPM descending
+  loads.sort(function(a, b) {
+    var aHot = a.rpm >= minRpm;
+    var bHot = b.rpm >= minRpm;
+    if (aHot && !bHot) return -1;
+    if (!aHot && bHot) return 1;
+    return b.rpm - a.rpm;
+  });
+
+  var dashContainer = document.querySelector('#screen-dash .card .card-body > div[style*="padding"]') ||
+                      document.querySelector('#screen-dash .card div[style*=".5rem .8rem"]');
+  var loadsScreen   = document.getElementById('screen-loads');
+
+  // Clear existing load cards in both locations
+  clearLoadCards();
+
+  var hotCount = 0;
+  var cards = loads.map(function(load) {
+    var isHot    = load.rpm >= minRpm;
+    var isWatch  = !isHot && load.rpm >= (minRpm - 0.20);
+    var cardClass = isHot ? 'hot' : isWatch ? 'watch' : 'watch';
+    var tagClass  = isHot ? 'tag-hot' : 'tag-watch';
+    var tagLabel  = isHot ? 'Matches Parameters' : 'Below Min RPM';
+    if (isHot) hotCount++;
+
+    var panelId = 'live_' + load.id;
+    var rpmDisplay  = load.rpm ? '$' + load.rpm.toFixed(2) + '/mi' : '—';
+    var rateDisplay = load.rate ? '$' + load.rate.toLocaleString() : 'Call';
+    var fuelEst     = load.fuelCost || '-$' + Math.round((load.miles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25)).toLocaleString();
+    var netEst      = load.rate ? '$' + Math.round(load.rate - parseFloat((load.fuelCost || '0').replace(/[^0-9.]/g,''))).toLocaleString() : '—';
+
+    return '<div class="load-card ' + cardClass + '" data-rate="' + (load.rate || 0) + '" data-miles="' + (load.miles || 0) + '">' +
+      '<div class="load-top load-card-clickable" onclick="toggleExpand(\'' + panelId + '\')">' +
+        '<div>' +
+          '<div class="load-route"><span class="expand-arrow" id="arrow_' + panelId + '">▼</span>' +
+            load.originCity + ', ' + load.originState + ' <span>→</span> ' + load.destCity + ', ' + load.destState +
+          '</div>' +
+          '<div style="margin-top:.3rem;"><span class="load-tag ' + tagClass + '">' + tagLabel + '</span></div>' +
+        '</div>' +
+        '<div><div class="load-rate">' + rateDisplay + '</div><div class="load-rate-sub">' + rpmDisplay + '</div></div>' +
+      '</div>' +
+      '<div class="broker-info" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
+        '<span class="broker-name">' + (load.broker || 'Broker') + ':</span>' +
+        '<span class="broker-phone">📞 ' + (load.contactPhone || load.brokerPhone || '—') + '</span>' +
+      '</div>' +
+      '<div class="load-meta" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
+        '<div><div class="lm-label">Miles</div><div class="lm-val">' + (load.miles || '—') + '</div></div>' +
+        '<div><div class="lm-label">Weight</div><div class="lm-val">' + (load.weight ? load.weight.toLocaleString() + ' lb' : '—') + '</div></div>' +
+        '<div><div class="lm-label">Pickup</div><div class="lm-val">' + (load.pickupDate || '—') + '</div></div>' +
+      '</div>' +
+      '<div class="load-expand-panel" id="' + panelId + '" ' +
+        'data-pickup="' + load.originCity + ', ' + load.originState + '" ' +
+        'data-rate="' + (load.rate || 0) + '" ' +
+        'data-miles="' + (load.miles || 0) + '" ' +
+        'data-broker="' + (load.broker || '') + '" ' +
+        'data-dest="' + load.destCity + ', ' + load.destState + '">' +
+        '<div id="broker-badge_' + panelId + '" style="margin-bottom:.4rem;display:flex;gap:.4rem;flex-wrap:wrap;"></div>' +
+        '<div id="hos_' + panelId + '"></div>' +
+        '<div class="expand-profit-grid">' +
+          '<div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">' + rateDisplay + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_' + panelId + '">' + fuelEst + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_' + panelId + '">' + netEst + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_' + panelId + '">—</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">' + rpmDisplay + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">' + (load.miles || '—') + '</div></div>' +
+        '</div>' +
+        '<div class="expand-verdict" id="verdict_' + panelId + '">—</div>' +
+        '<div class="deadhead-alert" id="dh_' + panelId + '"></div>' +
+        '<div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>' +
+          '<div class="expand-notes-text" id="notes_' + panelId + '">' + (load.notes || load.specInfo || 'No special notes on this load.') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="load-actions">' +
+        '<button class="load-action-btn call-btn" onclick="callBroker(\'' + (load.contactPhone || load.brokerPhone || '') + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
+        '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + (load.contactPhone || '') + '\')"><span class="btn-icon">✓</span>Book</button>' +
+        '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // Update hot loads count badge
+  var hotBadge = document.querySelector('#screen-dash .card .load-tag.tag-hot:not([class*="load-card"])');
+  if (hotBadge) hotBadge.textContent = hotCount + ' New';
+
+  // Inject into dash screen hot loads container
+  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  if (dashCardBody) {
+    dashCardBody.innerHTML = hotCount > 0
+      ? cards
+      : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads matching your parameters right now. Checking every 5 minutes — you will get a push notification when something good posts.</div></div>';
+  }
+
+  // Inject into loads screen — clear old cards and add new ones
+  if (loadsScreen) {
+    var existingCards = loadsScreen.querySelectorAll('.load-card');
+    existingCards.forEach(function(c) { c.remove(); });
+    var addBtn = document.getElementById('add-load-form');
+    var addBtnTrigger = loadsScreen.querySelector('button.btn-outline');
+    if (addBtnTrigger) {
+      loads.forEach(function(load, idx) {
+        var div = document.createElement('div');
+        div.innerHTML = cards.split('</div>\n<div class="load-card').map(function(c, i) {
+          return i === 0 ? c : '<div class="load-card' + c;
+        })[idx] || '';
+        if (div.firstElementChild) loadsScreen.insertBefore(div.firstElementChild, addBtnTrigger);
+      });
+    }
+  }
+
+  // Re-inject profit bars
+  injectProfitBars();
+}
+
+function clearLoadCards() {
+  // Clear dash hot loads
+  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  if (dashCardBody) dashCardBody.innerHTML = '';
+  // Clear loads screen cards
+  var loadsScreen = document.getElementById('screen-loads');
+  if (loadsScreen) {
+    loadsScreen.querySelectorAll('.load-card').forEach(function(c) { c.remove(); });
+  }
+}
+
+function showLoadingState() {
+  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  if (dashCardBody) {
+    dashCardBody.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--green);font-size:.85rem;">🔄 Searching for loads near you...</div>';
+  }
+}
+
+function showNoLoadsState(state) {
+  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  if (dashCardBody) {
+    dashCardBody.innerHTML = '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads found near ' + (state || 'your location') + ' right now. Checking every 5 minutes — you will get a push notification when something good posts.</div></div>';
+  }
+}
+
+// ── Hook into GPS — fetch loads when location is confirmed ────────────────
+var _origStartGPS = startGPS;
+startGPS = function() {
+  _origStartGPS();
+  // Also fetch loads after GPS resolves — handled via currentState update
+};
+
+var _origUpdateWeatherForState = updateWeatherForState;
+updateWeatherForState = function(stateCode) {
+  _origUpdateWeatherForState(stateCode);
+  // Fetch live loads whenever state updates
+  setTimeout(function() { fetchTruckstopLoads(false); }, 500);
+};
+
+// Manual refresh button
+function refreshLoads() {
+  fetchTruckstopLoads(true);
+  track('loads_manually_refreshed', {});
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PUSH NOTIFICATION SUBSCRIPTION
+// ══════════════════════════════════════════════════════════════════════════
+
+var VAPID_PUBLIC_KEY = 'BLc4PlGPbsl7DUqVdEk6_w9bmQcYLNTZpGuIXLnb866hUKF4IbTodgLZ9KLlnyNXD4iPt8gOJx8PXqNrcutgLhg';
+
+async function registerPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('Push not supported on this browser');
+    return;
+  }
+  if (!window._rcUserId) return;
+
+  try {
+    // Register service worker if not already registered
+    var reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+
+    // Check existing subscription
+    var existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      await savePushSubscription(existing);
+      return;
+    }
+
+    // Request permission
+    var permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('Push permission denied');
+      return;
+    }
+
+    // Subscribe
+    var subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+
+    await savePushSubscription(subscription);
+    await saveLoadAlertPrefs();
+
+    console.log('Push subscription registered');
+    track('push_subscription_registered', {});
+
+  } catch(err) {
+    console.error('Push registration error:', err);
+  }
+}
+
+async function savePushSubscription(subscription) {
+  if (!window._rcUserId || !window._supabaseReady) return;
+  var sub = subscription.toJSON();
+  try {
+    await _supabase.from('push_subscriptions').upsert({
+      user_id:  window._rcUserId,
+      endpoint: sub.endpoint,
+      p256dh:   sub.keys.p256dh,
+      auth:     sub.keys.auth,
+    }, { onConflict: 'user_id,endpoint' });
+  } catch(err) {
+    console.error('Error saving push subscription:', err);
+  }
+}
+
+async function saveLoadAlertPrefs() {
+  if (!window._rcUserId || !window._supabaseReady) return;
+  try {
+    await _supabase.from('load_alerts').upsert({
+      user_id:        window._rcUserId,
+      origin_state:   currentState || 'WA',
+      min_rpm:        defaults.minRpm || 2.00,
+      max_deadhead:   defaults.maxDeadhead || 150,
+      equipment_type: window._rcEquipmentType || 'V',
+      active:         true,
+    }, { onConflict: 'user_id' });
+  } catch(err) {
+    console.error('Error saving load alert prefs:', err);
+  }
+}
+
+// Update alert prefs whenever driver saves parameters
+var _origSaveParams = saveParams;
+saveParams = function() {
+  _origSaveParams();
+  if (window._rcUserId) saveLoadAlertPrefs();
+};
+
+function urlBase64ToUint8Array(base64String) {
+  var padding = '='.repeat((4 - base64String.length % 4) % 4);
+  var base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  var rawData = window.atob(base64);
+  var outputArray = new Uint8Array(rawData.length);
+  for (var i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Handle notification click — show the load when driver taps notification
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'LOAD_ALERT_CLICKED') {
+      var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
+      showScreen('loads', loadsBtn);
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LIVE LOADBACK — Real return loads based on arrival ETA
+// ══════════════════════════════════════════════════════════════════════════
+
+var _origShowLoadback = showLoadback;
+showLoadback = async function(origin, dest, rate, miles, broker, phone) {
+  // Call original for immediate display with cached data
+  _origShowLoadback(origin, dest, rate, miles, broker, phone);
+
+  // Then try to fetch real return loads from Truckstop
+  var destParts = dest.split(',');
+  var destState = destParts.length > 1 ? destParts[1].trim() : '';
+  var destCity  = destParts[0].trim();
+
+  if (!destState || !window._rcUserId) return;
+
+  // Calculate ETA
+  var now      = new Date();
+  var hosAvail = window._hosAvailable || 11;
+  var arrival  = calcArrival(miles, now, hosAvail);
+
+  try {
+    var equipType = window._rcEquipmentType || 'V';
+    var url = _tsWorkerUrl + '/search' +
+      '?originState=' + encodeURIComponent(destState) +
+      '&originCity='  + encodeURIComponent(destCity) +
+      '&equipmentType=' + encodeURIComponent(equipType) +
+      '&hoursOld=0' +
+      '&pageSize=25';
+
+    var res  = await fetch(url);
+    var data = await res.json();
+
+    if (!data.success || !data.loads || !data.loads.length) return;
+
+    var fuelPrice = defaults.fuelPrice || 4.25;
+    var mpg       = defaults.mpg || 6.5;
+    var outNet    = rate - Math.round((miles / mpg) * fuelPrice);
+    var minRpm    = defaults.minRpm || 2.00;
+
+    // Score and filter return loads
+    var scoredLoads = data.loads
+      .filter(function(l) { return l.rate > 0 && l.miles > 0; })
+      .map(function(l) {
+        var returnFuel   = Math.round((l.miles / mpg) * fuelPrice);
+        var returnNet    = l.rate - returnFuel;
+        var roundTripNet = outNet + returnNet;
+        return Object.assign({}, l, {
+          returnNet:    returnNet,
+          roundTripNet: roundTripNet,
+          availStr:     formatArrival(arrival),
+        });
+      })
+      .filter(function(l) { return l.rpm >= minRpm; })
+      .sort(function(a, b) { return b.roundTripNet - a.roundTripNet; })
+      .slice(0, 5);
+
+    if (!scoredLoads.length) return;
+
+    // Replace the loadback content with live data
+    var lbContent = document.getElementById('loadback-content');
+    if (!lbContent) return;
+
+    var loadsHtml = scoredLoads.map(function(l, i) {
+      var isBest = i === 0;
+      return '<div class="loadback-card ' + (isBest ? 'best' : '') + '">' +
+        '<div class="loadback-card-top">' +
+          '<div class="loadback-route">' + l.route + (isBest ? '<span class="loadback-best-badge">BEST</span>' : '') + '</div>' +
+          '<div class="loadback-rate">$' + l.rate.toLocaleString() + '</div>' +
+        '</div>' +
+        '<div class="loadback-stats">' +
+          '<span class="loadback-stat">Miles: <strong>' + l.miles + '</strong></span>' +
+          '<span class="loadback-stat">RPM: <strong>$' + l.rpm.toFixed(2) + '</strong></span>' +
+          '<span class="loadback-stat">Net: <strong>$' + l.returnNet.toLocaleString() + '</strong></span>' +
+          '<span class="loadback-stat">Round Trip: <strong style="color:var(--green)">$' + l.roundTripNet.toLocaleString() + '</strong></span>' +
+        '</div>' +
+        '<div class="loadback-date">📅 Available around arrival · ' + (l.equipment || 'V') + '</div>' +
+        '<div class="lb-actions">' +
+          (l.contactPhone ? '<button class="lb-call-btn" onclick="callBroker(\'' + l.contactPhone + '\',\'' + (l.broker || 'Broker') + '\')">📞 Call ' + (l.broker || 'Broker') + '</button>' : '') +
+          '<button class="lb-book-btn" onclick="addReturnLoad(\'' + l.route + '\',' + l.miles + ',' + l.rate + ')">✓ Add to Loads</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    // Find and replace just the return loads section
+    var sectionTitle = lbContent.querySelector('.loadback-section-title');
+    if (sectionTitle) {
+      // Remove everything after the section title
+      var next = sectionTitle.nextSibling;
+      while (next) {
+        var toRemove = next;
+        next = next.nextSibling;
+        if (toRemove.classList && toRemove.classList.contains('btn')) break;
+        lbContent.removeChild(toRemove);
+      }
+      sectionTitle.insertAdjacentHTML('afterend',
+        loadsHtml + AI_DISCLAIMER
+      );
+    }
+
+    track('live_loadback_fetched', { dest: dest, count: scoredLoads.length });
+
+  } catch(err) {
+    console.error('Live loadback error:', err);
+    // Original static data already showing — no action needed
+  }
+};
+
+// ── Register push on auth ready ───────────────────────────────────────────
+var _origOnAuthReadyTS = onAuthReady;
+onAuthReady = function(firstName, userId, email) {
+  _origOnAuthReadyTS(firstName, userId, email);
+  // Register push subscription after a short delay
+  setTimeout(function() { registerPushSubscription(); }, 3000);
+  // Save load alert prefs
+  setTimeout(function() { saveLoadAlertPrefs(); }, 4000);
 };
