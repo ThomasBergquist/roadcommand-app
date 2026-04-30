@@ -2984,8 +2984,11 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
 var _origOnAuthReadyTS = onAuthReady;
 onAuthReady = function(firstName, userId, email) {
   _origOnAuthReadyTS(firstName, userId, email);
-  // Register push subscription after a short delay
-  setTimeout(function() { registerPushSubscription(); }, 3000);
-  // Save load alert prefs
-  setTimeout(function() { saveLoadAlertPrefs(); }, 4000);
+  var waitForSupabase = setInterval(function() {
+    if (window._supabaseReady && window._supabase) {
+      clearInterval(waitForSupabase);
+      registerPushSubscription();
+      saveLoadAlertPrefs();
+    }
+  }, 500);
 };
