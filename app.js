@@ -848,19 +848,189 @@ function recalcPanel(panelId, rate, miles) {
 }
 
 function bookLoad(btn, origin, dest, rate, miles, broker, phone) {
+  // Mark card as booked immediately
   var card = btn.closest(".load-card");
   if (card) {
     card.className = card.className.replace(/hot|watch/, "booked");
     card.querySelectorAll(".load-tag").forEach(function(t) { t.className = "load-tag tag-booked"; t.textContent = "Booked"; });
   }
-  var brokerField = document.getElementById("inv-broker"); if (brokerField) brokerField.value = broker;
-  var amountField = document.getElementById("inv-amount"); if (amountField) amountField.value = rate;
-  var phoneField  = document.getElementById("inv-phone");  if (phoneField)  phoneField.value  = phone;
-  var refField    = document.getElementById("inv-ref");    if (refField)    refField.value    = origin + " to " + dest;
-  var dateField   = document.getElementById("inv-date");   if (dateField)   dateField.value   = new Date().toISOString().split("T")[0];
-  promptLogRun(origin, dest, rate, miles);
-  track('load_booked', { rate: rate, miles: miles, rpm: parseFloat((rate/miles).toFixed(2)), origin: origin, dest: dest, broker: broker });
-  showLoadback(origin, dest, rate, miles, broker, phone);
+
+  // Show actual pay confirmation modal
+  showBookConfirmModal(origin, dest, rate, miles, broker, phone);
+}
+
+function showBookConfirmModal(origin, dest, rate, miles, broker, phone) {
+  // Remove any existing modal
+  var existing = document.getElementById('book-confirm-modal');
+  if (existing) existing.remove();
+
+  var rpm     = miles > 0 ? (rate / miles).toFixed(2) : '0.00';
+  var fuelEst = Math.round((miles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25));
+  var netEst  = rate - fuelEst;
+  var today   = new Date().toISOString().split('T')[0];
+
+  var modal = document.createElement('div');
+  modal.id  = 'book-confirm-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:950;display:flex;align-items:flex-end;padding:1rem;';
+  modal.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:8px;width:100%;max-width:480px;margin:0 auto;padding:1.5rem;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">' +
+        '<div style="font-size:1rem;font-weight:bold;color:var(--green);">✓ Confirm Booking</div>' +
+        '<button onclick="document.getElementById(\'book-confirm-modal\').remove()" style="background:none;border:none;color:#b8c8b8;font-size:1.2rem;cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div style="background:var(--surface2);border-radius:4px;padding:.8rem;margin-bottom:1rem;font-size:.85rem;">' +
+        '<div style="font-weight:bold;color:var(--text);margin-bottom:.3rem;">' + origin + ' → ' + dest + '</div>' +
+        '<div style="color:#b8c8b8;">' + broker + ' · ' + miles + ' mi · $' + rpm + '/mi</div>' +
+      '</div>' +
+      '<div style="margin-bottom:1rem;">' +
+        '<label class="form-label">Actual Pay — did you negotiate a better rate?</label>' +
+        '<input class="form-input" id="book-actual-pay" type="number" value="' + rate + '" style="font-size:1.3rem;text-align:center;font-weight:bold;">' +
+        '<div style="display:flex;justify-content:space-between;margin-top:.4rem;font-size:.75rem;color:#b8c8b8;">' +
+          '<span>Posted: $' + rate.toLocaleString() + '</span>' +
+          '<span>Est. net: $' + netEst.toLocaleString() + '</span>' +
+          '<span>Fuel est: $' + fuelEst.toLocaleString() + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:1rem;">' +
+        '<label class="form-label">Payment Terms</label>' +
+        '<select class="form-select" id="book-terms">' +
+          '<option value="15">Net 15</option>' +
+          '<option value="30" selected>Net 30</option>' +
+          '<option value="45">Net 45</option>' +
+          '<option value="60">Net 60</option>' +
+        '</select>' +
+      '</div>' +
+      '<div style="font-size:.75rem;color:#b8c8b8;margin-bottom:1rem;">📎 You can attach your Rate Con and BOL after booking in the Money tab.</div>' +
+      '<div style="display:flex;gap:.5rem;">' +
+        '<button class="btn btn-green" onclick="confirmBooking(\'' + origin + '\',\'' + dest + '\',' + rate + ',' + miles + ',\'' + broker + '\',\'' + phone + '\')" style="flex:1;font-size:1rem;">✓ Book It</button>' +
+        '<button class="btn btn-outline" onclick="document.getElementById(\'book-confirm-modal\').remove()" style="flex:1;">Cancel</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+
+  // Focus and select the pay input
+  setTimeout(function() {
+    var input = document.getElementById('book-actual-pay');
+    if (input) { input.focus(); input.select(); }
+  }, 100);
+}
+
+async function confirmBooking(origin, dest, postedRate, miles, broker, phone) {
+  var actualPay = parseFloat(document.getElementById('book-actual-pay').value) || postedRate;
+  var terms     = parseInt(document.getElementById('book-terms').value) || 30;
+  var today     = new Date().toISOString().split('T')[0];
+  var dueDate   = new Date();
+  dueDate.setDate(dueDate.getDate() + terms);
+  var dueDateStr = dueDate.toISOString().split('T')[0];
+  var ref        = origin + ' to ' + dest;
+
+  // Close modal
+  var modal = document.getElementById('book-confirm-modal');
+  if (modal) modal.remove();
+
+  // 1. Auto-add broker to vault if not already there
+  var brokerId = await ensureBrokerInVault(broker, phone, terms);
+
+  // 2. Create invoice automatically
+  var inv = {
+    broker:    broker,
+    broker_id: brokerId,
+    amount:    actualPay,
+    ref:       ref,
+    date:      today,
+    terms:     terms,
+    phone:     phone,
+    dueDate:   dueDateStr,
+    status:    'pending',
+    id:        Date.now(),
+    notes:     'Booked via RoadCommand · ' + miles + ' mi · $' + (actualPay / miles).toFixed(2) + '/mi',
+  };
+
+  invoices.unshift(inv);
+  renderInvoices();
+
+  // Save to Supabase
+  var saved = await saveInvoiceToSupabase(inv);
+  var idx = invoices.findIndex(function(i) { return i.id === inv.id; });
+  if (idx >= 0 && saved) invoices[idx] = saved;
+
+  renderBrokers();
+  updateMoneyTotals();
+
+  // 3. Track
+  track('load_booked', {
+    rate:   actualPay,
+    posted: postedRate,
+    miles:  miles,
+    rpm:    parseFloat((actualPay / miles).toFixed(2)),
+    origin: origin,
+    dest:   dest,
+    broker: broker,
+    negotiated: actualPay > postedRate,
+  });
+
+  // 4. Show success toast
+  showBookingToast(actualPay, postedRate, broker);
+
+  // 5. Log run
+  promptLogRun(origin, dest, actualPay, miles);
+
+  // 6. Show loadback
+  showLoadback(origin, dest, actualPay, miles, broker, phone);
+}
+
+async function ensureBrokerInVault(brokerName, phone, terms) {
+  if (!window._rcUserId || !window._supabaseReady) return null;
+
+  // Check if broker already exists
+  var existing = _brokers.find(function(b) {
+    return b.name.toLowerCase() === brokerName.toLowerCase();
+  });
+  if (existing) return existing.id;
+
+  // Add broker to vault
+  try {
+    var { data, error } = await _supabase.from('brokers').insert({
+      user_id:       window._rcUserId,
+      name:          brokerName,
+      phone:         phone || '',
+      payment_terms: terms || 30,
+      notes:         'Auto-added when load was booked via RoadCommand',
+    }).select().single();
+
+    if (error) throw error;
+    _brokers.push(data);
+    populateBrokerDropdown();
+    return data.id;
+  } catch(err) {
+    console.error('Error adding broker to vault:', err);
+    return null;
+  }
+}
+
+function showBookingToast(actualPay, postedRate, broker) {
+  var existing = document.getElementById('booking-toast');
+  if (existing) existing.remove();
+
+  var negotiated = actualPay > postedRate;
+  var diff       = actualPay - postedRate;
+
+  var toast = document.createElement('div');
+  toast.id  = 'booking-toast';
+  toast.style.cssText = 'position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:960;background:var(--surface);border:1px solid var(--green-border);border-radius:8px;padding:.8rem 1.2rem;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.5);min-width:260px;';
+  toast.innerHTML =
+    '<div style="font-size:.7rem;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem;">✓ Load Booked</div>' +
+    '<div style="font-size:1.2rem;font-weight:bold;color:var(--green);">$' + actualPay.toLocaleString() + '</div>' +
+    (negotiated ? '<div style="font-size:.78rem;color:#ffd04d;margin-top:.2rem;">🤝 You negotiated $' + diff.toLocaleString() + ' extra</div>' : '') +
+    '<div style="font-size:.75rem;color:#b8c8b8;margin-top:.2rem;">' + broker + ' · Invoice saved</div>';
+
+  document.body.appendChild(toast);
+  setTimeout(function() {
+    toast.style.transition = 'opacity .5s';
+    toast.style.opacity = '0';
+    setTimeout(function() { toast.remove(); }, 500);
+  }, 3000);
 }
 
 function addReturnLoad(route, miles, rate) {
@@ -2984,11 +3154,8 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
 var _origOnAuthReadyTS = onAuthReady;
 onAuthReady = function(firstName, userId, email) {
   _origOnAuthReadyTS(firstName, userId, email);
-  var waitForSupabase = setInterval(function() {
-    if (window._supabaseReady && window._supabase) {
-      clearInterval(waitForSupabase);
-      registerPushSubscription();
-      saveLoadAlertPrefs();
-    }
-  }, 500);
+  // Register push subscription after a short delay
+  setTimeout(function() { registerPushSubscription(); }, 3000);
+  // Save load alert prefs
+  setTimeout(function() { saveLoadAlertPrefs(); }, 4000);
 };
