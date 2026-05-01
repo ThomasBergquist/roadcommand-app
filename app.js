@@ -184,13 +184,9 @@ function showScreen(id, btn) {
     var moreBtn = document.getElementById('more-nav-btn');
     if (moreBtn) moreBtn.classList.add('active');
   }
-  // Re-render loads when navigating to dash or loads screen
-  if (id === 'dash' || id === 'loads') {
-    if (_liveLoadsCache && _liveLoadsCache.length > 0) {
-      setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 100);
-    } else {
-      setTimeout(function() { fetchTruckstopLoads(false); }, 100);
-    }
+  // Re-render from cache when switching to dash or loads — no new fetch
+  if ((id === 'dash' || id === 'loads') && _liveLoadsCache && _liveLoadsCache.length > 0) {
+    setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 50);
   }
   track('tab_opened', { tab: id });
 }
@@ -2990,67 +2986,59 @@ var _liveLoadsLastFetch = 0;
 
 // ── Fetch live loads from Truckstop via Worker ────────────────────────────
 async function fetchTruckstopLoads(forceRefresh) {
-  if (_liveLoadsFetching) return;
-  var now = Date.now();
-  // Cache for 3 minutes unless forced
-  if (!forceRefresh && _liveLoadsLastFetch && (now - _liveLoadsLastFetch) < 180000) {
-    return _liveLoadsCache;
+  // Never block — always reset flag after 10 seconds max
+  if (_liveLoadsFetching) {
+    var timeSinceFetch = Date.now() - (_liveLoadsLastFetch || 0);
+    if (timeSinceFetch < 10000) return; // only block if recent
+    _liveLoadsFetching = false; // reset stuck flag
   }
 
-  var state     = currentState || 'WA';
-  var city      = currentCity  || '';
-  var maxDead   = defaults.maxDeadhead || 150;
-  var minRpm    = defaults.minRpm || 2.00;
-  var equipType = window._rcEquipmentType || 'V';
-  var loadType  = window._rcLoadType || 'All';
+  var now = Date.now();
+  if (!forceRefresh && _liveLoadsLastFetch && (now - _liveLoadsLastFetch) < 180000 && _liveLoadsCache.length > 0) {
+    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+    return;
+  }
 
   _liveLoadsFetching = true;
+  // Safety reset after 15 seconds no matter what
+  setTimeout(function() { _liveLoadsFetching = false; }, 15000);
+
+  var state    = currentState || 'WA';
+  var city     = currentCity  || '';
+  var maxDead  = defaults.maxDeadhead || 150;
+  var minRpm   = defaults.minRpm || 2.00;
+  var equipType = (window._rcEquipmentType || 'V').split(',')[0].trim();
+  var loadType  = window._rcLoadType || 'All';
+
   showLoadingState();
 
+  var url = _tsWorkerUrl + '/search' +
+    '?originState='   + encodeURIComponent(state) +
+    '&originCity='    + encodeURIComponent(city) +
+    '&equipmentType=' + encodeURIComponent(equipType) +
+    '&hoursOld=24' +
+    '&pageSize=50' +
+    '&originRange='   + maxDead +
+    '&loadType='      + encodeURIComponent(loadType);
+
   try {
-    var equipTypes = equipType.split(',').map(function(e) { return e.trim(); });
-    var allLoads = [];
+    var res  = await fetch(url);
+    var data = await res.json();
 
-    for (var i = 0; i < equipTypes.length; i++) {
-      var url = _tsWorkerUrl + '/search' +
-        '?originState='  + encodeURIComponent(state) +
-        '&originCity='   + encodeURIComponent(city) +
-        '&equipmentType=' + encodeURIComponent(equipTypes[i]) +
-        '&hoursOld=24' +
-        '&pageSize=25' +
-        '&originRange='  + maxDead +
-        '&loadType='     + encodeURIComponent(loadType);
-
-      var res  = await fetch(url);
-      var data = await res.json();
-      if (data.success && data.loads) {
-        allLoads = allLoads.concat(data.loads);
+    if (data.success && data.loads && data.loads.length > 0) {
+      var loads = data.loads;
+      // GPS deadhead filter
+      if (window._gpsLat && window._gpsLon) {
+        loads = loads.filter(function(l) {
+          var dh = getDeadheadMiles(l.originCity + ', ' + l.originState);
+          l.deadheadMiles = dh;
+          return dh <= maxDead || dh === 0;
+        });
       }
-    }
-
-    // Also do client-side deadhead filter using GPS if available
-    if (window._gpsLat && window._gpsLon && allLoads.length > 0) {
-      allLoads = allLoads.filter(function(load) {
-        if (!load.originCity || !load.originState) return true;
-        var dh = getDeadheadMiles(load.originCity + ', ' + load.originState);
-        load.deadheadMiles = dh;
-        return dh <= maxDead || dh === 0;
-      });
-    }
-
-    if (allLoads.length > 0) {
-      _liveLoadsCache = allLoads;
+      _liveLoadsCache     = loads;
       _liveLoadsLastFetch = now;
-      // Wait for DOM containers to exist before rendering
-      var waitForDOM = setInterval(function() {
-        if (document.getElementById('dash-live-loads') || document.getElementById('loads-screen-live')) {
-          clearInterval(waitForDOM);
-          renderLiveLoadCards(allLoads, minRpm);
-          track('live_loads_fetched', { count: allLoads.length, state: state });
-        }
-      }, 200);
-      // Give up after 10 seconds
-      setTimeout(function() { clearInterval(waitForDOM); }, 10000);
+      renderLiveLoadCards(loads, minRpm);
+      track('live_loads_fetched', { count: loads.length, state: state });
     } else {
       showNoLoadsState(state);
     }
@@ -3061,7 +3049,6 @@ async function fetchTruckstopLoads(forceRefresh) {
 
   _liveLoadsFetching = false;
 }
-
 // ── Render live load cards into both dash and loads screens ───────────────
 function renderLiveLoadCards(loads, minRpm) {
   minRpm = minRpm || defaults.minRpm || 2.00;
