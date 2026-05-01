@@ -1447,16 +1447,88 @@ function saveMaintItem() {
 // GPS DEADHEAD CALCULATOR
 // ══════════════════════════════════════════════════════════════
 var CITY_COORDS = {
-  "moses lake":[47.1301,-119.2780],"pasco":[46.2396,-119.1006],"kennewick":[46.2112,-119.1372],"richland":[46.2859,-119.2845],
-  "yakima":[46.6021,-120.5059],"spokane":[47.6588,-117.4260],"wenatchee":[47.4235,-120.3103],"ellensburg":[46.9965,-120.5478],
-  "walla walla":[46.0646,-118.3430],"tri cities":[46.2396,-119.1006],"portland":[45.5051,-122.6750],"seattle":[47.6062,-122.3321],
-  "boise":[43.6150,-116.2023],"salt lake city":[40.7608,-111.8910],"las vegas":[36.1699,-115.1398],"denver":[39.7392,-104.9903],
-  "phoenix":[33.4484,-112.0740],"los angeles":[34.0522,-118.2437],"sacramento":[38.5816,-121.4944],"reno":[39.5296,-119.8138],
-  "billings":[45.7833,-108.5007],"missoula":[46.8721,-113.9940],"great falls":[47.5002,-111.3008],"albuquerque":[35.0844,-106.6504],
-  "el paso":[31.7619,-106.4850],"dallas":[32.7767,-96.7970],"fort worth":[32.7555,-97.3308],"houston":[29.7604,-95.3698],
-  "san antonio":[29.4241,-98.4936],"kilgore":[32.3888,-94.8757],"oklahoma city":[35.4676,-97.5164],"kansas city":[39.0997,-94.5786],
+  // Washington
+  "moses lake":[47.1301,-119.2780],"pasco":[46.2396,-119.1006],"kennewick":[46.2112,-119.1372],
+  "richland":[46.2859,-119.2845],"yakima":[46.6021,-120.5059],"spokane":[47.6588,-117.4260],
+  "wenatchee":[47.4235,-120.3103],"ellensburg":[46.9965,-120.5478],"walla walla":[46.0646,-118.3430],
+  "tri cities":[46.2396,-119.1006],"seattle":[47.6062,-122.3321],"tacoma":[47.2529,-122.4443],
+  "olympia":[47.0379,-122.9007],"bellingham":[48.7519,-122.4787],"everett":[47.9790,-122.2021],
+  "kent":[47.3809,-122.2348],"auburn":[47.3073,-122.2285],"renton":[47.4829,-122.2171],
+  "federal way":[47.3223,-122.3126],"bremerton":[47.5673,-122.6329],"marysville":[48.0512,-122.1771],
+  "puyallup":[47.1854,-122.2929],"lakewood":[47.1718,-122.5185],"redmond":[47.6740,-122.1215],
+  "kirkland":[47.6815,-122.2087],"bellevue":[47.6101,-122.2015],"sammamish":[47.6163,-122.0356],
+  "shoreline":[47.7557,-122.3415],"burien":[47.4707,-122.3468],"maple valley":[47.3751,-122.0457],
+  "lynnwood":[47.8209,-122.3151],"mountlake terrace":[47.7882,-122.3151],"bothell":[47.7623,-122.2054],
+  "issaquah":[47.5301,-122.0326],"des moines":[47.4018,-122.3243],"seatac":[47.4440,-122.2987],
+  "tukwila":[47.4740,-122.2615],"white center":[47.5090,-122.3576],"covington":[47.3585,-122.1082],
+  "selah":[46.6549,-120.5306],"union gap":[46.5543,-120.4864],"sunnyside":[46.3243,-119.9107],
+  "grandview":[46.2543,-119.9018],"prosser":[46.2068,-119.7676],"benton city":[46.2632,-119.4876],
+  "othello":[46.8265,-119.1756],"quincy":[47.2343,-119.8526],"ephrata":[47.3176,-119.5518],
+  "george":[47.0832,-119.8582],"royal city":[46.9043,-119.6365],"mattawa":[46.7329,-119.9065],
+  "connell":[46.6618,-118.8607],"ritzville":[47.1268,-118.3793],"davenport":[47.6554,-118.1557],
+  "chewelah":[48.2693,-117.7140],"colville":[48.5465,-117.8985],"republic":[48.6499,-118.7340],
+  "okanogan":[48.3604,-119.5726],"omak":[48.4115,-119.5282],"chelan":[47.8368,-120.0165],
+  "leavenworth":[47.5960,-120.6615],"east wenatchee":[47.4182,-120.2904],"cashmere":[47.5193,-120.4668],
+  "bingen":[45.7154,-121.4697],"white salmon":[45.7243,-121.4891],"goldendale":[45.8218,-120.8254],
+  "klickitat":[45.8265,-121.1579],"stevenson":[45.6946,-121.8894],"carson":[45.7218,-121.9057],
+  "north bonneville":[45.6432,-121.9668],"camas":[45.5871,-122.3993],"washougal":[45.5832,-122.3537],
+  "vancouver":[45.6387,-122.6615],"battle ground":[45.7818,-122.5293],"ridgefield":[45.8157,-122.7432],
+  "la center":[45.8807,-122.6715],"woodland":[45.9054,-122.7454],"kelso":[46.1468,-122.9043],
+  "longview":[46.1382,-122.9382],"castle rock":[46.2743,-122.9043],"toledo":[46.4432,-122.8507],
+  "centralia":[46.7182,-122.9543],"chehalis":[46.6618,-122.9651],"tenino":[46.8593,-122.8543],
+  "shelton":[47.2154,-123.1007],"aberdeen":[46.9754,-123.8154],"hoquiam":[46.9804,-123.8890],
+  "montesano":[46.9818,-123.6007],"raymond":[46.6854,-123.7340],"south bend":[46.6604,-123.8007],
+  "elma":[47.0032,-123.4090],"mccleary":[47.0568,-123.2665],"oakville":[46.8368,-123.2390],
+  "port angeles":[48.1182,-123.4307],"port townsend":[48.1168,-122.7601],"sequim":[48.0793,-123.1040],
+  "anacortes":[48.5126,-122.6126],"mount vernon":[48.4204,-122.3343],"burlington":[48.4743,-122.3265],
+  "sedro woolley":[48.5043,-122.2343],"concrete":[48.5368,-121.7515],"darrington":[48.2543,-121.6040],
+  "arlington":[48.1657,-122.1251],"stanwood":[48.2407,-122.3743],"camano island":[48.1468,-122.4890],
+  "oak harbor":[48.2932,-122.6451],"coupeville":[48.2193,-122.6876],"langley":[48.0393,-122.4051],
+  "mukilteo":[47.9493,-122.3051],"edmonds":[47.8107,-122.3776],"kenmore":[47.7568,-122.2426],
+  "duvall":[47.7415,-121.9851],"snohomish":[47.9129,-122.0976],"monroe":[47.8554,-121.9701],
+  "sultan":[47.8693,-121.8140],"gold bar":[47.8543,-121.6940],"index":[47.8240,-121.5565],
+  "skykomish":[47.7140,-121.3576],"forks":[47.9493,-124.3851],"port orchard":[47.5393,-122.6326],
+  "gig harbor":[47.3293,-122.5801],"graham":[47.0468,-122.2976],"spanaway":[47.1043,-122.4351],
+  "bonney lake":[47.1807,-122.1801],"sumner":[47.2043,-122.2351],"orting":[47.0993,-122.2076],
+  "buckley":[47.1643,-122.0276],"enumclaw":[47.2043,-121.9901],"black diamond":[47.3143,-122.0151],
+  "north bend":[47.4943,-121.7851],"snoqualmie":[47.5293,-121.8326],"fall city":[47.5668,-121.8801],
+  "carnation":[47.6493,-121.9126],"skyway":[47.4868,-122.2451],"vashon":[47.4493,-122.4651],
+  "steilacoom":[47.1718,-122.5951],"university place":[47.2143,-122.5476],"fircrest":[47.2268,-122.5201],
+  // Oregon
+  "portland":[45.5051,-122.6750],"salem":[44.9429,-123.0351],"eugene":[44.0521,-123.0868],
+  "bend":[44.0582,-121.3153],"medford":[42.3265,-122.8756],"pendleton":[45.6721,-118.7887],
+  "la grande":[45.3243,-118.0876],"ontario":[44.0268,-116.9629],"grants pass":[42.4393,-123.3284],
+  "roseburg":[43.2165,-123.3418],"albany":[44.6368,-123.1059],"corvallis":[44.5646,-123.2620],
+  "springfield":[44.0462,-122.9710],"gresham":[45.5029,-122.4312],"hillsboro":[45.5229,-122.9898],
+  "beaverton":[45.4871,-122.8037],"lake oswego":[45.4207,-122.7007],"tigard":[45.4312,-122.7712],
+  "tualatin":[45.3840,-122.7626],"wilsonville":[45.2976,-122.7737],"woodburn":[45.1543,-122.8548],
+  "mcminnville":[45.2096,-123.1987],"newberg":[45.3018,-122.9723],"forest grove":[45.5207,-123.1098],
+  "astoria":[46.1882,-123.8313],"seaside":[45.9932,-123.9229],"cannon beach":[45.8918,-123.9607],
+  "tillamook":[45.4557,-123.8448],"lincoln city":[44.9582,-124.0076],"newport":[44.6368,-124.0526],
+  "florence":[43.9818,-124.1001],"coos bay":[43.3665,-124.2154],"brookings":[42.0543,-124.2829],
+  "klamath falls":[42.2249,-121.7817],"lakeview":[42.1882,-120.3457],"burns":[43.5865,-119.0540],
+  "john day":[44.4154,-118.9526],"prineville":[44.2993,-120.8348],"redmond":[44.2726,-121.1490],
+  "sisters":[44.2907,-121.5490],"madras":[44.6326,-121.1293],"the dalles":[45.5943,-121.1787],
+  "hood river":[45.7076,-121.5215],"mosier":[45.6843,-121.4026],"cascade locks":[45.6693,-121.8590],
+  // Idaho
+  "boise":[43.6150,-116.2023],"nampa":[43.5407,-116.5635],"meridian":[43.6121,-116.3915],
+  "idaho falls":[43.4917,-112.0408],"pocatello":[42.8713,-112.4455],"twin falls":[42.5629,-114.4609],
+  "coeur dalene":[47.6777,-116.7805],"lewiston":[46.4165,-117.0177],"caldwell":[43.6629,-116.6874],
+  "post falls":[47.7182,-116.9512],"moscow":[46.7324,-117.0002],"sandpoint":[48.2765,-116.5535],
+  "kellogg":[47.5382,-116.1240],"st maries":[47.3182,-116.5735],"grangeville":[45.9254,-116.1240],
+  // Montana
+  "billings":[45.7833,-108.5007],"missoula":[46.8721,-113.9940],"great falls":[47.5002,-111.3008],
+  "bozeman":[45.6770,-111.0429],"helena":[46.5958,-112.0270],"butte":[46.0038,-112.5348],
+  "kalispell":[48.1957,-114.3124],"havre":[48.5487,-109.6799],"miles city":[46.4082,-105.8406],
+  "glendive":[47.1049,-104.7124],"lewistown":[47.0638,-109.4287],"livingston":[45.6624,-110.5601],
+  // Other major cities
+  "salt lake city":[40.7608,-111.8910],"las vegas":[36.1699,-115.1398],"denver":[39.7392,-104.9903],
+  "phoenix":[33.4484,-112.0740],"los angeles":[34.0522,-118.2437],"sacramento":[38.5816,-121.4944],
+  "reno":[39.5296,-119.8138],"albuquerque":[35.0844,-106.6504],"el paso":[31.7619,-106.4850],
+  "dallas":[32.7767,-96.7970],"fort worth":[32.7555,-97.3308],"houston":[29.7604,-95.3698],
+  "san antonio":[29.4241,-98.4936],"oklahoma city":[35.4676,-97.5164],"kansas city":[39.0997,-94.5786],
   "omaha":[41.2565,-95.9345],"minneapolis":[44.9778,-93.2650],"chicago":[41.8781,-87.6298],
-  "coeur dalene":[47.6777,-116.7805],"lewiston":[46.4165,-117.0177],"twin falls":[42.5629,-114.4609],"pocatello":[42.8713,-112.4455],
+  "kilgore":[32.3888,-94.8757]
 };
 
 function haversineMiles(lat1, lon1, lat2, lon2) {
@@ -1466,16 +1538,50 @@ function haversineMiles(lat1, lon1, lat2, lon2) {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1.15);
 }
 
+var _cityCoordCache = {};
+
 function getDeadheadMiles(pickupCity) {
   if (!window._gpsLat || !window._gpsLon) return 0;
-  var key = pickupCity.toLowerCase().split(",")[0].trim();
+  var key = pickupCity.toLowerCase().split(',')[0].trim();
+
+  // Check expanded CITY_COORDS
   var coords = CITY_COORDS[key];
   if (!coords) {
     var keys = Object.keys(CITY_COORDS);
-    for (var i = 0; i < keys.length; i++) { if (key.indexOf(keys[i]) >= 0 || keys[i].indexOf(key) >= 0) { coords = CITY_COORDS[keys[i]]; break; } }
+    for (var i = 0; i < keys.length; i++) {
+      if (key.indexOf(keys[i]) >= 0 || keys[i].indexOf(key) >= 0) {
+        coords = CITY_COORDS[keys[i]]; break;
+      }
+    }
   }
-  if (!coords) return 0;
+
+  // Check runtime cache (from Nominatim lookups)
+  if (!coords && _cityCoordCache[key]) coords = _cityCoordCache[key];
+
+  if (!coords) {
+    // Unknown city — kick off async geocode and return a high number so it fails filter
+    // This prevents unknown cities from passing the deadhead filter incorrectly
+    geocodeCityAsync(key, pickupCity);
+    return 9999;
+  }
+
   return haversineMiles(window._gpsLat, window._gpsLon, coords[0], coords[1]);
+}
+
+async function geocodeCityAsync(key, fullCityStr) {
+  if (_cityCoordCache[key] !== undefined) return;
+  _cityCoordCache[key] = null; // Mark as pending
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
+      encodeURIComponent(fullCityStr + ', USA') + '&limit=1';
+    var res  = await fetch(url);
+    var data = await res.json();
+    if (data && data[0]) {
+      _cityCoordCache[key] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+    }
+  } catch(e) {
+    _cityCoordCache[key] = null;
+  }
 }
 
 // Calculate deadhead miles between two cities (for Loadback)
@@ -3099,16 +3205,11 @@ function renderLiveLoadCards(loads, minRpm) {
   var maxWeight = defaults.maxWeight || 0;
   var maxLength = defaults.maxLength || 0;
   var pickupFilter = window._rcPickupDateFilter || '';
-
-  // Calculate pickup date cutoff
   var pickupCutoff = null;
   if (pickupFilter) {
-    var today = new Date(); today.setHours(0,0,0,0);
-    if (pickupFilter === 'today')    pickupCutoff = new Date(today);
-    if (pickupFilter === 'tomorrow') { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 1); }
-    if (pickupFilter === '2days')    { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 2); }
-    if (pickupFilter === '3days')    { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 3); }
-    if (pickupFilter === 'week')     { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 7); }
+    // pickupFilter is now a date string like "2026-05-04"
+    pickupCutoff = new Date(pickupFilter);
+    pickupCutoff.setHours(0,0,0,0);
   }
 
   var hotLoads = loads.filter(function(l) {
@@ -3121,7 +3222,7 @@ function renderLiveLoadCards(loads, minRpm) {
     if (maxLength > 0 && l.length > 0 && l.length > maxLength) return false;
     if (pickupCutoff && l.pickupDate) {
       var pd = new Date(l.pickupDate); pd.setHours(0,0,0,0);
-      if (pd > pickupCutoff) return false;
+      if (pd < pickupCutoff) return false; // filter out loads BEFORE the selected date
     }
     return true;
   });

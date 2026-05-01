@@ -281,15 +281,9 @@
         </div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Max Deadhead (mi)</label><input class="form-input" id="p-maxdead" type="number" placeholder="150"></div>
-          <div class="form-group"><label class="form-label">Pickup Date</label>
-            <select class="form-select" id="p-pickup-date">
-              <option value="">Any Date</option>
-              <option value="today">Today</option>
-              <option value="tomorrow">Tomorrow</option>
-              <option value="2days">Within 2 Days</option>
-              <option value="3days">Within 3 Days</option>
-              <option value="week">This Week</option>
-            </select>
+          <div class="form-group"><label class="form-label">Pickup Date (on or after)</label>
+            <input class="form-input" id="p-pickup-date" type="date">
+            <div class="form-hint">Leave blank to show all dates</div>
           </div>
         </div>
         <div class="form-row">
