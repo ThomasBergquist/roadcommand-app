@@ -2908,16 +2908,20 @@ function renderLiveLoadCards(loads, minRpm) {
   var minMiles = defaults.minMiles || 500;
   var maxMiles = defaults.maxMiles || 2000;
 
-  // Filter out loads with no rate or miles data
-  var validLoads = loads.filter(function(l) { return l.rate > 0 && l.miles > 0; });
+  console.log('renderLiveLoadCards: ' + loads.length + ' loads, minGross=' + minGross + ' minMiles=' + minMiles + ' maxMiles=' + maxMiles + ' minRpm=' + minRpm);
 
-  // Split: hot = meets all params, watch = has rate but below params
-  var hotLoads   = validLoads.filter(function(l) {
+  // Only hide loads that have rate AND miles data but fail filters
+  // Loads with rate=0 or miles=0 keep showing as "call for rate"
+  var hotLoads = loads.filter(function(l) {
+    if (l.rate <= 0 || l.miles <= 0) return false;
     return l.rate >= minGross && l.miles >= minMiles && l.miles <= maxMiles && l.rpm >= minRpm;
   });
-  var watchLoads = validLoads.filter(function(l) {
-    return !(l.rate >= minGross && l.miles >= minMiles && l.miles <= maxMiles && l.rpm >= minRpm);
+  var watchLoads = loads.filter(function(l) {
+    if (hotLoads.indexOf(l) >= 0) return false;
+    return true; // show everything else as watching
   });
+
+  console.log('Hot: ' + hotLoads.length + ' Watch: ' + watchLoads.length);
 
   // Hot first, then watching
   loads = hotLoads.concat(watchLoads);
