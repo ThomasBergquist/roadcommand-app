@@ -1564,6 +1564,27 @@ function extractPhoneFromNotes(notes, fallbackPhone) {
   return fallbackPhone || '';
 }
 
+var _drivingDistCache = {};
+
+async function getDrivingMiles(fromLat, fromLon, toLat, toLon) {
+  var key = fromLat.toFixed(3) + ',' + fromLon.toFixed(3) + '-' + toLat.toFixed(3) + ',' + toLon.toFixed(3);
+  if (_drivingDistCache[key]) return _drivingDistCache[key];
+  try {
+    var url = 'https://router.project-osrm.org/route/v1/driving/' +
+      fromLon + ',' + fromLat + ';' + toLon + ',' + toLat +
+      '?overview=false&steps=false';
+    var res  = await fetch(url);
+    var data = await res.json();
+    if (data && data.routes && data.routes[0]) {
+      var miles = Math.round(data.routes[0].distance * 0.000621371);
+      _drivingDistCache[key] = miles;
+      return miles;
+    }
+  } catch(e) {}
+  // Fallback to haversine × 1.25
+  return Math.round(haversineMiles(fromLat, fromLon, toLat, toLon) * 1.25);
+}
+
 function getDeadheadMiles(pickupCity) {
   if (!window._gpsLat || !window._gpsLon) return 0;
   var key = pickupCity.toLowerCase().split(',')[0].trim();
@@ -3206,16 +3227,34 @@ function renderLiveLoadCards(loads, minRpm) {
   var mpg       = defaults.mpg         || 6.5;
   var emptyMpg  = defaults.emptyMpg    || 8.0;
 
-  // Calculate deadhead for each load using current GPS (guaranteed available at render time)
+  // Calculate deadhead for each load using current GPS
   if (window._gpsLat && window._gpsLon) {
+    // Use Truckstop's own OriginDistance when available (PC Miler routing)
+    // Otherwise use haversine × 1.25 as driving distance approximation
     loads.forEach(function(l) {
-      l.deadheadMiles = getDeadheadMiles(l.originCity + ', ' + l.originState);
+      if (l.originDistance && l.originDistance > 0) {
+        // Truckstop already calculated this via PC Miler
+        l.deadheadMiles = l.originDistance;
+      } else {
+        var coords = CITY_COORDS[(l.originCity || '').toLowerCase().trim()];
+        if (!coords) {
+          var keys = Object.keys(CITY_COORDS);
+          for (var i = 0; i < keys.length; i++) {
+            var k = (l.originCity || '').toLowerCase().trim();
+            if (k.indexOf(keys[i]) >= 0 || keys[i].indexOf(k) >= 0) { coords = CITY_COORDS[keys[i]]; break; }
+          }
+        }
+        if (coords) {
+          // Use haversine × 1.25 for driving approximation
+          l.deadheadMiles = Math.round(haversineMiles(window._gpsLat, window._gpsLon, coords[0], coords[1]) * 1.25);
+        } else {
+          l.deadheadMiles = 0;
+        }
+      }
     });
-    // Filter out loads beyond max deadhead — only when distance is known (>0)
     loads = loads.filter(function(l) {
       return l.deadheadMiles === 0 || l.deadheadMiles <= maxDead;
     });
-    // Update cache with filtered results so tab switches don't re-show filtered loads
     _liveLoadsCache = loads;
   }
 
