@@ -1129,7 +1129,10 @@ async function confirmBooking(origin, dest, postedRate, miles, broker, phone) {
   // 5. Log run
   promptLogRun(origin, dest, actualPay, miles);
 
-  // 6. Show loadback
+  // 7. Save booked load to Supabase for Loadback push notifications
+  await saveBookedLoadForLoadback(origin, dest, actualPay, miles, broker);
+
+  // 8. Show loadback
   showLoadback(origin, dest, actualPay, miles, broker, phone);
 }
 
@@ -1159,6 +1162,40 @@ async function ensureBrokerInVault(brokerName, phone, terms) {
   } catch(err) {
     console.error('Error adding broker to vault:', err);
     return null;
+  }
+}
+
+async function saveBookedLoadForLoadback(origin, dest, rate, miles, broker) {
+  if (!window._rcUserId || !window._supabaseReady) return;
+  try {
+    var destParts = dest.split(',');
+    var destCity  = destParts[0].trim();
+    var destState = destParts.length > 1 ? destParts[1].trim() : '';
+
+    // Calculate ETA based on miles and avg speed
+    var avgSpeed  = 55;
+    var drivingHours = miles / avgSpeed;
+    var etaDate   = new Date();
+    etaDate.setHours(etaDate.getHours() + Math.ceil(drivingHours));
+
+    await _supabase.from('booked_loads').upsert({
+      user_id:        window._rcUserId,
+      origin:         origin,
+      destination:    dest,
+      dest_state:     destState,
+      dest_city:      destCity,
+      rate:           rate,
+      miles:          miles,
+      broker:         broker,
+      eta_date:       etaDate.toISOString().split('T')[0],
+      equipment_type: window._rcEquipmentType || 'V',
+      min_rpm:        defaults.minRpm || 2.00,
+      active:         true,
+    }, { onConflict: 'user_id,destination,eta_date' });
+
+    console.log('Booked load saved for Loadback notifications — destination:', dest);
+  } catch(err) {
+    console.error('Error saving booked load:', err);
   }
 }
 
@@ -1415,6 +1452,29 @@ function getDeadheadMiles(pickupCity) {
   }
   if (!coords) return 0;
   return haversineMiles(window._gpsLat, window._gpsLon, coords[0], coords[1]);
+}
+
+// Calculate deadhead miles between two cities (for Loadback)
+function getDeadheadMilesFromCity(fromCity, fromState, toCity, toState) {
+  var fromKey = (fromCity || '').toLowerCase().trim();
+  var toKey   = (toCity   || '').toLowerCase().trim();
+  var fromCoords = CITY_COORDS[fromKey];
+  var toCoords   = CITY_COORDS[toKey];
+
+  if (!fromCoords) {
+    var keys = Object.keys(CITY_COORDS);
+    for (var i = 0; i < keys.length; i++) {
+      if (fromKey.indexOf(keys[i]) >= 0 || keys[i].indexOf(fromKey) >= 0) { fromCoords = CITY_COORDS[keys[i]]; break; }
+    }
+  }
+  if (!toCoords) {
+    var keys = Object.keys(CITY_COORDS);
+    for (var i = 0; i < keys.length; i++) {
+      if (toKey.indexOf(keys[i]) >= 0 || keys[i].indexOf(toKey) >= 0) { toCoords = CITY_COORDS[keys[i]]; break; }
+    }
+  }
+  if (!fromCoords || !toCoords) return 0;
+  return haversineMiles(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2930,6 +2990,7 @@ async function fetchTruckstopLoads(forceRefresh) {
   }
 
   var state     = currentState || 'WA';
+  var city      = currentCity  || '';
   var maxDead   = defaults.maxDeadhead || 150;
   var minRpm    = defaults.minRpm || 2.00;
   var equipType = window._rcEquipmentType || 'V';
@@ -2939,24 +3000,34 @@ async function fetchTruckstopLoads(forceRefresh) {
   showLoadingState();
 
   try {
-    // If multiple equipment types, make separate calls and combine
     var equipTypes = equipType.split(',').map(function(e) { return e.trim(); });
     var allLoads = [];
 
     for (var i = 0; i < equipTypes.length; i++) {
       var url = _tsWorkerUrl + '/search' +
-        '?originState=' + encodeURIComponent(state) +
+        '?originState='  + encodeURIComponent(state) +
+        '&originCity='   + encodeURIComponent(city) +
         '&equipmentType=' + encodeURIComponent(equipTypes[i]) +
         '&hoursOld=24' +
         '&pageSize=25' +
-        '&originRange=' + maxDead +
-        '&loadType=' + encodeURIComponent(loadType);
+        '&originRange='  + maxDead +
+        '&loadType='     + encodeURIComponent(loadType);
 
       var res  = await fetch(url);
       var data = await res.json();
       if (data.success && data.loads) {
         allLoads = allLoads.concat(data.loads);
       }
+    }
+
+    // Also do client-side deadhead filter using GPS if available
+    if (window._gpsLat && window._gpsLon && allLoads.length > 0) {
+      allLoads = allLoads.filter(function(load) {
+        if (!load.originCity || !load.originState) return true;
+        var dh = getDeadheadMiles(load.originCity + ', ' + load.originState);
+        load.deadheadMiles = dh;
+        return dh <= maxDead || dh === 0;
+      });
     }
 
     if (allLoads.length > 0) {
@@ -3015,13 +3086,13 @@ function renderLiveLoadCards(loads, minRpm) {
     var rpmDisplay  = load.rpm ? '$' + load.rpm.toFixed(2) + '/mi' : '—';
     var rateDisplay = load.rate ? '$' + load.rate.toLocaleString() : 'Call';
 
-    // Calculate fuel with deadhead
+    // Calculate fuel with actual deadhead from GPS
     var loadedFuelEst = load.miles > 0 ? Math.round((load.miles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25)) : 0;
-    var deadMilesEst  = load.originCity ? getDeadheadMiles(load.originCity + ', ' + load.originState) : 0;
+    var deadMilesEst  = load.deadheadMiles !== undefined ? load.deadheadMiles : (load.originCity ? getDeadheadMiles(load.originCity + ', ' + load.originState) : 0);
     var deadFuelEst   = deadMilesEst > 0 ? Math.round((deadMilesEst / (defaults.emptyMpg || 8.0)) * (defaults.fuelPrice || 4.25)) : 0;
     var totalFuelEst  = loadedFuelEst + deadFuelEst;
     var fuelDisplay   = totalFuelEst > 0 ? '-$' + totalFuelEst.toLocaleString() : (load.fuelCost || '—');
-    var fuelSubDisplay = deadFuelEst > 0 ? '$' + loadedFuelEst + ' loaded + $' + deadFuelEst + ' DH' : '';
+    var fuelSubDisplay = deadFuelEst > 0 ? '$' + loadedFuelEst + ' loaded + $' + deadFuelEst + ' DH (' + Math.round(deadMilesEst) + ' mi)' : '';
     var netEst        = load.rate && totalFuelEst ? '$' + Math.max(0, load.rate - totalFuelEst).toLocaleString() : '—';
 
     return '<div class="load-card ' + cardClass + '" data-rate="' + (load.rate || 0) + '" data-miles="' + (load.miles || 0) + '">' +
@@ -3277,25 +3348,37 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
 
     if (!data.success || !data.loads || !data.loads.length) return;
 
-    var fuelPrice = defaults.fuelPrice || 4.25;
-    var mpg       = defaults.mpg || 6.5;
-    var outNet    = rate - Math.round((miles / mpg) * fuelPrice);
-    var minRpm    = defaults.minRpm || 2.00;
+    var fuelPrice  = defaults.fuelPrice  || 4.25;
+    var mpg        = defaults.mpg        || 6.5;
+    var emptyMpg   = defaults.emptyMpg   || 8.0;
+    var outNet     = rate - Math.round((miles / mpg) * fuelPrice);
+    var minRpm     = defaults.minRpm     || 2.00;
+    var minGross   = defaults.minGross   || 0;
+    var maxDeadLB  = defaults.maxDeadhead || 150;
 
-    // Score and filter return loads
+    // Score and filter return loads — apply deadhead filter from destination city
     var scoredLoads = data.loads
       .filter(function(l) { return l.rate > 0 && l.miles > 0; })
       .map(function(l) {
-        var returnFuel   = Math.round((l.miles / mpg) * fuelPrice);
-        var returnNet    = l.rate - returnFuel;
+        // Calculate deadhead from destination city to this pickup
+        var dhFromDest = getDeadheadMilesFromCity(destCity, destState, l.originCity, l.originState);
+        var dhFuel     = dhFromDest > 0 ? Math.round((dhFromDest / emptyMpg) * fuelPrice) : 0;
+        var returnFuel = Math.round((l.miles / mpg) * fuelPrice);
+        var returnNet  = l.rate - returnFuel - dhFuel;
         var roundTripNet = outNet + returnNet;
         return Object.assign({}, l, {
           returnNet:    returnNet,
           roundTripNet: roundTripNet,
+          dhFromDest:   dhFromDest,
           availStr:     formatArrival(arrival),
         });
       })
-      .filter(function(l) { return l.rpm >= minRpm; })
+      .filter(function(l) {
+        if (l.rpm < minRpm) return false;
+        if (minGross > 0 && l.rate < minGross) return false;
+        if (maxDeadLB > 0 && l.dhFromDest > maxDeadLB) return false;
+        return true;
+      })
       .sort(function(a, b) { return b.roundTripNet - a.roundTripNet; })
       .slice(0, 5);
 
