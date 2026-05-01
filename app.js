@@ -259,41 +259,46 @@ function calculateProfit() {
 }
 
 function saveParams() {
-  // Rate requirements
-  var minrpm   = parseFloat(document.getElementById('set-minrpm') && document.getElementById('set-minrpm').value) || 2.00;
-  var minGross = parseFloat(document.getElementById('p-gross') && document.getElementById('p-gross').value) || 1500;
-  var minMiles = parseFloat(document.getElementById('p-minmi') && document.getElementById('p-minmi').value) || 500;
-  var maxMiles = parseFloat(document.getElementById('p-maxmi') && document.getElementById('p-maxmi').value) || 2000;
-  var maxDead  = parseFloat(document.querySelector('#screen-params input[value="150"], #screen-params .form-input[placeholder]') && document.querySelectorAll('#screen-params .card:nth-child(4) .form-input')[1] && document.querySelectorAll('#screen-params .card:nth-child(4) .form-input')[1].value) || 150;
-
-  // Fuel/truck defaults
-  var fuel     = parseFloat(document.getElementById('calc-fuel') && document.getElementById('calc-fuel').value) || 4.25;
-  var mpg      = parseFloat(document.getElementById('calc-mpg')  && document.getElementById('calc-mpg').value)  || 6.5;
-
-  // Preferred lanes
+  // Read from Parameters screen fields
+  var minRpm   = parseFloat(document.getElementById('p-rpm')     && document.getElementById('p-rpm').value)     || 2.00;
+  var minGross = parseFloat(document.getElementById('p-gross')   && document.getElementById('p-gross').value)   || 1500;
+  var minMiles = parseFloat(document.getElementById('p-minmi')   && document.getElementById('p-minmi').value)   || 0;
+  var maxMiles = parseFloat(document.getElementById('p-maxmi')   && document.getElementById('p-maxmi').value)   || 2500;
+  var maxDead  = parseFloat(document.getElementById('p-maxdead') && document.getElementById('p-maxdead').value) || 150;
   var homeBase    = document.getElementById('p-home')    ? document.getElementById('p-home').value.trim()    : 'Moses Lake, WA';
   var originStates = document.getElementById('p-origins') ? document.getElementById('p-origins').value.trim() : 'WA, OR, ID, MT';
   var destStates   = document.getElementById('p-dests')   ? document.getElementById('p-dests').value.trim()   : 'WA, OR, ID, UT, NV, CA';
 
-  // Save to defaults object
-  defaults.fuelPrice    = fuel;
-  defaults.mpg          = mpg;
-  defaults.minRpm       = minrpm;
-  defaults.minGross     = minGross;
-  defaults.minMiles     = minMiles;
-  defaults.maxMiles     = maxMiles;
-  defaults.maxDeadhead  = maxDead;
+  // Fuel defaults from calc panel
+  var fuel = parseFloat(document.getElementById('calc-fuel') && document.getElementById('calc-fuel').value) || 4.25;
+  var mpg  = parseFloat(document.getElementById('calc-mpg')  && document.getElementById('calc-mpg').value)  || 6.5;
+
+  // Update defaults object
+  defaults.minRpm      = minRpm;
+  defaults.minGross    = minGross;
+  defaults.minMiles    = minMiles;
+  defaults.maxMiles    = maxMiles;
+  defaults.maxDeadhead = maxDead;
+  defaults.fuelPrice   = fuel;
+  defaults.mpg         = mpg;
+
+  // Also sync set-minrpm in Settings screen
+  var settingsRpm = document.getElementById('set-minrpm');
+  if (settingsRpm) settingsRpm.value = minRpm;
 
   // Save to localStorage
   try {
     localStorage.setItem('rc-params', JSON.stringify({
-      minrpm, minGross, minMiles, maxMiles, maxDead,
+      minRpm, minGross, minMiles, maxMiles, maxDead,
       homeBase, originStates, destStates, fuel, mpg,
     }));
   } catch(e) {}
 
   // Save to Supabase
   savePreferencesToSupabase();
+
+  // Update alert prefs for push notifications
+  if (window._rcUserId) saveLoadAlertPrefs();
 
   injectProfitBars();
 
@@ -569,20 +574,20 @@ function loadSavedPreferences() {
       if (d.speed)   { var spEl = document.getElementById('set-speed'); if (spEl) spEl.value = d.speed; }
       if (d.minrpm)  { defaults.minRpm = d.minrpm; var mrEl = document.getElementById('set-minrpm'); if (mrEl) mrEl.value = d.minrpm; }
     }
-    // Load parameters
+    // Load parameters from localStorage
     const savedParams = localStorage.getItem('rc-params');
     if (savedParams) {
       const p = JSON.parse(savedParams);
-      if (p.minrpm)       { defaults.minRpm      = p.minrpm;   var el = document.getElementById('set-minrpm'); if (el) el.value = p.minrpm; }
-      if (p.minGross)     { defaults.minGross     = p.minGross; var el = document.getElementById('p-gross');    if (el) el.value = p.minGross; }
-      if (p.minMiles)     { defaults.minMiles     = p.minMiles; var el = document.getElementById('p-minmi');    if (el) el.value = p.minMiles; }
-      if (p.maxMiles)     { defaults.maxMiles     = p.maxMiles; var el = document.getElementById('p-maxmi');    if (el) el.value = p.maxMiles; }
-      if (p.maxDead)      { defaults.maxDeadhead  = p.maxDead; }
+      if (p.minRpm !== undefined)   { defaults.minRpm      = p.minRpm;   var el = document.getElementById('p-rpm');     if (el) el.value = p.minRpm; var el2 = document.getElementById('set-minrpm'); if (el2) el2.value = p.minRpm; }
+      if (p.minGross !== undefined)  { defaults.minGross    = p.minGross;  var el = document.getElementById('p-gross');   if (el) el.value = p.minGross; }
+      if (p.minMiles !== undefined)  { defaults.minMiles    = p.minMiles;  var el = document.getElementById('p-minmi');   if (el) el.value = p.minMiles; }
+      if (p.maxMiles !== undefined)  { defaults.maxMiles    = p.maxMiles;  var el = document.getElementById('p-maxmi');   if (el) el.value = p.maxMiles; }
+      if (p.maxDead !== undefined)   { defaults.maxDeadhead = p.maxDead;   var el = document.getElementById('p-maxdead'); if (el) el.value = p.maxDead; }
       if (p.homeBase)     { var el = document.getElementById('p-home');    if (el) el.value = p.homeBase; }
       if (p.originStates) { var el = document.getElementById('p-origins'); if (el) el.value = p.originStates; }
       if (p.destStates)   { var el = document.getElementById('p-dests');   if (el) el.value = p.destStates; }
-      if (p.fuel)         { defaults.fuelPrice = p.fuel; var el = document.getElementById('calc-fuel'); if (el) el.value = p.fuel; }
-      if (p.mpg)          { defaults.mpg = p.mpg; var el = document.getElementById('calc-mpg');  if (el) el.value = p.mpg; }
+      if (p.fuel !== undefined)      { defaults.fuelPrice = p.fuel; var el = document.getElementById('calc-fuel'); if (el) el.value = p.fuel; var el2 = document.getElementById('set-fuel'); if (el2) el2.value = p.fuel; }
+      if (p.mpg !== undefined)       { defaults.mpg = p.mpg;   var el = document.getElementById('calc-mpg');  if (el) el.value = p.mpg;  var el2 = document.getElementById('set-mpg');  if (el2) el2.value = p.mpg; }
     }
     const truck = localStorage.getItem('rc-truck');
     if (truck) {
@@ -640,15 +645,17 @@ async function loadPreferencesFromSupabase() {
 
     // Update UI fields
     var fields = {
-      'set-minrpm':    data.min_rpm,
-      'p-gross':       data.min_gross,
-      'p-minmi':       data.min_miles,
-      'p-maxmi':       data.max_miles,
-      'set-mpg':       data.mpg,
+      'p-rpm':       data.min_rpm,
+      'set-minrpm':  data.min_rpm,
+      'p-gross':     data.min_gross,
+      'p-minmi':     data.min_miles,
+      'p-maxmi':     data.max_miles,
+      'p-maxdead':   data.max_deadhead,
+      'set-mpg':     data.mpg,
       'set-empty-mpg': data.empty_mpg,
-      'set-fuel':      data.fuel_price,
-      'calc-fuel':     data.fuel_price,
-      'calc-mpg':      data.mpg,
+      'set-fuel':    data.fuel_price,
+      'calc-fuel':   data.fuel_price,
+      'calc-mpg':    data.mpg,
     };
     Object.keys(fields).forEach(function(id) {
       var el = document.getElementById(id);
