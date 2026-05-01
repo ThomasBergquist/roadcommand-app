@@ -308,7 +308,7 @@ function filterLoads(type) {
   document.getElementById('filter-' + type).className = 'btn btn-green btn-sm';
 }
 
-const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0, minRpm: 2.00 };
+const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0, minRpm: 2.00, minGross: 1500, minMiles: 500, maxMiles: 2000, maxDeadhead: 150 };
 
 // ── ANALYTICS ────────────────────────────────────────────────
 function track(eventName, properties) {
@@ -3037,13 +3037,8 @@ updateWeatherForState = function(stateCode) {
   setTimeout(function() { fetchTruckstopLoads(false); }, 500);
 };
 
-// Also fetch immediately on auth ready using default state
+// Also fetch immediately on auth ready — triggered after preferences load
 var _origOnAuthReadyLoads = onAuthReady;
-onAuthReady = function(firstName, userId, email) {
-  _origOnAuthReadyLoads(firstName, userId, email);
-  // Fetch immediately with WA as default, GPS will re-fetch with real state
-  setTimeout(function() { fetchTruckstopLoads(false); }, 2000);
-};
 
 // Manual refresh button
 function refreshLoads() {
