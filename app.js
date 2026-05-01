@@ -1559,28 +1559,30 @@ function getDeadheadMiles(pickupCity) {
   if (!coords && _cityCoordCache[key]) coords = _cityCoordCache[key];
 
   if (!coords) {
-    // Unknown city — kick off async geocode and return a high number so it fails filter
-    // This prevents unknown cities from passing the deadhead filter incorrectly
+    // Unknown city — kick off background geocode for next time, return 0 (don't filter)
     geocodeCityAsync(key, pickupCity);
-    return 9999;
+    return 0;
   }
 
   return haversineMiles(window._gpsLat, window._gpsLon, coords[0], coords[1]);
 }
 
 async function geocodeCityAsync(key, fullCityStr) {
-  if (_cityCoordCache[key] !== undefined) return;
-  _cityCoordCache[key] = null; // Mark as pending
+  if (_cityCoordCache[key] !== undefined) return; // already cached or pending
+  _cityCoordCache[key] = null; // mark as pending
   try {
     var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
       encodeURIComponent(fullCityStr + ', USA') + '&limit=1';
     var res  = await fetch(url);
     var data = await res.json();
     if (data && data[0]) {
-      _cityCoordCache[key] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+      var coords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+      _cityCoordCache[key] = coords;
+      // Also add to CITY_COORDS for future use in this session
+      CITY_COORDS[key] = coords;
     }
   } catch(e) {
-    _cityCoordCache[key] = null;
+    delete _cityCoordCache[key]; // allow retry next time
   }
 }
 
@@ -3153,12 +3155,31 @@ async function fetchTruckstopLoads(forceRefresh) {
 
     if (data.success && data.loads && data.loads.length > 0) {
       var loads = data.loads;
-      // GPS deadhead filter
+      // Geocode any unknown cities before filtering
       if (window._gpsLat && window._gpsLon) {
+        // Find cities not in our coords database
+        var unknownCities = [];
+        loads.forEach(function(l) {
+          var key = (l.originCity || '').toLowerCase().trim();
+          if (!CITY_COORDS[key] && !_cityCoordCache[key]) {
+            var cityStr = l.originCity + ', ' + l.originState;
+            if (unknownCities.indexOf(cityStr) < 0) unknownCities.push(cityStr);
+          }
+        });
+
+        // Geocode unknown cities (max 5 to avoid rate limiting)
+        if (unknownCities.length > 0) {
+          var toGeocode = unknownCities.slice(0, 5);
+          await Promise.all(toGeocode.map(function(cityStr) {
+            return geocodeCityAsync(cityStr.toLowerCase().split(',')[0].trim(), cityStr);
+          }));
+        }
+
+        // Now filter with updated cache
         loads = loads.filter(function(l) {
           var dh = getDeadheadMiles(l.originCity + ', ' + l.originState);
           l.deadheadMiles = dh;
-          return dh <= maxDead || dh === 0;
+          return dh === 0 || dh <= maxDead;
         });
       }
       _liveLoadsCache     = loads;
