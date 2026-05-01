@@ -1639,7 +1639,7 @@ function startGPS() {
         const addr = d.address || {};
         var iso = addr['ISO3166-2-lvl4'] || '';
         var state_code = iso ? iso.split('-').pop().toUpperCase() : (addr.state_code || '').toUpperCase();
-        const city = addr.city || addr.town || addr.village || addr.county || '';
+        const city = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || addr.municipality || '';
         const state = addr.state || '';
         currentState = state_code; currentCity = city;
         currentRegion = STATE_REGION[state_code] || 'Unknown';
@@ -3155,33 +3155,6 @@ async function fetchTruckstopLoads(forceRefresh) {
 
     if (data.success && data.loads && data.loads.length > 0) {
       var loads = data.loads;
-      // Geocode any unknown cities before filtering
-      if (window._gpsLat && window._gpsLon) {
-        // Find cities not in our coords database
-        var unknownCities = [];
-        loads.forEach(function(l) {
-          var key = (l.originCity || '').toLowerCase().trim();
-          if (!CITY_COORDS[key] && !_cityCoordCache[key]) {
-            var cityStr = l.originCity + ', ' + l.originState;
-            if (unknownCities.indexOf(cityStr) < 0) unknownCities.push(cityStr);
-          }
-        });
-
-        // Geocode unknown cities (max 5 to avoid rate limiting)
-        if (unknownCities.length > 0) {
-          var toGeocode = unknownCities.slice(0, 5);
-          await Promise.all(toGeocode.map(function(cityStr) {
-            return geocodeCityAsync(cityStr.toLowerCase().split(',')[0].trim(), cityStr);
-          }));
-        }
-
-        // Now filter with updated cache
-        loads = loads.filter(function(l) {
-          var dh = getDeadheadMiles(l.originCity + ', ' + l.originState);
-          l.deadheadMiles = dh;
-          return dh === 0 || dh <= maxDead;
-        });
-      }
       _liveLoadsCache     = loads;
       _liveLoadsLastFetch = now;
       renderLiveLoadCards(loads, minRpm);
@@ -3199,13 +3172,26 @@ async function fetchTruckstopLoads(forceRefresh) {
 // ── Render live load cards into both dash and loads screens ───────────────
 function renderLiveLoadCards(loads, minRpm) {
   minRpm = minRpm || defaults.minRpm || 2.00;
-  var minGross  = defaults.minGross  || 0;
-  var minMiles  = defaults.minMiles  || 0;
-  var maxMiles  = defaults.maxMiles  || 9999;
-  var maxWeight = defaults.maxWeight || 48000;
-  var fuelPrice = defaults.fuelPrice || 4.25;
-  var mpg       = defaults.mpg       || 6.5;
-  var emptyMpg  = defaults.emptyMpg  || 8.0;
+  var minGross  = defaults.minGross    || 0;
+  var minMiles  = defaults.minMiles    || 0;
+  var maxMiles  = defaults.maxMiles    || 9999;
+  var maxWeight = defaults.maxWeight   || 0;
+  var maxLength = defaults.maxLength   || 0;
+  var maxDead   = defaults.maxDeadhead || 200;
+  var fuelPrice = defaults.fuelPrice   || 4.25;
+  var mpg       = defaults.mpg         || 6.5;
+  var emptyMpg  = defaults.emptyMpg    || 8.0;
+
+  // Calculate deadhead for each load using current GPS (guaranteed available at render time)
+  if (window._gpsLat && window._gpsLon) {
+    loads.forEach(function(l) {
+      l.deadheadMiles = getDeadheadMiles(l.originCity + ', ' + l.originState);
+    });
+    // Filter out loads beyond max deadhead — only when distance is known (>0)
+    loads = loads.filter(function(l) {
+      return l.deadheadMiles === 0 || l.deadheadMiles <= maxDead;
+    });
+  }
 
   // Calculate net RPM for each load (rate minus fuel / total miles)
   loads.forEach(function(l) {
