@@ -890,7 +890,25 @@ function recalcPanel(panelId, rate, miles) {
   else if (parseFloat(rpm) >= minR)                         { tier = "ok";     verdictText = "⚠️ Acceptable"; }
   else                                                       { tier = "weak";   verdictText = "❌ Below Minimum"; }
   var fuelEl = document.getElementById("fuel_" + panelId);
-  if (fuelEl) fuelEl.textContent = deadMiles > 0 ? "-$" + fuelCost.toLocaleString() + " (incl. " + deadMiles + "mi DH)" : "-$" + fuelCost.toLocaleString();
+  if (fuelEl) {
+    if (deadMiles > 0) {
+      fuelEl.textContent = '-$' + fuelCost.toLocaleString();
+      fuelEl.title = 'Loaded fuel: $' + loadedFuel + ' · Deadhead fuel: $' + deadFuel + ' (' + deadMiles + ' mi empty)';
+      // Show breakdown below
+      var fuelBreakdown = fuelEl.nextElementSibling;
+      if (!fuelBreakdown || !fuelBreakdown.classList.contains('fuel-breakdown')) {
+        fuelBreakdown = document.createElement('div');
+        fuelBreakdown.className = 'fuel-breakdown';
+        fuelBreakdown.style.cssText = 'font-size:.68rem;color:#b8c8b8;margin-top:.1rem;';
+        fuelEl.parentNode.appendChild(fuelBreakdown);
+      }
+      fuelBreakdown.textContent = '$' + loadedFuel + ' loaded + $' + deadFuel + ' DH';
+    } else {
+      fuelEl.textContent = '-$' + fuelCost.toLocaleString();
+      var fuelBreakdown = fuelEl.nextElementSibling;
+      if (fuelBreakdown && fuelBreakdown.classList.contains('fuel-breakdown')) fuelBreakdown.remove();
+    }
+  }
   var netEl = document.getElementById("net_" + panelId);
   if (netEl) { netEl.textContent = (net >= 0 ? "$" : "-$") + Math.abs(net).toLocaleString(); netEl.className = "expand-val " + (net >= 0 ? "green" : "red"); }
   var npmEl = document.getElementById("npm_" + panelId);
@@ -2307,17 +2325,52 @@ function showBriefingBanner(text) {
 
 async function getLoadDecision(panelId, rate, miles, broker, pickup) {
   var btn = document.getElementById('ai-decide-' + panelId); if (btn) { btn.textContent = '🤖 Analyzing...'; btn.disabled = true; }
-  var deadMiles = getDeadheadMiles(pickup) || 0, fuelPrice = defaults.fuelPrice || 4.25, mpg = defaults.mpg || 6.5, emptyMpg = defaults.emptyMpg || 8.0;
-  var loadedFuel = Math.round((miles/mpg)*fuelPrice), deadFuel = Math.round((deadMiles/emptyMpg)*fuelPrice), net = rate-loadedFuel-deadFuel, rpm = (rate/miles).toFixed(2);
+  var deadMiles  = getDeadheadMiles(pickup) || 0;
+  var fuelPrice  = defaults.fuelPrice || 4.25;
+  var mpg        = defaults.mpg || 6.5;
+  var emptyMpg   = defaults.emptyMpg || 8.0;
+  var loadedFuel = Math.round((miles / mpg) * fuelPrice);
+  var deadFuel   = Math.round((deadMiles / emptyMpg) * fuelPrice);
+  var totalFuel  = loadedFuel + deadFuel;
+  var net        = rate - totalFuel;
+  var rpm        = parseFloat((rate / miles).toFixed(2));
+  var netPerMile = parseFloat((net / (miles + deadMiles)).toFixed(2));
+  var minRpm     = defaults.minRpm || 2.00;
+  var minGross   = defaults.minGross || 1500;
+
+  var rpmStatus   = rpm >= minRpm   ? 'ABOVE minimum ($' + rpm + ' vs $' + minRpm + ' min)' : 'BELOW minimum ($' + rpm + ' vs $' + minRpm + ' min)';
+  var grossStatus = rate >= minGross ? 'ABOVE minimum ($' + rate + ' vs $' + minGross + ' min)' : 'BELOW minimum ($' + rate + ' vs $' + minGross + ' min)';
+
   var brokerInfo = "";
-  if (broker) { var bKey = broker.toLowerCase(), keys = Object.keys(BROKER_DB); for (var k = 0; k < keys.length; k++) { if (bKey.indexOf(keys[k]) >= 0 || keys[k].indexOf(bKey) >= 0) { var bd = BROKER_DB[keys[k]]; brokerInfo = "Broker credit: " + bd.score + ", avg " + bd.days + " days to pay."; break; } } }
-  var prompt = "You are a freight dispatcher advising an owner-operator trucker. Give a quick yes or no recommendation on this load with ONE sentence of reasoning. Be blunt.\n\nLoad: $" + rate + " for " + miles + " miles from " + (pickup||'unknown') + "\nRate per mile: $" + rpm + "\nNet after fuel: $" + net + " (incl. " + deadMiles + " mi deadhead)\nBroker: " + (broker||"unknown") + (brokerInfo ? " — " + brokerInfo : "") + "\nDriver min RPM: $" + (defaults.minRpm || defaults.minrpm || '2.00') + "/mi\n\nReply format: TAKE IT or PASS — [one sentence reason]";
+  if (broker) {
+    var bKey = broker.toLowerCase(), keys = Object.keys(BROKER_DB);
+    for (var k = 0; k < keys.length; k++) {
+      if (bKey.indexOf(keys[k]) >= 0 || keys[k].indexOf(bKey) >= 0) {
+        var bd = BROKER_DB[keys[k]];
+        brokerInfo = "Broker credit: " + bd.score + ", avg " + bd.days + " days to pay.";
+        break;
+      }
+    }
+  }
+
+  var prompt =
+    "You are a freight dispatcher advising an owner-operator trucker. Give a quick TAKE IT or PASS recommendation with ONE sentence of reasoning. Be blunt and specific with numbers.\n\n" +
+    "LOAD DETAILS:\n" +
+    "- Gross rate: $" + rate + " — " + grossStatus + "\n" +
+    "- Miles: " + miles + " loaded + " + deadMiles + " deadhead\n" +
+    "- Rate per mile: $" + rpm + " — " + rpmStatus + "\n" +
+    "- Loaded fuel: $" + loadedFuel + " · Deadhead fuel: $" + deadFuel + "\n" +
+    "- Net after all fuel: $" + net + " ($" + netPerMile + "/mi all-in)\n" +
+    "- Broker: " + (broker || "unknown") + (brokerInfo ? " — " + brokerInfo : "") + "\n\n" +
+    "Reply format: TAKE IT or PASS — [one sentence with the key number that drives your decision]";
+
   try {
     var text = await callAI(prompt, 80);
     var resultEl = document.getElementById('ai-decide-result-' + panelId);
     if (resultEl) {
       var isTake = text.toUpperCase().includes('TAKE');
-      resultEl.innerHTML = '<div style="padding:.5rem .7rem;border-radius:3px;font-size:.82rem;margin-top:.4rem;background:' + (isTake ? 'var(--green-dim)' : 'var(--red-dim)') + ';border:1px solid ' + (isTake ? 'var(--green-border)' : 'rgba(255,126,126,.35)') + ';color:' + (isTake ? 'var(--green)' : 'var(--red)') + ';">🤖 ' + text + '</div>' +
+      resultEl.innerHTML =
+        '<div style="padding:.5rem .7rem;border-radius:3px;font-size:.82rem;margin-top:.4rem;background:' + (isTake ? 'var(--green-dim)' : 'var(--red-dim)') + ';border:1px solid ' + (isTake ? 'var(--green-border)' : 'rgba(255,126,126,.35)') + ';color:' + (isTake ? 'var(--green)' : 'var(--red)') + ';">🤖 ' + text + '</div>' +
         '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.25rem;font-style:italic;">AI estimate · Verify costs before booking</div>';
       resultEl.style.display = 'block';
     }
@@ -2937,8 +2990,15 @@ function renderLiveLoadCards(loads, minRpm) {
     var panelId = 'live_' + load.id;
     var rpmDisplay  = load.rpm ? '$' + load.rpm.toFixed(2) + '/mi' : '—';
     var rateDisplay = load.rate ? '$' + load.rate.toLocaleString() : 'Call';
-    var fuelEst     = load.fuelCost || '-$' + Math.round((load.miles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25)).toLocaleString();
-    var netEst      = load.rate ? '$' + Math.round(load.rate - parseFloat((load.fuelCost || '0').replace(/[^0-9.]/g,''))).toLocaleString() : '—';
+
+    // Calculate fuel with deadhead
+    var loadedFuelEst = load.miles > 0 ? Math.round((load.miles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25)) : 0;
+    var deadMilesEst  = load.originCity ? getDeadheadMiles(load.originCity + ', ' + load.originState) : 0;
+    var deadFuelEst   = deadMilesEst > 0 ? Math.round((deadMilesEst / (defaults.emptyMpg || 8.0)) * (defaults.fuelPrice || 4.25)) : 0;
+    var totalFuelEst  = loadedFuelEst + deadFuelEst;
+    var fuelDisplay   = totalFuelEst > 0 ? '-$' + totalFuelEst.toLocaleString() : (load.fuelCost || '—');
+    var fuelSubDisplay = deadFuelEst > 0 ? '$' + loadedFuelEst + ' loaded + $' + deadFuelEst + ' DH' : '';
+    var netEst        = load.rate && totalFuelEst ? '$' + Math.max(0, load.rate - totalFuelEst).toLocaleString() : '—';
 
     return '<div class="load-card ' + cardClass + '" data-rate="' + (load.rate || 0) + '" data-miles="' + (load.miles || 0) + '">' +
       '<div class="load-top load-card-clickable" onclick="toggleExpand(\'' + panelId + '\')">' +
@@ -2969,7 +3029,7 @@ function renderLiveLoadCards(loads, minRpm) {
         '<div id="hos_' + panelId + '"></div>' +
         '<div class="expand-profit-grid">' +
           '<div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">' + rateDisplay + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_' + panelId + '">' + fuelEst + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_' + panelId + '">' + fuelDisplay + (fuelSubDisplay ? '<div style="font-size:.65rem;color:#b8c8b8;margin-top:.1rem;">' + fuelSubDisplay + '</div>' : '') + '</div></div>' +
           '<div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_' + panelId + '">' + netEst + '</div></div>' +
           '<div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_' + panelId + '">—</div></div>' +
           '<div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">' + rpmDisplay + '</div></div>' +
