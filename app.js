@@ -3276,7 +3276,8 @@ function renderLiveLoadCards(loads, minRpm) {
       var tagClass  = isHot ? 'tag-hot' : 'tag-watch';
       var tagLabel  = isHot ? '🔥 Matches Parameters' : '👁 Below Parameters';
 
-      var bestPhone = extractPhoneFromNotes(load.notes, load.contactPhone || load.brokerPhone || '');
+      var bestPhone  = extractPhoneFromNotes(load.notes, load.contactPhone || load.brokerPhone || '');
+      var panelId    = 'live_' + load.id;
       var rpmDisplay = load.rpm ? '$' + load.rpm.toFixed(2) + '/mi' : '—';
       var netRpmDisplay = load.netRpm > 0 ? '$' + load.netRpm.toFixed(2) + ' net/mi' : rpmDisplay;
       var rateDisplay = load.rate ? '$' + load.rate.toLocaleString() : 'Call';
