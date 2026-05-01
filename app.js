@@ -259,38 +259,41 @@ function calculateProfit() {
 }
 
 function saveParams() {
-  // Read from Parameters screen fields
-  var minRpm   = parseFloat(document.getElementById('p-rpm')     && document.getElementById('p-rpm').value)     || 2.00;
-  var minGross = parseFloat(document.getElementById('p-gross')   && document.getElementById('p-gross').value)   || 1500;
-  var minMiles = parseFloat(document.getElementById('p-minmi')   && document.getElementById('p-minmi').value)   || 0;
-  var maxMiles = parseFloat(document.getElementById('p-maxmi')   && document.getElementById('p-maxmi').value)   || 2500;
-  var maxDead  = parseFloat(document.getElementById('p-maxdead') && document.getElementById('p-maxdead').value) || 150;
-  var homeBase    = document.getElementById('p-home')    ? document.getElementById('p-home').value.trim()    : 'Moses Lake, WA';
-  var originStates = document.getElementById('p-origins') ? document.getElementById('p-origins').value.trim() : 'WA, OR, ID, MT';
-  var destStates   = document.getElementById('p-dests')   ? document.getElementById('p-dests').value.trim()   : 'WA, OR, ID, UT, NV, CA';
-
-  // Fuel defaults from calc panel
+  var minRpm    = parseFloat(document.getElementById('p-rpm')       && document.getElementById('p-rpm').value)       || 2.00;
+  var minGross  = parseFloat(document.getElementById('p-gross')     && document.getElementById('p-gross').value)     || 0;
+  var minMiles  = parseFloat(document.getElementById('p-minmi')     && document.getElementById('p-minmi').value)     || 0;
+  var maxMiles  = parseFloat(document.getElementById('p-maxmi')     && document.getElementById('p-maxmi').value)     || 9999;
+  var maxDead   = parseFloat(document.getElementById('p-maxdead')   && document.getElementById('p-maxdead').value)   || 150;
+  var maxWeight = parseFloat(document.getElementById('p-maxweight') && document.getElementById('p-maxweight').value) || 48000;
+  var equipType = document.getElementById('p-equipment') ? document.getElementById('p-equipment').value : 'V';
+  var loadType  = document.getElementById('p-loadtype')  ? document.getElementById('p-loadtype').value  : 'All';
+  var homeBase     = document.getElementById('p-home')    ? document.getElementById('p-home').value.trim()    : '';
+  var originStates = document.getElementById('p-origins') ? document.getElementById('p-origins').value.trim() : 'WA';
+  var destStates   = document.getElementById('p-dests')   ? document.getElementById('p-dests').value.trim()   : '';
   var fuel = parseFloat(document.getElementById('calc-fuel') && document.getElementById('calc-fuel').value) || 4.25;
   var mpg  = parseFloat(document.getElementById('calc-mpg')  && document.getElementById('calc-mpg').value)  || 6.5;
 
-  // Update defaults object
+  // Update defaults
   defaults.minRpm      = minRpm;
   defaults.minGross    = minGross;
   defaults.minMiles    = minMiles;
   defaults.maxMiles    = maxMiles;
   defaults.maxDeadhead = maxDead;
+  defaults.maxWeight   = maxWeight;
   defaults.fuelPrice   = fuel;
   defaults.mpg         = mpg;
+  window._rcEquipmentType = equipType;
+  window._rcLoadType = loadType;
 
-  // Also sync set-minrpm in Settings screen
+  // Sync Settings screen RPM field
   var settingsRpm = document.getElementById('set-minrpm');
   if (settingsRpm) settingsRpm.value = minRpm;
 
   // Save to localStorage
   try {
     localStorage.setItem('rc-params', JSON.stringify({
-      minRpm, minGross, minMiles, maxMiles, maxDead,
-      homeBase, originStates, destStates, fuel, mpg,
+      minRpm, minGross, minMiles, maxMiles, maxDead, maxWeight,
+      equipType, loadType, homeBase, originStates, destStates, fuel, mpg,
     }));
   } catch(e) {}
 
@@ -301,10 +304,7 @@ function saveParams() {
   if (window._rcUserId) saveLoadAlertPrefs();
 
   injectProfitBars();
-
-  // Re-fetch loads with new parameters
   fetchTruckstopLoads(true);
-
   alert('Parameters saved!');
 }
 
@@ -578,16 +578,19 @@ function loadSavedPreferences() {
     const savedParams = localStorage.getItem('rc-params');
     if (savedParams) {
       const p = JSON.parse(savedParams);
-      if (p.minRpm !== undefined)   { defaults.minRpm      = p.minRpm;   var el = document.getElementById('p-rpm');     if (el) el.value = p.minRpm; var el2 = document.getElementById('set-minrpm'); if (el2) el2.value = p.minRpm; }
-      if (p.minGross !== undefined)  { defaults.minGross    = p.minGross;  var el = document.getElementById('p-gross');   if (el) el.value = p.minGross; }
-      if (p.minMiles !== undefined)  { defaults.minMiles    = p.minMiles;  var el = document.getElementById('p-minmi');   if (el) el.value = p.minMiles; }
-      if (p.maxMiles !== undefined)  { defaults.maxMiles    = p.maxMiles;  var el = document.getElementById('p-maxmi');   if (el) el.value = p.maxMiles; }
-      if (p.maxDead !== undefined)   { defaults.maxDeadhead = p.maxDead;   var el = document.getElementById('p-maxdead'); if (el) el.value = p.maxDead; }
-      if (p.homeBase)     { var el = document.getElementById('p-home');    if (el) el.value = p.homeBase; }
+      if (p.minRpm !== undefined)    { defaults.minRpm      = p.minRpm;    var el = document.getElementById('p-rpm');       if (el) el.value = p.minRpm;    var el2 = document.getElementById('set-minrpm'); if (el2) el2.value = p.minRpm; }
+      if (p.minGross !== undefined)   { defaults.minGross    = p.minGross;   var el = document.getElementById('p-gross');     if (el) el.value = p.minGross; }
+      if (p.minMiles !== undefined)   { defaults.minMiles    = p.minMiles;   var el = document.getElementById('p-minmi');     if (el) el.value = p.minMiles; }
+      if (p.maxMiles !== undefined)   { defaults.maxMiles    = p.maxMiles;   var el = document.getElementById('p-maxmi');     if (el) el.value = p.maxMiles; }
+      if (p.maxDead !== undefined)    { defaults.maxDeadhead = p.maxDead;    var el = document.getElementById('p-maxdead');   if (el) el.value = p.maxDead; }
+      if (p.maxWeight !== undefined)  { defaults.maxWeight   = p.maxWeight;  var el = document.getElementById('p-maxweight'); if (el) el.value = p.maxWeight; }
+      if (p.equipType)  { window._rcEquipmentType = p.equipType; var el = document.getElementById('p-equipment'); if (el) el.value = p.equipType; }
+      if (p.loadType)   { window._rcLoadType = p.loadType; var el = document.getElementById('p-loadtype');  if (el) el.value = p.loadType; }
+      if (p.homeBase)   { var el = document.getElementById('p-home');      if (el) el.value = p.homeBase; }
       if (p.originStates) { var el = document.getElementById('p-origins'); if (el) el.value = p.originStates; }
       if (p.destStates)   { var el = document.getElementById('p-dests');   if (el) el.value = p.destStates; }
-      if (p.fuel !== undefined)      { defaults.fuelPrice = p.fuel; var el = document.getElementById('calc-fuel'); if (el) el.value = p.fuel; var el2 = document.getElementById('set-fuel'); if (el2) el2.value = p.fuel; }
-      if (p.mpg !== undefined)       { defaults.mpg = p.mpg;   var el = document.getElementById('calc-mpg');  if (el) el.value = p.mpg;  var el2 = document.getElementById('set-mpg');  if (el2) el2.value = p.mpg; }
+      if (p.fuel !== undefined) { defaults.fuelPrice = p.fuel; var el = document.getElementById('calc-fuel'); if (el) el.value = p.fuel; var el2 = document.getElementById('set-fuel'); if (el2) el2.value = p.fuel; }
+      if (p.mpg !== undefined)  { defaults.mpg = p.mpg;   var el = document.getElementById('calc-mpg');  if (el) el.value = p.mpg;  var el2 = document.getElementById('set-mpg');  if (el2) el2.value = p.mpg; }
     }
     const truck = localStorage.getItem('rc-truck');
     if (truck) {
@@ -2926,30 +2929,41 @@ async function fetchTruckstopLoads(forceRefresh) {
     return _liveLoadsCache;
   }
 
-  var state = currentState || 'WA';
-  var maxDead = defaults.maxDeadhead || 150;
-  var minRpm  = defaults.minRpm || 2.00;
+  var state     = currentState || 'WA';
+  var maxDead   = defaults.maxDeadhead || 150;
+  var minRpm    = defaults.minRpm || 2.00;
   var equipType = window._rcEquipmentType || 'V';
+  var loadType  = window._rcLoadType || 'All';
 
   _liveLoadsFetching = true;
   showLoadingState();
 
   try {
-    var url = _tsWorkerUrl + '/search' +
-      '?originState=' + encodeURIComponent(state) +
-      '&equipmentType=' + encodeURIComponent(equipType) +
-      '&hoursOld=24' +
-      '&pageSize=50' +
-      '&originRange=' + maxDead;
+    // If multiple equipment types, make separate calls and combine
+    var equipTypes = equipType.split(',').map(function(e) { return e.trim(); });
+    var allLoads = [];
 
-    var res = await fetch(url);
-    var data = await res.json();
+    for (var i = 0; i < equipTypes.length; i++) {
+      var url = _tsWorkerUrl + '/search' +
+        '?originState=' + encodeURIComponent(state) +
+        '&equipmentType=' + encodeURIComponent(equipTypes[i]) +
+        '&hoursOld=24' +
+        '&pageSize=25' +
+        '&originRange=' + maxDead +
+        '&loadType=' + encodeURIComponent(loadType);
 
-    if (data.success && data.loads && data.loads.length > 0) {
-      _liveLoadsCache = data.loads;
+      var res  = await fetch(url);
+      var data = await res.json();
+      if (data.success && data.loads) {
+        allLoads = allLoads.concat(data.loads);
+      }
+    }
+
+    if (allLoads.length > 0) {
+      _liveLoadsCache = allLoads;
       _liveLoadsLastFetch = now;
-      renderLiveLoadCards(data.loads, minRpm);
-      track('live_loads_fetched', { count: data.loads.length, state: state });
+      renderLiveLoadCards(allLoads, minRpm);
+      track('live_loads_fetched', { count: allLoads.length, state: state });
     } else {
       showNoLoadsState(state);
     }
@@ -2964,21 +2978,24 @@ async function fetchTruckstopLoads(forceRefresh) {
 // ── Render live load cards into both dash and loads screens ───────────────
 function renderLiveLoadCards(loads, minRpm) {
   minRpm = minRpm || defaults.minRpm || 2.00;
-  var minGross = defaults.minGross || 1500;
-  var minMiles = defaults.minMiles || 500;
-  var maxMiles = defaults.maxMiles || 2000;
+  var minGross  = defaults.minGross    || 0;
+  var minMiles  = defaults.minMiles    || 0;
+  var maxMiles  = defaults.maxMiles    || 9999;
+  var maxWeight = defaults.maxWeight   || 48000;
 
-  console.log('renderLiveLoadCards: ' + loads.length + ' loads, minGross=' + minGross + ' minMiles=' + minMiles + ' maxMiles=' + maxMiles + ' minRpm=' + minRpm);
+  console.log('renderLiveLoadCards: ' + loads.length + ' loads, minGross=' + minGross + ' minMiles=' + minMiles + ' maxMiles=' + maxMiles + ' minRpm=' + minRpm + ' maxWeight=' + maxWeight);
 
-  // Only hide loads that have rate AND miles data but fail filters
-  // Loads with rate=0 or miles=0 keep showing as "call for rate"
   var hotLoads = loads.filter(function(l) {
     if (l.rate <= 0 || l.miles <= 0) return false;
-    return l.rate >= minGross && l.miles >= minMiles && l.miles <= maxMiles && l.rpm >= minRpm;
+    if (minGross > 0 && l.rate < minGross) return false;
+    if (minMiles > 0 && l.miles < minMiles) return false;
+    if (maxMiles < 9999 && l.miles > maxMiles) return false;
+    if (l.rpm < minRpm) return false;
+    if (maxWeight > 0 && l.weight > 0 && l.weight > maxWeight) return false;
+    return true;
   });
   var watchLoads = loads.filter(function(l) {
-    if (hotLoads.indexOf(l) >= 0) return false;
-    return true; // show everything else as watching
+    return hotLoads.indexOf(l) < 0;
   });
 
   console.log('Hot: ' + hotLoads.length + ' Watch: ' + watchLoads.length);

@@ -95,7 +95,7 @@
     <div class="card" id="authority-health-card" style="display:none;margin-bottom:.8rem;border-color:var(--green-border);"></div>
 
     <!-- COMMAND SCORE CARD -->
-    <div class="card" id="command-score-card" style="margin-bottom:.8rem;"></div>
+    <div class="card" id="command-score-card" style="margin-bottom:1rem;"></div>
 
     <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
       <input class="form-input" id="dash-odometer" type="number" placeholder="Odometer (miles)" style="width:70%;font-size:.82rem;">
@@ -276,11 +276,30 @@
       <div class="card-header"><div class="card-title">Equipment & Load</div></div>
       <div class="card-body">
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Max Weight (lbs)</label><input class="form-input" value="44000"></div>
+          <div class="form-group"><label class="form-label">Max Weight (lbs)</label><input class="form-input" id="p-maxweight" value="44000"></div>
           <div class="form-group"><label class="form-label">Max Deadhead (mi)</label><input class="form-input" id="p-maxdead" value="150"></div>
         </div>
-        <div class="form-group"><label class="form-label">Preferred Commodities</label><input class="form-input" value="Ag, General, Steel, Equipment"></div>
-        <div class="form-group"><label class="form-label">Avoid Commodities</label><input class="form-input" placeholder="e.g. Hazmat, Livestock"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Equipment Type</label>
+            <select class="form-select" id="p-equipment">
+              <option value="V">Van (V)</option>
+              <option value="F">Flatbed (F)</option>
+              <option value="R">Reefer (R)</option>
+              <option value="V,F">Van + Flatbed</option>
+              <option value="V,R">Van + Reefer</option>
+              <option value="V,F,R">All Types</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Load Type</label>
+            <select class="form-select" id="p-loadtype">
+              <option value="Full">Full Loads Only</option>
+              <option value="All" selected>Full + Partial</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Preferred Commodities</label><input class="form-input" id="p-commodities" value="Ag, General, Steel, Equipment"></div>
+        <div class="form-group"><label class="form-label">Avoid Commodities</label><input class="form-input" id="p-avoid-comm" placeholder="e.g. Hazmat, Livestock"></div>
       </div>
     </div>
     <div class="card">
