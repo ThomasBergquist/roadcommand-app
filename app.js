@@ -624,7 +624,7 @@ async function loadPreferencesFromSupabase() {
       .from('user_preferences')
       .select('*')
       .eq('user_id', window._rcUserId)
-      .single();
+      .maybeSingle();
     if (error || !data) return;
 
     // Apply to defaults
