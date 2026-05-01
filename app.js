@@ -1290,8 +1290,13 @@ function addReturnLoad(route, miles, rate) {
       '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + origin + '\',\'' + dest + '\',' + rate + ',' + miles + ',\'Return Broker\',\'\')"><span class="btn-icon">✓</span>Book</button>' +
       '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
     '</div>';
-  if (firstCard) loadsScreen.insertBefore(newCard, firstCard);
-  else loadsScreen.appendChild(newCard);
+  var loadsLive = document.getElementById('loads-screen-live');
+  if (!loadsLive) {
+    var loadsScreen = document.getElementById('screen-loads');
+    if (loadsScreen) loadsScreen.appendChild(newCard);
+  } else {
+    loadsLive.insertBefore(newCard, loadsLive.firstChild);
+  }
   closeLoadbackDirect();
   var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
   showScreen("loads", loadsBtn);
