@@ -1521,7 +1521,11 @@ function showLoadback(origin, dest, rate, miles, broker, phone) {
           '<div class="loadback-stats"><span class="loadback-stat">Miles: <strong>' + l.miles + '</strong></span><span class="loadback-stat">RPM: <strong>$' + l.rpm.toFixed(2) + '</strong></span><span class="loadback-stat">Net: <strong>$' + l.returnNet.toLocaleString() + '</strong></span><span class="loadback-stat">Round Trip: <strong style="color:var(--green)">$' + l.roundTripNet.toLocaleString() + '</strong></span></div>' +
           '<div class="loadback-date">📅 Available: ' + l.availStr + ' · ' + l.commodity + '</div>' +
           '<div class="lb-actions">' + (l.phone ? '<button class="lb-call-btn" onclick="callBroker(\'' + l.phone + '\',\'' + l.broker + '\')">📞 Call ' + l.broker + '</button>' : '') +
-          '<button class="lb-book-btn" onclick="addReturnLoad(\'' + l.route + '\',' + l.miles + ',' + l.rate + ')">✓ Add to Loads</button></div></div>';
+          '<button class="lb-book-btn" onclick="addReturnLoad(\'' + l.route + '\',' + l.miles + ',' + l.rate + ')">✓ Add to Loads</button>' +
+          '<button class="lb-call-btn lb-ai-btn" onclick="analyzeReturnLoad(this,\'' + l.route + '\',' + l.rate + ',' + l.miles + ',' + l.rpm.toFixed(2) + ',' + l.returnNet + ',' + l.roundTripNet + ',\'' + (l.broker||'') + '\')" style="color:#7ab8ff;border-color:rgba(122,184,255,.35);">🤖 Analyze</button>' +
+          '</div>' +
+          '<div class="lb-ai-result" style="display:none;margin-top:.5rem;padding:.5rem .7rem;border-radius:3px;font-size:.82rem;"></div>' +
+          '</div>';
       }).join("")
     : '<div class="alert alert-amber"><div class="alert-icon">⚠️</div><div>No return loads found for ' + dest + '. Connect Truckstop API for live loads.</div></div>';
   lbContent.innerHTML =
@@ -2857,32 +2861,21 @@ function renderLiveLoadCards(loads, minRpm) {
   }).join('');
 
   // Update hot loads count badge
-  var hotBadge = document.querySelector('#screen-dash .card .load-tag.tag-hot:not([class*="load-card"])');
+  var hotBadge = document.querySelector('#screen-dash .card-header .load-tag');
   if (hotBadge) hotBadge.textContent = hotCount + ' New';
 
-  // Inject into dash screen hot loads container
-  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  // Inject into dash screen
+  var dashCardBody = document.getElementById('dash-live-loads');
   if (dashCardBody) {
     dashCardBody.innerHTML = hotCount > 0
       ? cards
-      : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads matching your parameters right now. Checking every 5 minutes — you will get a push notification when something good posts.</div></div>';
+      : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads matching your parameters right now. Checking every 5 minutes.</div></div>';
   }
 
-  // Inject into loads screen — clear old cards and add new ones
-  if (loadsScreen) {
-    var existingCards = loadsScreen.querySelectorAll('.load-card');
-    existingCards.forEach(function(c) { c.remove(); });
-    var addBtn = document.getElementById('add-load-form');
-    var addBtnTrigger = loadsScreen.querySelector('button.btn-outline');
-    if (addBtnTrigger) {
-      loads.forEach(function(load, idx) {
-        var div = document.createElement('div');
-        div.innerHTML = cards.split('</div>\n<div class="load-card').map(function(c, i) {
-          return i === 0 ? c : '<div class="load-card' + c;
-        })[idx] || '';
-        if (div.firstElementChild) loadsScreen.insertBefore(div.firstElementChild, addBtnTrigger);
-      });
-    }
+  // Inject into loads screen
+  var loadsLive = document.getElementById('loads-screen-live');
+  if (loadsLive) {
+    loadsLive.innerHTML = cards;
   }
 
   // Re-inject profit bars
@@ -2890,42 +2883,41 @@ function renderLiveLoadCards(loads, minRpm) {
 }
 
 function clearLoadCards() {
-  // Clear dash hot loads
-  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  var dashCardBody = document.getElementById('dash-live-loads');
   if (dashCardBody) dashCardBody.innerHTML = '';
-  // Clear loads screen cards
-  var loadsScreen = document.getElementById('screen-loads');
-  if (loadsScreen) {
-    loadsScreen.querySelectorAll('.load-card').forEach(function(c) { c.remove(); });
-  }
+  var loadsLive = document.getElementById('loads-screen-live');
+  if (loadsLive) loadsLive.innerHTML = '';
 }
 
 function showLoadingState() {
-  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  var dashCardBody = document.getElementById('dash-live-loads');
   if (dashCardBody) {
     dashCardBody.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--green);font-size:.85rem;">🔄 Searching for loads near you...</div>';
   }
 }
 
 function showNoLoadsState(state) {
-  var dashCardBody = document.querySelector('#screen-dash .card div[style*="padding:.5rem .8rem"]');
+  var dashCardBody = document.getElementById('dash-live-loads');
   if (dashCardBody) {
     dashCardBody.innerHTML = '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads found near ' + (state || 'your location') + ' right now. Checking every 5 minutes — you will get a push notification when something good posts.</div></div>';
   }
+  var loadsLive = document.getElementById('loads-screen-live');
+  if (loadsLive) loadsLive.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">📋</div><div>No loads found near ' + (state || 'your location') + ' right now.</div></div>';
 }
 
 // ── Hook into GPS — fetch loads when location is confirmed ────────────────
-var _origStartGPS = startGPS;
-startGPS = function() {
-  _origStartGPS();
-  // Also fetch loads after GPS resolves — handled via currentState update
-};
-
 var _origUpdateWeatherForState = updateWeatherForState;
 updateWeatherForState = function(stateCode) {
   _origUpdateWeatherForState(stateCode);
-  // Fetch live loads whenever state updates
   setTimeout(function() { fetchTruckstopLoads(false); }, 500);
+};
+
+// Also fetch immediately on auth ready using default state
+var _origOnAuthReadyLoads = onAuthReady;
+onAuthReady = function(firstName, userId, email) {
+  _origOnAuthReadyLoads(firstName, userId, email);
+  // Fetch immediately with WA as default, GPS will re-fetch with real state
+  setTimeout(function() { fetchTruckstopLoads(false); }, 2000);
 };
 
 // Manual refresh button
@@ -3122,7 +3114,9 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
         '<div class="lb-actions">' +
           (l.contactPhone ? '<button class="lb-call-btn" onclick="callBroker(\'' + l.contactPhone + '\',\'' + (l.broker || 'Broker') + '\')">📞 Call ' + (l.broker || 'Broker') + '</button>' : '') +
           '<button class="lb-book-btn" onclick="addReturnLoad(\'' + l.route + '\',' + l.miles + ',' + l.rate + ')">✓ Add to Loads</button>' +
+          '<button class="lb-call-btn lb-ai-btn" onclick="analyzeReturnLoad(this,\'' + l.route + '\',' + l.rate + ',' + l.miles + ',' + l.rpm.toFixed(2) + ',' + l.returnNet + ',' + l.roundTripNet + ',\'' + (l.broker||'') + '\')" style="color:#7ab8ff;border-color:rgba(122,184,255,.35);">🤖 Analyze</button>' +
         '</div>' +
+        '<div class="lb-ai-result" style="display:none;margin-top:.5rem;padding:.5rem .7rem;border-radius:3px;font-size:.82rem;"></div>' +
       '</div>';
     }).join('');
 
@@ -3150,7 +3144,75 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
   }
 };
 
-// ── Register push on auth ready ───────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════════════
+// AI ANALYZE — Return load analysis in Loadback context
+// ══════════════════════════════════════════════════════════════════════════
+async function analyzeReturnLoad(btn, route, returnRate, returnMiles, returnRpm, returnNet, roundTripNet, broker) {
+  var resultEl = btn.parentElement.nextElementSibling;
+  if (!resultEl || !resultEl.classList.contains('lb-ai-result')) return;
+
+  btn.textContent = '🤖 Analyzing...';
+  btn.disabled = true;
+
+  // Get outbound context from last booked load
+  var lastLoad   = window._lastLoadback || {};
+  var outRate    = lastLoad.rate   || 0;
+  var outMiles   = lastLoad.miles  || 0;
+  var outOrigin  = lastLoad.origin || 'unknown';
+  var outDest    = lastLoad.dest   || 'unknown';
+  var outFuel    = Math.round((outMiles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25));
+  var outNet     = outRate - outFuel;
+  var minRpm     = defaults.minRpm || 2.00;
+
+  // Get broker credit if available
+  var brokerInfo = '';
+  if (broker) {
+    var bKey = broker.toLowerCase();
+    var keys = Object.keys(BROKER_DB);
+    for (var k = 0; k < keys.length; k++) {
+      if (bKey.indexOf(keys[k]) >= 0 || keys[k].indexOf(bKey) >= 0) {
+        var bd = BROKER_DB[keys[k]];
+        brokerInfo = broker + ' — Credit: ' + bd.score + ', pays in ' + bd.days + ' days avg.';
+        break;
+      }
+    }
+  }
+
+  var prompt =
+    'You are a freight dispatcher analyzing a return load for an owner-operator trucker. ' +
+    'Give a single TAKE IT or PASS verdict with one sentence of round trip reasoning. Be specific with numbers.\n\n' +
+    'OUTBOUND LOAD:\n' +
+    '- Route: ' + outOrigin + ' → ' + outDest + '\n' +
+    '- Rate: $' + outRate.toLocaleString() + ' · ' + outMiles + ' mi · Net: $' + outNet.toLocaleString() + '\n\n' +
+    'RETURN LOAD:\n' +
+    '- Route: ' + route + '\n' +
+    '- Rate: $' + returnRate.toLocaleString() + ' · ' + returnMiles + ' mi · $' + returnRpm + '/mi · Net: $' + returnNet.toLocaleString() + '\n' +
+    '- Round trip net: $' + roundTripNet.toLocaleString() + '\n' +
+    (brokerInfo ? '- Broker: ' + brokerInfo + '\n' : '') +
+    '- Driver min RPM: $' + minRpm + '/mi\n\n' +
+    'Reply format: TAKE IT or PASS — [one sentence with round trip net and key reason]';
+
+  try {
+    var text = await callAI(prompt, 100);
+    var isTake = text.toUpperCase().includes('TAKE');
+    resultEl.style.display = 'block';
+    resultEl.style.background = isTake ? 'var(--green-dim)' : 'rgba(255,126,126,.1)';
+    resultEl.style.border = '1px solid ' + (isTake ? 'var(--green-border)' : 'rgba(255,126,126,.35)');
+    resultEl.style.color = isTake ? 'var(--green)' : 'var(--red)';
+    resultEl.innerHTML = '🤖 ' + text +
+      '<div style="font-size:.68rem;color:#b8c8b8;margin-top:.25rem;font-style:italic;">AI estimate · Verify before booking</div>';
+  } catch(e) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = 'var(--surface2)';
+    resultEl.style.color = '#b8c8b8';
+    resultEl.textContent = 'AI unavailable. Check your connection.';
+  }
+
+  btn.textContent = '🤖 Analyze';
+  btn.disabled = false;
+}
+
 var _origOnAuthReadyTS = onAuthReady;
 onAuthReady = function(firstName, userId, email) {
   _origOnAuthReadyTS(firstName, userId, email);
