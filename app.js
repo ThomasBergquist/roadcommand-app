@@ -3212,9 +3212,6 @@ updateWeatherForState = function(stateCode) {
   setTimeout(function() { fetchTruckstopLoads(false); }, 500);
 };
 
-// Also fetch immediately on auth ready — triggered after preferences load
-var _origOnAuthReadyLoads = onAuthReady;
-
 // Manual refresh button
 function refreshLoads() {
   fetchTruckstopLoads(true);
@@ -3519,13 +3516,22 @@ onAuthReady = function(firstName, userId, email) {
   var waitForSupabase = setInterval(function() {
     if (window._supabaseReady && window._supabase) {
       clearInterval(waitForSupabase);
-      // Load preferences from Supabase first so filters are correct
+      // Load preferences then fetch loads
       loadPreferencesFromSupabase().then(function() {
         registerPushSubscription();
         saveLoadAlertPrefs();
-        // Re-fetch loads with correct parameters after prefs load
+        setTimeout(function() { fetchTruckstopLoads(true); }, 500);
+      }).catch(function() {
+        // If prefs fail, still fetch loads with defaults
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
       });
     }
   }, 500);
+  // Fallback — fetch loads after 8 seconds regardless of Supabase state
+  setTimeout(function() {
+    if (_liveLoadsCache.length === 0) {
+      console.log('Fallback load fetch firing');
+      fetchTruckstopLoads(true);
+    }
+  }, 8000);
 };
