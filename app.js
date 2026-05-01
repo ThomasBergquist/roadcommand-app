@@ -3052,13 +3052,30 @@ async function fetchTruckstopLoads(forceRefresh) {
 // ── Render live load cards into both dash and loads screens ───────────────
 function renderLiveLoadCards(loads, minRpm) {
   minRpm = minRpm || defaults.minRpm || 2.00;
-  var minGross  = defaults.minGross    || 0;
-  var minMiles  = defaults.minMiles    || 0;
-  var maxMiles  = defaults.maxMiles    || 9999;
-  var maxWeight = defaults.maxWeight   || 48000;
+  var minGross  = defaults.minGross  || 0;
+  var minMiles  = defaults.minMiles  || 0;
+  var maxMiles  = defaults.maxMiles  || 9999;
+  var maxWeight = defaults.maxWeight || 48000;
+  var fuelPrice = defaults.fuelPrice || 4.25;
+  var mpg       = defaults.mpg       || 6.5;
+  var emptyMpg  = defaults.emptyMpg  || 8.0;
 
-  console.log('renderLiveLoadCards: ' + loads.length + ' loads, minGross=' + minGross + ' minMiles=' + minMiles + ' maxMiles=' + maxMiles + ' minRpm=' + minRpm + ' maxWeight=' + maxWeight);
+  // Calculate net RPM for each load (rate minus fuel / total miles)
+  loads.forEach(function(l) {
+    if (l.rate > 0 && l.miles > 0) {
+      var loadedFuel = Math.round((l.miles / mpg) * fuelPrice);
+      var deadFuel   = l.deadheadMiles > 0 ? Math.round((l.deadheadMiles / emptyMpg) * fuelPrice) : 0;
+      var totalMiles = l.miles + (l.deadheadMiles || 0);
+      l.netRpm = parseFloat(((l.rate - loadedFuel - deadFuel) / totalMiles).toFixed(2));
+    } else {
+      l.netRpm = 0;
+    }
+  });
 
+  // Sort all loads by net RPM descending — best at top
+  loads.sort(function(a, b) { return b.netRpm - a.netRpm; });
+
+  // Classify hot vs watch based on parameters
   var hotLoads = loads.filter(function(l) {
     if (l.rate <= 0 || l.miles <= 0) return false;
     if (minGross > 0 && l.rate < minGross) return false;
@@ -3068,102 +3085,104 @@ function renderLiveLoadCards(loads, minRpm) {
     if (maxWeight > 0 && l.weight > 0 && l.weight > maxWeight) return false;
     return true;
   });
-  var watchLoads = loads.filter(function(l) {
-    return hotLoads.indexOf(l) < 0;
-  });
+  var watchLoads = loads.filter(function(l) { return hotLoads.indexOf(l) < 0; });
 
-  console.log('Hot: ' + hotLoads.length + ' Watch: ' + watchLoads.length);
-
-  // Hot first, then watching
-  loads = hotLoads.concat(watchLoads);
   var hotCount = hotLoads.length;
+
+  // Dash gets top 15 by net RPM regardless of hot/watch
+  var dashLoads  = loads.slice(0, 15);
+  // Loads screen gets all
+  var allLoads   = loads;
   clearLoadCards();
 
-  var cards = loads.map(function(load) {
-    var isHot     = hotLoads.indexOf(load) >= 0;
-    var cardClass = isHot ? 'hot' : 'watch';
-    var tagClass  = isHot ? 'tag-hot' : 'tag-watch';
-    var tagLabel  = isHot ? '🔥 Matches Parameters' : '👁 Below Parameters';
+  function buildCards(loadsArr) {
+    return loadsArr.map(function(load) {
+      var isHot     = hotLoads.indexOf(load) >= 0;
+      var cardClass = isHot ? 'hot' : 'watch';
+      var tagClass  = isHot ? 'tag-hot' : 'tag-watch';
+      var tagLabel  = isHot ? '🔥 Matches Parameters' : '👁 Below Parameters';
 
-    var panelId = 'live_' + load.id;
-    var rpmDisplay  = load.rpm ? '$' + load.rpm.toFixed(2) + '/mi' : '—';
-    var rateDisplay = load.rate ? '$' + load.rate.toLocaleString() : 'Call';
+      var panelId    = 'live_' + load.id;
+      var rpmDisplay = load.rpm ? '$' + load.rpm.toFixed(2) + '/mi' : '—';
+      var netRpmDisplay = load.netRpm > 0 ? '$' + load.netRpm.toFixed(2) + ' net/mi' : rpmDisplay;
+      var rateDisplay = load.rate ? '$' + load.rate.toLocaleString() : 'Call';
 
-    // Calculate fuel with actual deadhead from GPS
-    var loadedFuelEst = load.miles > 0 ? Math.round((load.miles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25)) : 0;
-    var deadMilesEst  = load.deadheadMiles !== undefined ? load.deadheadMiles : (load.originCity ? getDeadheadMiles(load.originCity + ', ' + load.originState) : 0);
-    var deadFuelEst   = deadMilesEst > 0 ? Math.round((deadMilesEst / (defaults.emptyMpg || 8.0)) * (defaults.fuelPrice || 4.25)) : 0;
-    var totalFuelEst  = loadedFuelEst + deadFuelEst;
-    var fuelDisplay   = totalFuelEst > 0 ? '-$' + totalFuelEst.toLocaleString() : (load.fuelCost || '—');
-    var fuelSubDisplay = deadFuelEst > 0 ? '$' + loadedFuelEst + ' loaded + $' + deadFuelEst + ' DH (' + Math.round(deadMilesEst) + ' mi)' : '';
-    var netEst        = load.rate && totalFuelEst ? '$' + Math.max(0, load.rate - totalFuelEst).toLocaleString() : '—';
+      var loadedFuelEst  = load.miles > 0 ? Math.round((load.miles / (defaults.mpg || 6.5)) * (defaults.fuelPrice || 4.25)) : 0;
+      var deadMilesEst   = load.deadheadMiles !== undefined ? load.deadheadMiles : 0;
+      var deadFuelEst    = deadMilesEst > 0 ? Math.round((deadMilesEst / (defaults.emptyMpg || 8.0)) * (defaults.fuelPrice || 4.25)) : 0;
+      var totalFuelEst   = loadedFuelEst + deadFuelEst;
+      var fuelDisplay    = totalFuelEst > 0 ? '-$' + totalFuelEst.toLocaleString() : (load.fuelCost || '—');
+      var fuelSubDisplay = deadFuelEst > 0 ? '$' + loadedFuelEst + ' loaded + $' + deadFuelEst + ' DH (' + Math.round(deadMilesEst) + ' mi)' : '';
+      var netEst         = load.rate && totalFuelEst ? '$' + Math.max(0, load.rate - totalFuelEst).toLocaleString() : '—';
 
-    return '<div class="load-card ' + cardClass + '" data-rate="' + (load.rate || 0) + '" data-miles="' + (load.miles || 0) + '">' +
-      '<div class="load-top load-card-clickable" onclick="toggleExpand(\'' + panelId + '\')">' +
-        '<div>' +
-          '<div class="load-route"><span class="expand-arrow" id="arrow_' + panelId + '">▼</span>' +
-            load.originCity + ', ' + load.originState + ' <span>→</span> ' + load.destCity + ', ' + load.destState +
+      return '<div class="load-card ' + cardClass + '" data-rate="' + (load.rate || 0) + '" data-miles="' + (load.miles || 0) + '">' +
+        '<div class="load-top load-card-clickable" onclick="toggleExpand(\'' + panelId + '\')">' +
+          '<div>' +
+            '<div class="load-route"><span class="expand-arrow" id="arrow_' + panelId + '">▼</span>' +
+              load.originCity + ', ' + load.originState + ' <span>→</span> ' + load.destCity + ', ' + load.destState +
+            '</div>' +
+            '<div style="margin-top:.3rem;"><span class="load-tag ' + tagClass + '">' + tagLabel + '</span></div>' +
           '</div>' +
-          '<div style="margin-top:.3rem;"><span class="load-tag ' + tagClass + '">' + tagLabel + '</span></div>' +
+          '<div style="text-align:right;"><div class="load-rate">' + rateDisplay + '</div><div class="load-rate-sub" style="color:var(--green);">' + netRpmDisplay + '</div></div>' +
         '</div>' +
-        '<div><div class="load-rate">' + rateDisplay + '</div><div class="load-rate-sub">' + rpmDisplay + '</div></div>' +
-      '</div>' +
-      '<div class="broker-info" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
-        '<span class="broker-name">' + (load.broker || 'Broker') + ':</span>' +
-        '<span class="broker-phone">📞 ' + (load.contactPhone || load.brokerPhone || '—') + '</span>' +
-      '</div>' +
-      '<div class="load-meta" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
-        '<div><div class="lm-label">Miles</div><div class="lm-val">' + (load.miles || '—') + '</div></div>' +
-        '<div><div class="lm-label">Weight</div><div class="lm-val">' + (load.weight ? load.weight.toLocaleString() + ' lb' : '—') + '</div></div>' +
-        '<div><div class="lm-label">Pickup</div><div class="lm-val">' + (load.pickupDate || '—') + '</div></div>' +
-      '</div>' +
-      '<div class="load-expand-panel" id="' + panelId + '" ' +
-        'data-pickup="' + load.originCity + ', ' + load.originState + '" ' +
-        'data-rate="' + (load.rate || 0) + '" ' +
-        'data-miles="' + (load.miles || 0) + '" ' +
-        'data-broker="' + (load.broker || '') + '" ' +
-        'data-dest="' + load.destCity + ', ' + load.destState + '">' +
-        '<div id="broker-badge_' + panelId + '" style="margin-bottom:.4rem;display:flex;gap:.4rem;flex-wrap:wrap;"></div>' +
-        '<div id="hos_' + panelId + '"></div>' +
-        '<div class="expand-profit-grid">' +
-          '<div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">' + rateDisplay + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_' + panelId + '">' + fuelDisplay + (fuelSubDisplay ? '<div style="font-size:.65rem;color:#b8c8b8;margin-top:.1rem;">' + fuelSubDisplay + '</div>' : '') + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_' + panelId + '">' + netEst + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val" id="npm_' + panelId + '">—</div></div>' +
-          '<div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">' + rpmDisplay + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">' + (load.miles || '—') + '</div></div>' +
+        '<div class="broker-info" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
+          '<span class="broker-name">' + (load.broker || 'Broker') + ':</span>' +
+          '<span class="broker-phone">📞 ' + (load.contactPhone || load.brokerPhone || '—') + '</span>' +
         '</div>' +
-        '<div class="expand-verdict" id="verdict_' + panelId + '">—</div>' +
-        '<div class="deadhead-alert" id="dh_' + panelId + '"></div>' +
-        '<div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>' +
-          '<div class="expand-notes-text" id="notes_' + panelId + '">' + (load.notes || load.specInfo || 'No special notes on this load.') + '</div>' +
+        '<div class="load-meta" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
+          '<div><div class="lm-label">Miles</div><div class="lm-val">' + (load.miles || '—') + '</div></div>' +
+          '<div><div class="lm-label">Weight</div><div class="lm-val">' + (load.weight ? load.weight.toLocaleString() + ' lb' : '—') + '</div></div>' +
+          '<div><div class="lm-label">Pickup</div><div class="lm-val">' + (load.pickupDate || '—') + '</div></div>' +
         '</div>' +
-      '</div>' +
-      '<div class="load-actions">' +
-        '<button class="load-action-btn call-btn" onclick="callBroker(\'' + (load.contactPhone || load.brokerPhone || '') + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
-        '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + (load.contactPhone || '') + '\')"><span class="btn-icon">✓</span>Book</button>' +
-        '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+        '<div class="load-expand-panel" id="' + panelId + '" ' +
+          'data-pickup="' + load.originCity + ', ' + load.originState + '" ' +
+          'data-rate="' + (load.rate || 0) + '" ' +
+          'data-miles="' + (load.miles || 0) + '" ' +
+          'data-broker="' + (load.broker || '') + '" ' +
+          'data-dest="' + load.destCity + ', ' + load.destState + '">' +
+          '<div id="broker-badge_' + panelId + '" style="margin-bottom:.4rem;display:flex;gap:.4rem;flex-wrap:wrap;"></div>' +
+          '<div id="hos_' + panelId + '"></div>' +
+          '<div class="expand-profit-grid">' +
+            '<div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">' + rateDisplay + '</div></div>' +
+            '<div class="expand-stat"><div class="expand-label">Est. Fuel</div><div class="expand-val red" id="fuel_' + panelId + '">' + fuelDisplay + (fuelSubDisplay ? '<div style="font-size:.65rem;color:#b8c8b8;margin-top:.1rem;">' + fuelSubDisplay + '</div>' : '') + '</div></div>' +
+            '<div class="expand-stat"><div class="expand-label">Net Profit</div><div class="expand-val green" id="net_' + panelId + '">' + netEst + '</div></div>' +
+            '<div class="expand-stat"><div class="expand-label">Net/Mile</div><div class="expand-val green">' + (load.netRpm > 0 ? '$' + load.netRpm.toFixed(2) : '—') + '</div></div>' +
+            '<div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">' + rpmDisplay + '</div></div>' +
+            '<div class="expand-stat"><div class="expand-label">Miles</div><div class="expand-val">' + (load.miles || '—') + '</div></div>' +
+          '</div>' +
+          '<div class="expand-verdict" id="verdict_' + panelId + '">—</div>' +
+          '<div class="deadhead-alert" id="dh_' + panelId + '"></div>' +
+          '<div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>' +
+            '<div class="expand-notes-text" id="notes_' + panelId + '">' + (load.notes || load.specInfo || 'No special notes on this load.') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="load-actions">' +
+          '<button class="load-action-btn call-btn" onclick="callBroker(\'' + (load.contactPhone || load.brokerPhone || '') + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
+          '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + (load.contactPhone || '') + '\')"><span class="btn-icon">✓</span>Book</button>' +
+          '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  var dashCards  = buildCards(dashLoads);
+  var allCards   = buildCards(allLoads);
 
   // Update hot loads count badge
   var hotBadge = document.querySelector('#screen-dash .card-header .load-tag');
-  if (hotBadge) hotBadge.textContent = hotCount + ' New';
+  if (hotBadge) hotBadge.textContent = hotCount + ' HOT';
 
-  // Inject into dash screen
+  // Inject into dash screen — top 15 only
   var dashCardBody = document.getElementById('dash-live-loads');
   if (dashCardBody) {
-    dashCardBody.innerHTML = hotCount > 0
-      ? cards
-      : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads matching your parameters right now. Checking every 5 minutes.</div></div>';
+    dashCardBody.innerHTML = allLoads.length > 0
+      ? dashCards
+      : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads near you right now. Checking every 5 minutes.</div></div>';
   }
 
-  // Inject into loads screen
+  // Inject into loads screen — all loads
   var loadsLive = document.getElementById('loads-screen-live');
-  if (loadsLive) {
-    loadsLive.innerHTML = cards;
-  }
+  if (loadsLive) loadsLive.innerHTML = allCards;
 
   // Re-inject profit bars
   injectProfitBars();
