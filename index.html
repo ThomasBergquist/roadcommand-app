@@ -276,8 +276,21 @@
       <div class="card-header"><div class="card-title">Equipment & Load</div></div>
       <div class="card-body">
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Max Weight (lbs)</label><input class="form-input" id="p-maxweight" value="44000"></div>
-          <div class="form-group"><label class="form-label">Max Deadhead (mi)</label><input class="form-input" id="p-maxdead" value="150"></div>
+          <div class="form-group"><label class="form-label">Max Weight (lbs)</label><input class="form-input" id="p-maxweight" type="number" placeholder="44000"></div>
+          <div class="form-group"><label class="form-label">Max Length (ft)</label><input class="form-input" id="p-maxlength" type="number" placeholder="53"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Max Deadhead (mi)</label><input class="form-input" id="p-maxdead" type="number" placeholder="150"></div>
+          <div class="form-group"><label class="form-label">Pickup Date</label>
+            <select class="form-select" id="p-pickup-date">
+              <option value="">Any Date</option>
+              <option value="today">Today</option>
+              <option value="tomorrow">Tomorrow</option>
+              <option value="2days">Within 2 Days</option>
+              <option value="3days">Within 3 Days</option>
+              <option value="week">This Week</option>
+            </select>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">

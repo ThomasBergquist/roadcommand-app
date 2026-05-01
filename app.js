@@ -268,9 +268,11 @@ function saveParams() {
   var minMiles  = parseFloat(document.getElementById('p-minmi')     && document.getElementById('p-minmi').value)     || 0;
   var maxMiles  = parseFloat(document.getElementById('p-maxmi')     && document.getElementById('p-maxmi').value)     || 9999;
   var maxDead   = parseFloat(document.getElementById('p-maxdead')   && document.getElementById('p-maxdead').value)   || 150;
-  var maxWeight = parseFloat(document.getElementById('p-maxweight') && document.getElementById('p-maxweight').value) || 48000;
+  var maxWeight = parseFloat(document.getElementById('p-maxweight') && document.getElementById('p-maxweight').value) || 0;
+  var maxLength = parseFloat(document.getElementById('p-maxlength') && document.getElementById('p-maxlength').value) || 0;
   var equipType = document.getElementById('p-equipment') ? document.getElementById('p-equipment').value : 'V';
   var loadType  = document.getElementById('p-loadtype')  ? document.getElementById('p-loadtype').value  : 'All';
+  var pickupDateFilter = document.getElementById('p-pickup-date') ? document.getElementById('p-pickup-date').value : '';
   var homeBase     = document.getElementById('p-home')    ? document.getElementById('p-home').value.trim()    : '';
   var originStates = document.getElementById('p-origins') ? document.getElementById('p-origins').value.trim() : 'WA';
   var destStates   = document.getElementById('p-dests')   ? document.getElementById('p-dests').value.trim()   : '';
@@ -284,10 +286,12 @@ function saveParams() {
   defaults.maxMiles    = maxMiles;
   defaults.maxDeadhead = maxDead;
   defaults.maxWeight   = maxWeight;
+  defaults.maxLength   = maxLength;
   defaults.fuelPrice   = fuel;
   defaults.mpg         = mpg;
-  window._rcEquipmentType = equipType;
-  window._rcLoadType = loadType;
+  window._rcEquipmentType      = equipType;
+  window._rcLoadType           = loadType;
+  window._rcPickupDateFilter   = pickupDateFilter;
 
   // Sync Settings screen RPM field
   var settingsRpm = document.getElementById('set-minrpm');
@@ -296,8 +300,8 @@ function saveParams() {
   // Save to localStorage
   try {
     localStorage.setItem('rc-params', JSON.stringify({
-      minRpm, minGross, minMiles, maxMiles, maxDead, maxWeight,
-      equipType, loadType, homeBase, originStates, destStates, fuel, mpg,
+      minRpm, minGross, minMiles, maxMiles, maxDead, maxWeight, maxLength,
+      equipType, loadType, pickupDateFilter, homeBase, originStates, destStates, fuel, mpg,
     }));
   } catch(e) {}
 
@@ -588,8 +592,10 @@ function loadSavedPreferences() {
       if (p.maxMiles !== undefined)   { defaults.maxMiles    = p.maxMiles;   var el = document.getElementById('p-maxmi');     if (el) el.value = p.maxMiles; }
       if (p.maxDead !== undefined)    { defaults.maxDeadhead = p.maxDead;    var el = document.getElementById('p-maxdead');   if (el) el.value = p.maxDead; }
       if (p.maxWeight !== undefined)  { defaults.maxWeight   = p.maxWeight;  var el = document.getElementById('p-maxweight'); if (el) el.value = p.maxWeight; }
+      if (p.maxLength !== undefined)  { defaults.maxLength   = p.maxLength;  var el = document.getElementById('p-maxlength'); if (el) el.value = p.maxLength; }
       if (p.equipType)  { window._rcEquipmentType = p.equipType; var el = document.getElementById('p-equipment'); if (el) el.value = p.equipType; }
       if (p.loadType)   { window._rcLoadType = p.loadType; var el = document.getElementById('p-loadtype');  if (el) el.value = p.loadType; }
+      if (p.pickupDateFilter !== undefined) { window._rcPickupDateFilter = p.pickupDateFilter; var el = document.getElementById('p-pickup-date'); if (el) el.value = p.pickupDateFilter; }
       if (p.homeBase)   { var el = document.getElementById('p-home');      if (el) el.value = p.homeBase; }
       if (p.originStates) { var el = document.getElementById('p-origins'); if (el) el.value = p.originStates; }
       if (p.destStates)   { var el = document.getElementById('p-dests');   if (el) el.value = p.destStates; }
@@ -614,17 +620,20 @@ async function savePreferencesToSupabase() {
   if (!window._rcUserId || !window._supabaseReady) return;
   try {
     await _supabase.from('user_preferences').upsert({
-      user_id:       window._rcUserId,
-      min_rpm:       defaults.minRpm       || 2.00,
-      min_gross:     defaults.minGross     || 1500,
-      min_miles:     defaults.minMiles     || 500,
-      max_miles:     defaults.maxMiles     || 2000,
-      max_deadhead:  defaults.maxDeadhead  || 150,
-      mpg:           defaults.mpg          || 6.5,
-      empty_mpg:     defaults.emptyMpg     || 8.0,
-      fuel_price:    defaults.fuelPrice    || 4.25,
-      equipment_type: window._rcEquipmentType || 'V',
-      updated_at:    new Date().toISOString(),
+      user_id:             window._rcUserId,
+      min_rpm:             defaults.minRpm       || 2.00,
+      min_gross:           defaults.minGross     || 0,
+      min_miles:           defaults.minMiles     || 0,
+      max_miles:           defaults.maxMiles     || 9999,
+      max_deadhead:        defaults.maxDeadhead  || 150,
+      max_weight:          defaults.maxWeight    || 0,
+      max_length:          defaults.maxLength    || 0,
+      mpg:                 defaults.mpg          || 6.5,
+      empty_mpg:           defaults.emptyMpg     || 8.0,
+      fuel_price:          defaults.fuelPrice    || 4.25,
+      equipment_type:      window._rcEquipmentType        || 'V',
+      pickup_date_filter:  window._rcPickupDateFilter     || '',
+      updated_at:          new Date().toISOString(),
     }, { onConflict: 'user_id' });
   } catch(err) { console.error('Error saving preferences:', err); }
 }
@@ -640,30 +649,41 @@ async function loadPreferencesFromSupabase() {
     if (error || !data) return;
 
     // Apply to defaults
-    if (data.min_rpm)      defaults.minRpm      = parseFloat(data.min_rpm);
-    if (data.min_gross)    defaults.minGross    = parseFloat(data.min_gross);
-    if (data.min_miles)    defaults.minMiles    = parseInt(data.min_miles);
-    if (data.max_miles)    defaults.maxMiles    = parseInt(data.max_miles);
-    if (data.max_deadhead) defaults.maxDeadhead = parseInt(data.max_deadhead);
-    if (data.mpg)          defaults.mpg         = parseFloat(data.mpg);
-    if (data.empty_mpg)    defaults.emptyMpg    = parseFloat(data.empty_mpg);
-    if (data.fuel_price)   defaults.fuelPrice   = parseFloat(data.fuel_price);
-    if (data.equipment_type) window._rcEquipmentType = data.equipment_type;
+    if (data.min_rpm)             defaults.minRpm      = parseFloat(data.min_rpm);
+    if (data.min_gross)           defaults.minGross    = parseFloat(data.min_gross);
+    if (data.min_miles)           defaults.minMiles    = parseInt(data.min_miles);
+    if (data.max_miles)           defaults.maxMiles    = parseInt(data.max_miles);
+    if (data.max_deadhead)        defaults.maxDeadhead = parseInt(data.max_deadhead);
+    if (data.max_weight)          defaults.maxWeight   = parseFloat(data.max_weight);
+    if (data.max_length)          defaults.maxLength   = parseFloat(data.max_length);
+    if (data.mpg)                 defaults.mpg         = parseFloat(data.mpg);
+    if (data.empty_mpg)           defaults.emptyMpg    = parseFloat(data.empty_mpg);
+    if (data.fuel_price)          defaults.fuelPrice   = parseFloat(data.fuel_price);
+    if (data.equipment_type)      window._rcEquipmentType     = data.equipment_type;
+    if (data.pickup_date_filter !== undefined) window._rcPickupDateFilter = data.pickup_date_filter;
 
     // Update UI fields
     var fields = {
-      'p-rpm':       data.min_rpm,
-      'set-minrpm':  data.min_rpm,
-      'p-gross':     data.min_gross,
-      'p-minmi':     data.min_miles,
-      'p-maxmi':     data.max_miles,
-      'p-maxdead':   data.max_deadhead,
-      'set-mpg':     data.mpg,
+      'p-rpm':         data.min_rpm,
+      'set-minrpm':    data.min_rpm,
+      'p-gross':       data.min_gross,
+      'p-minmi':       data.min_miles,
+      'p-maxmi':       data.max_miles,
+      'p-maxdead':     data.max_deadhead,
+      'p-maxweight':   data.max_weight,
+      'p-maxlength':   data.max_length,
+      'set-mpg':       data.mpg,
       'set-empty-mpg': data.empty_mpg,
-      'set-fuel':    data.fuel_price,
-      'calc-fuel':   data.fuel_price,
-      'calc-mpg':    data.mpg,
+      'set-fuel':      data.fuel_price,
+      'calc-fuel':     data.fuel_price,
+      'calc-mpg':      data.mpg,
     };
+    Object.keys(fields).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && fields[id] !== undefined && fields[id] !== null) el.value = fields[id];
+    });
+    if (data.equipment_type) { var el = document.getElementById('p-equipment'); if (el) el.value = data.equipment_type; }
+    if (data.pickup_date_filter !== undefined) { var el = document.getElementById('p-pickup-date'); if (el) el.value = data.pickup_date_filter; }
     Object.keys(fields).forEach(function(id) {
       var el = document.getElementById(id);
       if (el && fields[id]) el.value = fields[id];
@@ -3076,6 +3096,21 @@ function renderLiveLoadCards(loads, minRpm) {
   loads.sort(function(a, b) { return b.netRpm - a.netRpm; });
 
   // Classify hot vs watch based on parameters
+  var maxWeight = defaults.maxWeight || 0;
+  var maxLength = defaults.maxLength || 0;
+  var pickupFilter = window._rcPickupDateFilter || '';
+
+  // Calculate pickup date cutoff
+  var pickupCutoff = null;
+  if (pickupFilter) {
+    var today = new Date(); today.setHours(0,0,0,0);
+    if (pickupFilter === 'today')    pickupCutoff = new Date(today);
+    if (pickupFilter === 'tomorrow') { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 1); }
+    if (pickupFilter === '2days')    { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 2); }
+    if (pickupFilter === '3days')    { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 3); }
+    if (pickupFilter === 'week')     { pickupCutoff = new Date(today); pickupCutoff.setDate(pickupCutoff.getDate() + 7); }
+  }
+
   var hotLoads = loads.filter(function(l) {
     if (l.rate <= 0 || l.miles <= 0) return false;
     if (minGross > 0 && l.rate < minGross) return false;
@@ -3083,6 +3118,11 @@ function renderLiveLoadCards(loads, minRpm) {
     if (maxMiles < 9999 && l.miles > maxMiles) return false;
     if (l.rpm < minRpm) return false;
     if (maxWeight > 0 && l.weight > 0 && l.weight > maxWeight) return false;
+    if (maxLength > 0 && l.length > 0 && l.length > maxLength) return false;
+    if (pickupCutoff && l.pickupDate) {
+      var pd = new Date(l.pickupDate); pd.setHours(0,0,0,0);
+      if (pd > pickupCutoff) return false;
+    }
     return true;
   });
   var watchLoads = loads.filter(function(l) { return hotLoads.indexOf(l) < 0; });
