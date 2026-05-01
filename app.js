@@ -1545,6 +1545,25 @@ function haversineMiles(lat1, lon1, lat2, lon2) {
 
 var _cityCoordCache = {};
 
+function formatLoadNotes(notes) {
+  if (!notes || notes.trim() === '') return 'No special notes on this load.';
+  // Convert newlines to <br>, preserve all text
+  return notes
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>')
+    .replace(/\r/g, '');
+}
+
+function extractPhoneFromNotes(notes, fallbackPhone) {
+  if (!notes) return fallbackPhone || '';
+  // Look for phone patterns in notes: (xxx) xxx-xxxx or xxx-xxx-xxxx or xxxxxxxxxx
+  var phoneMatch = notes.match(/(\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4})/);
+  if (phoneMatch) return phoneMatch[1].replace(/\s/g, '-');
+  return fallbackPhone || '';
+}
+
 function getDeadheadMiles(pickupCity) {
   if (!window._gpsLat || !window._gpsLon) return 0;
   var key = pickupCity.toLowerCase().split(',')[0].trim();
@@ -3257,7 +3276,7 @@ function renderLiveLoadCards(loads, minRpm) {
       var tagClass  = isHot ? 'tag-hot' : 'tag-watch';
       var tagLabel  = isHot ? '🔥 Matches Parameters' : '👁 Below Parameters';
 
-      var panelId    = 'live_' + load.id;
+      var bestPhone = extractPhoneFromNotes(load.notes, load.contactPhone || load.brokerPhone || '');
       var rpmDisplay = load.rpm ? '$' + load.rpm.toFixed(2) + '/mi' : '—';
       var netRpmDisplay = load.netRpm > 0 ? '$' + load.netRpm.toFixed(2) + ' net/mi' : rpmDisplay;
       var rateDisplay = load.rate ? '$' + load.rate.toLocaleString() : 'Call';
@@ -3282,7 +3301,7 @@ function renderLiveLoadCards(loads, minRpm) {
         '</div>' +
         '<div class="broker-info" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
           '<span class="broker-name">' + (load.broker || 'Broker') + ':</span>' +
-          '<span class="broker-phone">📞 ' + (load.contactPhone || load.brokerPhone || '—') + '</span>' +
+          '<span class="broker-phone">📞 ' + (bestPhone || '—') + '</span>' +
         '</div>' +
         '<div class="load-meta" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
           '<div><div class="lm-label">Miles</div><div class="lm-val">' + (load.miles || '—') + '</div></div>' +
@@ -3308,12 +3327,14 @@ function renderLiveLoadCards(loads, minRpm) {
           '<div class="expand-verdict" id="verdict_' + panelId + '">—</div>' +
           '<div class="deadhead-alert" id="dh_' + panelId + '"></div>' +
           '<div class="expand-notes"><div class="expand-label" style="margin-bottom:.3rem;">📋 Load Notes</div>' +
-            '<div class="expand-notes-text" id="notes_' + panelId + '">' + (load.notes || load.specInfo || 'No special notes on this load.') + '</div>' +
+            '<div class="expand-notes-text" id="notes_' + panelId + '">' + 
+            formatLoadNotes(load.notes || load.specInfo || '') + 
+            '</div>' +
           '</div>' +
         '</div>' +
         '<div class="load-actions">' +
-          '<button class="load-action-btn call-btn" onclick="callBroker(\'' + (load.contactPhone || load.brokerPhone || '') + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
-          '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + (load.contactPhone || '') + '\')"><span class="btn-icon">✓</span>Book</button>' +
+          '<button class="load-action-btn call-btn" onclick="callBroker(\'' + bestPhone + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
+          '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + bestPhone + '\')"><span class="btn-icon">✓</span>Book</button>' +
           '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
         '</div>' +
       '</div>';
