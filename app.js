@@ -184,6 +184,14 @@ function showScreen(id, btn) {
     var moreBtn = document.getElementById('more-nav-btn');
     if (moreBtn) moreBtn.classList.add('active');
   }
+  // Re-render loads when navigating to dash or loads screen
+  if (id === 'dash' || id === 'loads') {
+    if (_liveLoadsCache && _liveLoadsCache.length > 0) {
+      setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 100);
+    } else {
+      setTimeout(function() { fetchTruckstopLoads(false); }, 100);
+    }
+  }
   track('tab_opened', { tab: id });
 }
 
@@ -3033,8 +3041,16 @@ async function fetchTruckstopLoads(forceRefresh) {
     if (allLoads.length > 0) {
       _liveLoadsCache = allLoads;
       _liveLoadsLastFetch = now;
-      renderLiveLoadCards(allLoads, minRpm);
-      track('live_loads_fetched', { count: allLoads.length, state: state });
+      // Wait for DOM containers to exist before rendering
+      var waitForDOM = setInterval(function() {
+        if (document.getElementById('dash-live-loads') || document.getElementById('loads-screen-live')) {
+          clearInterval(waitForDOM);
+          renderLiveLoadCards(allLoads, minRpm);
+          track('live_loads_fetched', { count: allLoads.length, state: state });
+        }
+      }, 200);
+      // Give up after 10 seconds
+      setTimeout(function() { clearInterval(waitForDOM); }, 10000);
     } else {
       showNoLoadsState(state);
     }
