@@ -3191,6 +3191,8 @@ function renderLiveLoadCards(loads, minRpm) {
     loads = loads.filter(function(l) {
       return l.deadheadMiles === 0 || l.deadheadMiles <= maxDead;
     });
+    // Update cache with filtered results so tab switches don't re-show filtered loads
+    _liveLoadsCache = loads;
   }
 
   // Calculate net RPM for each load (rate minus fuel / total miles)
