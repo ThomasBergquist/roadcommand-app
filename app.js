@@ -188,6 +188,10 @@ function showScreen(id, btn) {
   if ((id === 'dash' || id === 'loads') && _liveLoadsCache && _liveLoadsCache.length > 0) {
     setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 50);
   }
+  // Trigger national freight data when states tab opens
+  if (id === 'states') {
+    setTimeout(function() { fetchNationalStateData(); }, 100);
+  }
   track('tab_opened', { tab: id });
 }
 
@@ -3441,6 +3445,108 @@ async function fetchTruckstopLoads(forceRefresh) {
   _liveLoadsFetching = false;
 }
 // ── Render live load cards into both dash and loads screens ───────────────
+// ── National freight market data — queries all states for States tab ──────
+var _nationalStatsFetching = false;
+var _nationalStatsLastFetch = 0;
+
+async function fetchNationalStateData() {
+  // Only refresh once per 30 minutes
+  var now = Date.now();
+  if (_nationalStatsFetching) return;
+  if (_nationalStatsLastFetch && (now - _nationalStatsLastFetch) < 1800000) return;
+  _nationalStatsFetching = true;
+
+  var ALL_STATES = [
+    'WA','OR','ID','MT','WY','CA','NV','UT','CO','AZ','NM',
+    'TX','OK','KS','NE','SD','ND','MN','IA','MO','AR','LA',
+    'MS','AL','TN','KY','IN','IL','WI','MI','OH','WV','VA',
+    'NC','SC','GA','FL','PA','NY','NJ','CT','MA','ME','NH','VT','DE','MD'
+  ];
+
+  var STATE_NAMES = {
+    WA:'Washington',OR:'Oregon',ID:'Idaho',MT:'Montana',WY:'Wyoming',
+    CA:'California',NV:'Nevada',UT:'Utah',CO:'Colorado',AZ:'Arizona',
+    NM:'New Mexico',TX:'Texas',OK:'Oklahoma',KS:'Kansas',NE:'Nebraska',
+    SD:'South Dakota',ND:'North Dakota',MN:'Minnesota',IA:'Iowa',
+    MO:'Missouri',AR:'Arkansas',LA:'Louisiana',MS:'Mississippi',
+    AL:'Alabama',TN:'Tennessee',KY:'Kentucky',IN:'Indiana',IL:'Illinois',
+    WI:'Wisconsin',MI:'Michigan',OH:'Ohio',WV:'West Virginia',VA:'Virginia',
+    NC:'North Carolina',SC:'South Carolina',GA:'Georgia',FL:'Florida',
+    PA:'Pennsylvania',NY:'New York',NJ:'New Jersey',CT:'Connecticut',
+    MA:'Massachusetts',ME:'Maine',NH:'New Hampshire',VT:'Vermont',
+    DE:'Delaware',MD:'Maryland'
+  };
+
+  var equipType = (window._rcEquipmentType || 'V').split(',')[0].trim();
+  var statMap = {};
+
+  // Show loading indicator on states tab
+  var list = document.getElementById('state-list');
+  if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">🔄 Loading national freight data...</div>';
+
+  // Query states in batches of 8 parallel requests to avoid hammering the API
+  var BATCH_SIZE = 8;
+  for (var b = 0; b < ALL_STATES.length; b += BATCH_SIZE) {
+    var batch = ALL_STATES.slice(b, b + BATCH_SIZE);
+    var promises = batch.map(function(st) {
+      var url = _tsWorkerUrl + '/search' +
+        '?originState='   + encodeURIComponent(st) +
+        '&originCity='    + '' +
+        '&equipmentType=' + encodeURIComponent(equipType) +
+        '&hoursOld=24' +
+        '&pageSize=50' +
+        '&originRange=999' +
+        '&loadType=All';
+      return fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.success || !data.loads) return;
+          data.loads.forEach(function(l) {
+            if (!l.originState || l.rate <= 0 || l.miles <= 0) return;
+            var s = l.originState.toUpperCase().trim();
+            if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
+            statMap[s].volume++;
+            statMap[s].rpmSum   += l.rate / l.miles;
+            statMap[s].rpmCount += 1;
+          });
+        })
+        .catch(function() {}); // silently skip failed states
+    });
+    await Promise.all(promises);
+    // Small pause between batches to be polite to the API
+    if (b + BATCH_SIZE < ALL_STATES.length) {
+      await new Promise(function(resolve) { setTimeout(resolve, 300); });
+    }
+  }
+
+  // Build stateData array from results
+  var updated = Object.keys(statMap).map(function(code) {
+    var s = statMap[code];
+    var avgRpm = s.rpmCount > 0 ? s.rpmSum / s.rpmCount : 0;
+    var existing = stateData.find(function(x) { return x.code === code; });
+    var trend = existing ? existing.trend : 'flat';
+    return {
+      code:   code,
+      name:   STATE_NAMES[code] || code,
+      volume: s.volume,
+      rpm:    parseFloat(avgRpm.toFixed(2)),
+      trend:  trend,
+      maxVol: 0
+    };
+  });
+
+  if (updated.length > 0) {
+    var maxVol = Math.max.apply(null, updated.map(function(s) { return s.volume; }));
+    updated.forEach(function(s) { s.maxVol = maxVol; });
+    updated.sort(function(a, b) { return b.volume - a.volume; });
+    stateData = updated;
+    renderStates(stateData);
+    _nationalStatsLastFetch = Date.now();
+  }
+
+  _nationalStatsFetching = false;
+}
+
 function updateStatesFromLoads(loads) {
   var statMap = {};
   loads.forEach(function(l) {
@@ -4016,6 +4122,8 @@ onAuthReady = function(firstName, userId, email) {
         registerPushSubscription();
         saveLoadAlertPrefs();
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
+        // Fire national state data fetch in background — powers States tab
+        setTimeout(function() { fetchNationalStateData(); }, 2000);
       }).catch(function() {
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
       });
