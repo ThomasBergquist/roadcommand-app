@@ -1611,10 +1611,16 @@ async function geocodeCityAsync(key, fullCityStr) {
       var coords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
       _cityCoordCache[key] = coords;
       CITY_COORDS[key] = coords;
-      // Persist to localStorage so it survives refreshes
       try { localStorage.setItem('rc-geocache', JSON.stringify(_cityCoordCache)); } catch(e) {}
+      // Re-render loads with updated deadhead now that we have coords
+      if (_liveLoadsCache.length > 0) {
+        clearTimeout(window._geocodeRerenderTimer);
+        window._geocodeRerenderTimer = setTimeout(function() {
+          renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+        }, 1000); // debounce — wait 1s for multiple geocodes to batch
+      }
     } else {
-      delete _cityCoordCache[key]; // allow retry
+      delete _cityCoordCache[key];
     }
   } catch(e) {
     delete _cityCoordCache[key];
