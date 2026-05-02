@@ -3475,13 +3475,13 @@ function renderLiveLoadCards(loads, minRpm) {
     _liveLoadsCache = loads;
   }
 
-  // Calculate net RPM for each load (rate minus fuel / total miles)
+  // Calculate net RPM for each load (rate minus all fuel / loaded miles only)
+  // Deadhead cost is already subtracted from net profit — dividing by loaded miles only avoids double-penalizing deadhead
   loads.forEach(function(l) {
     if (l.rate > 0 && l.miles > 0) {
       var loadedFuel = Math.round((l.miles / mpg) * fuelPrice);
       var deadFuel   = l.deadheadMiles > 0 ? Math.round((l.deadheadMiles / emptyMpg) * fuelPrice) : 0;
-      var totalMiles = l.miles + (l.deadheadMiles || 0);
-      l.netRpm = parseFloat(((l.rate - loadedFuel - deadFuel) / totalMiles).toFixed(2));
+      l.netRpm = parseFloat(((l.rate - loadedFuel - deadFuel) / l.miles).toFixed(2));
     } else {
       l.netRpm = 0;
     }
