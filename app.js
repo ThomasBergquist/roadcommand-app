@@ -3474,7 +3474,7 @@ async function fetchNationalStateData() {
 
   var equipType = (window._rcEquipmentType || 'V').split(',')[0].trim();
   var statMap = {};
-  var BATCH_SIZE = 8;
+  var BATCH_SIZE = 4; // conservative — Truckstop rate limits aggressive parallel requests
 
   var list = document.getElementById('state-list');
   if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">Loading national freight data...</div>';
@@ -3495,7 +3495,7 @@ async function fetchNationalStateData() {
       }).catch(function() {});
     });
     await Promise.all(p1);
-    if (b + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 200); });
+    if (b + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 1000); });
   }
 
   // Show real volumes immediately while RPM data loads
@@ -3537,7 +3537,7 @@ async function fetchNationalStateData() {
       }).catch(function() {});
     });
     await Promise.all(p2);
-    if (b2 + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 200); });
+    if (b2 + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 1000); });
   }
 
   // Final render: real volume + real avg RPM
