@@ -1451,15 +1451,153 @@ function saveMaintItem() {
 // ══════════════════════════════════════════════════════════════
 // GPS DEADHEAD CALCULATOR
 // ══════════════════════════════════════════════════════════════
-// ── City coordinate cache ─────────────────────────────────────────────────
-// Seed with common cities for fast lookup — unknown cities geocoded via Nominatim
+// ── Shared City Coordinate System ────────────────────────────────────────
+// Reads from Supabase city_coords table (shared across all users)
+// Contributes new geocodes back to the table for everyone
 var _cityCoordCache = {};
+var _supabaseCoordsLoaded = false;
+var _lastGPSCity = '';
 
-// Load persisted geocode cache from localStorage on startup
+// Load persisted local cache as fast fallback
 try {
   var _savedGeoCache = localStorage.getItem('rc-geocache');
   if (_savedGeoCache) _cityCoordCache = JSON.parse(_savedGeoCache);
 } catch(e) {}
+
+// Load shared coords from Supabase on startup
+async function loadSharedCityCoords() {
+  if (!window._supabaseReady || !window._supabase) return;
+  try {
+    var { data, error } = await _supabase
+      .from('city_coords')
+      .select('city_key, state_code, lat, lon');
+    if (error || !data) return;
+    data.forEach(function(row) {
+      var key = row.city_key;
+      var coords = [parseFloat(row.lat), parseFloat(row.lon)];
+      _cityCoordCache[key] = coords;
+      CITY_COORDS[key] = coords;
+    });
+    _supabaseCoordsLoaded = true;
+    // Persist to localStorage for offline use
+    try { localStorage.setItem('rc-geocache', JSON.stringify(_cityCoordCache)); } catch(e) {}
+    console.log('Loaded ' + data.length + ' city coords from shared database');
+  } catch(err) {
+    console.error('Error loading city coords:', err);
+  }
+}
+
+// Save a new city coord to Supabase shared table
+async function saveSharedCityCoord(key, cityName, stateCode, lat, lon, source) {
+  if (!window._supabaseReady || !window._supabase) return;
+  try {
+    await _supabase.from('city_coords').insert({
+      city_key:   key,
+      city_name:  cityName,
+      state_code: stateCode || '',
+      lat:        lat,
+      lon:        lon,
+      source:     source || 'geocode',
+    });
+  } catch(err) {
+    // Ignore unique constraint violations (city already exists)
+  }
+}
+
+// Geocode an unknown city via Nominatim and save to shared table
+async function geocodeCityAsync(key, fullCityStr, stateCode) {
+  if (_cityCoordCache[key] !== undefined) return;
+  _cityCoordCache[key] = null; // mark as pending
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
+      encodeURIComponent(fullCityStr + ', USA') + '&limit=1';
+    var res  = await fetch(url);
+    var data = await res.json();
+    if (data && data[0]) {
+      var lat    = parseFloat(data[0].lat);
+      var lon    = parseFloat(data[0].lon);
+      var coords = [lat, lon];
+      _cityCoordCache[key] = coords;
+      CITY_COORDS[key] = coords;
+      // Save to localStorage for this device
+      try { localStorage.setItem('rc-geocache', JSON.stringify(_cityCoordCache)); } catch(e) {}
+      // Save to shared Supabase table for all users
+      var cityName = fullCityStr.split(',')[0].trim();
+      saveSharedCityCoord(key, cityName, stateCode || '', lat, lon, 'geocode');
+      // Re-render loads with updated deadhead
+      if (_liveLoadsCache.length > 0) {
+        clearTimeout(window._geocodeRerenderTimer);
+        window._geocodeRerenderTimer = setTimeout(function() {
+          renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+        }, 1000);
+      }
+    } else {
+      delete _cityCoordCache[key];
+    }
+  } catch(e) {
+    delete _cityCoordCache[key];
+  }
+}
+
+// Seed shared table with built-in coords on first load (runs once)
+async function seedSharedCityCoords() {
+  if (!window._supabaseReady || !window._supabase) return;
+  if (localStorage.getItem('rc-coords-seeded')) return;
+  try {
+    var rows = Object.keys(CITY_COORDS).map(function(key) {
+      return {
+        city_key:   key,
+        city_name:  key.replace(/\b\w/g, function(c) { return c.toUpperCase(); }),
+        state_code: '',
+        lat:        CITY_COORDS[key][0],
+        lon:        CITY_COORDS[key][1],
+        source:     'seed',
+      };
+    });
+    // Insert in batches of 50
+    for (var i = 0; i < rows.length; i += 50) {
+      await _supabase.from('city_coords').insert(rows.slice(i, i + 50));
+    }
+    localStorage.setItem('rc-coords-seeded', '1');
+    console.log('Seeded', rows.length, 'cities to shared database');
+  } catch(e) { console.error('Seed error:', e); }
+}
+
+var _lastGPSCollectTime = 0;
+async function collectGPSCityCoord(lat, lon) {
+  // Only collect every 5 minutes max
+  var now = Date.now();
+  if (now - _lastGPSCollectTime < 300000) return;
+  _lastGPSCollectTime = now;
+
+  try {
+    var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' +
+      lat + '&lon=' + lon + '&zoom=10';
+    var res  = await fetch(url);
+    var data = await res.json();
+    if (!data || !data.address) return;
+
+    var addr      = data.address;
+    var cityName  = addr.city || addr.town || addr.village || addr.hamlet || addr.municipality || '';
+    var stateCode = addr['ISO3166-2-lvl4'] ? addr['ISO3166-2-lvl4'].replace('US-','') : '';
+
+    if (!cityName) return;
+
+    var key = cityName.toLowerCase().trim();
+
+    // Only save if not already known
+    if (CITY_COORDS[key]) return;
+    if (_cityCoordCache[key]) return;
+
+    // Save to cache and shared table
+    var coords = [lat, lon];
+    _cityCoordCache[key] = coords;
+    CITY_COORDS[key] = coords;
+    try { localStorage.setItem('rc-geocache', JSON.stringify(_cityCoordCache)); } catch(e) {}
+    saveSharedCityCoord(key, cityName, stateCode, lat, lon, 'gps');
+    console.log('GPS collected new city:', cityName, stateCode);
+  } catch(e) {}
+}
 
 var CITY_COORDS = {
   // Washington — common load origins
@@ -1473,6 +1611,8 @@ var CITY_COORDS = {
   "tukwila":[47.4740,-122.2615],"vancouver":[45.6387,-122.6615],"longview":[46.1382,-122.9382],
   "kelso":[46.1468,-122.9043],"centralia":[46.7182,-122.9543],"chehalis":[46.6618,-122.9651],
   "napavine":[46.5693,-122.9051],"winlock":[46.4943,-122.9376],"shelton":[47.2154,-123.1007],
+  "colville":[48.5466,-117.9055],"everson":[48.9201,-122.3426],"kalama":[46.0085,-122.8425],
+  "kettle falls":[48.6105,-118.0563],"chehalis":[46.6618,-122.9651],"centralia":[46.7182,-122.9543],
   "bremerton":[47.5673,-122.6329],"port angeles":[48.1182,-123.4307],"anacortes":[48.5126,-122.6126],
   "mount vernon":[48.4204,-122.3343],"oak harbor":[48.2932,-122.6451],"lakeview":[47.2293,-119.4976],
   "othello":[46.8265,-119.1756],"quincy":[47.2343,-119.8526],"ephrata":[47.3176,-119.5518],
@@ -1526,8 +1666,6 @@ function haversineMiles(lat1, lon1, lat2, lon2) {
   var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1.15);
 }
-
-var _cityCoordCache = {};
 
 function formatLoadNotes(notes) {
   if (!notes || notes.trim() === '') return 'No special notes on this load.';
@@ -3431,6 +3569,10 @@ function showNoLoadsState(state) {
 var _origUpdateWeatherForState = updateWeatherForState;
 updateWeatherForState = function(stateCode) {
   _origUpdateWeatherForState(stateCode);
+  // Collect GPS city for shared database
+  if (window._gpsLat && window._gpsLon) {
+    collectGPSCityCoord(window._gpsLat, window._gpsLon);
+  }
   setTimeout(function() { fetchTruckstopLoads(false); }, 500);
 };
 
@@ -3738,18 +3880,20 @@ onAuthReady = function(firstName, userId, email) {
   var waitForSupabase = setInterval(function() {
     if (window._supabaseReady && window._supabase) {
       clearInterval(waitForSupabase);
-      // Load preferences then fetch loads
-      loadPreferencesFromSupabase().then(function() {
+      // Load shared city coords first, then preferences, then loads
+      loadSharedCityCoords().then(function() {
+        seedSharedCityCoords(); // seed built-in coords if not done yet
+        return loadPreferencesFromSupabase();
+      }).then(function() {
         registerPushSubscription();
         saveLoadAlertPrefs();
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
       }).catch(function() {
-        // If prefs fail, still fetch loads with defaults
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
       });
     }
   }, 500);
-  // Fallback — fetch loads after 8 seconds regardless of Supabase state
+  // Fallback fetch after 8 seconds
   setTimeout(function() {
     if (_liveLoadsCache.length === 0) {
       console.log('Fallback load fetch firing');
