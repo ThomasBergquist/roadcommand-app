@@ -1554,14 +1554,14 @@ async function loadSharedCityCoords() {
 async function saveSharedCityCoord(key, cityName, stateCode, lat, lon, source) {
   if (!window._supabaseReady || !window._supabase) return;
   try {
-    await _supabase.from('city_coords').insert({
+    await _supabase.from('city_coords').upsert({
       city_key:   key,
       city_name:  cityName,
       state_code: stateCode || '',
       lat:        lat,
       lon:        lon,
       source:     source || 'geocode',
-    });
+    }, { onConflict: 'city_key' });
   } catch(err) {
     // Ignore unique constraint violations (city already exists)
   }
@@ -1605,7 +1605,7 @@ async function geocodeCityAsync(key, fullCityStr, stateCode) {
 // Seed shared table with built-in coords on first load (runs once)
 async function seedSharedCityCoords() {
   if (!window._supabaseReady || !window._supabase) return;
-  if (localStorage.getItem('rc-coords-seeded')) return;
+  if (localStorage.getItem('rc-coords-seeded-v2')) return;
   try {
     var rows = Object.keys(CITY_COORDS).map(function(key) {
       return {
@@ -1617,11 +1617,11 @@ async function seedSharedCityCoords() {
         source:     'seed',
       };
     });
-    // Insert in batches of 50
+    // Upsert in batches of 50 — safe to re-run, never conflicts
     for (var i = 0; i < rows.length; i += 50) {
-      await _supabase.from('city_coords').insert(rows.slice(i, i + 50));
+      await _supabase.from('city_coords').upsert(rows.slice(i, i + 50), { onConflict: 'city_key' });
     }
-    localStorage.setItem('rc-coords-seeded', '1');
+    localStorage.setItem('rc-coords-seeded-v2', '1');
     console.log('Seeded', rows.length, 'cities to shared database');
   } catch(e) { console.error('Seed error:', e); }
 }
@@ -4009,7 +4009,8 @@ onAuthReady = function(firstName, userId, email) {
       clearInterval(waitForSupabase);
       // Load shared city coords first, then preferences, then loads
       loadSharedCityCoords().then(function() {
-        seedSharedCityCoords(); // seed built-in coords if not done yet
+        // Seed runs in background — does NOT block load fetch
+        seedSharedCityCoords();
         return loadPreferencesFromSupabase();
       }).then(function() {
         registerPushSubscription();
@@ -4020,11 +4021,11 @@ onAuthReady = function(firstName, userId, email) {
       });
     }
   }, 500);
-  // Fallback fetch after 8 seconds
+  // Fallback fetch — extended to 20s so it only fires if the chain truly stalls
   setTimeout(function() {
     if (_liveLoadsCache.length === 0) {
       console.log('Fallback load fetch firing');
       fetchTruckstopLoads(true);
     }
-  }, 8000);
+  }, 20000);
 };
