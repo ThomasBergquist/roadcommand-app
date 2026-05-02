@@ -3412,7 +3412,7 @@ async function fetchTruckstopLoads(forceRefresh) {
     '&originCity='    + encodeURIComponent(city) +
     '&equipmentType=' + encodeURIComponent(equipType) +
     '&hoursOld=24' +
-    '&pageSize=50' +
+    '&pageSize=200' +
     '&originRange='   + maxDead +
     '&loadType='      + encodeURIComponent(loadType);
 
@@ -3425,7 +3425,11 @@ async function fetchTruckstopLoads(forceRefresh) {
       _liveLoadsCache     = loads;
       _liveLoadsLastFetch = now;
       renderLiveLoadCards(loads, minRpm);
+      updateStatesFromLoads(loads);
       track('live_loads_fetched', { count: loads.length, state: state });
+    } else if (_liveLoadsCache.length > 0) {
+      // Worker returned empty/error but we have cached loads — show those rather than blank
+      renderLiveLoadCards(_liveLoadsCache, minRpm);
     } else {
       showNoLoadsState(state);
     }
@@ -3437,6 +3441,45 @@ async function fetchTruckstopLoads(forceRefresh) {
   _liveLoadsFetching = false;
 }
 // ── Render live load cards into both dash and loads screens ───────────────
+function updateStatesFromLoads(loads) {
+  var statMap = {};
+  loads.forEach(function(l) {
+    if (!l.originState || l.rate <= 0 || l.miles <= 0) return;
+    var s = l.originState.toUpperCase().trim();
+    if (!statMap[s]) statMap[s] = { code: s, volume: 0, rpmSum: 0, rpmCount: 0 };
+    statMap[s].volume++;
+    var rpm = l.rate / l.miles;
+    statMap[s].rpmSum   += rpm;
+    statMap[s].rpmCount += 1;
+  });
+  var STATE_NAMES = {
+    WA:'Washington',OR:'Oregon',ID:'Idaho',CA:'California',NV:'Nevada',
+    MT:'Montana',WY:'Wyoming',UT:'Utah',CO:'Colorado',AZ:'Arizona',
+    NM:'New Mexico',TX:'Texas',OK:'Oklahoma',KS:'Kansas',NE:'Nebraska',
+    SD:'South Dakota',ND:'North Dakota',MN:'Minnesota',IA:'Iowa',
+    MO:'Missouri',AR:'Arkansas',LA:'Louisiana',MS:'Mississippi',
+    AL:'Alabama',TN:'Tennessee',KY:'Kentucky',IN:'Indiana',IL:'Illinois',
+    WI:'Wisconsin',MI:'Michigan',OH:'Ohio',WV:'West Virginia',VA:'Virginia',
+    NC:'North Carolina',SC:'South Carolina',GA:'Georgia',FL:'Florida',
+    PA:'Pennsylvania',NY:'New York',NJ:'New Jersey',CT:'Connecticut',
+    MA:'Massachusetts',RI:'Rhode Island',NH:'New Hampshire',VT:'Vermont',
+    ME:'Maine',DE:'Delaware',MD:'Maryland',DC:'DC'
+  };
+  var updated = Object.keys(statMap).map(function(code) {
+    var s = statMap[code];
+    var avgRpm = s.rpmCount > 0 ? s.rpmSum / s.rpmCount : 0;
+    var existing = stateData.find(function(x) { return x.code === code; });
+    var trend = existing ? existing.trend : 'flat';
+    return { code:code, name:STATE_NAMES[code]||code, volume:s.volume, rpm:parseFloat(avgRpm.toFixed(2)), trend:trend, maxVol:0 };
+  });
+  if (updated.length === 0) return;
+  var maxVol = Math.max.apply(null, updated.map(function(s) { return s.volume; }));
+  updated.forEach(function(s) { s.maxVol = maxVol; });
+  updated.sort(function(a, b) { return b.volume - a.volume; });
+  stateData = updated;
+  renderStates(stateData);
+}
+
 function renderLiveLoadCards(loads, minRpm) {
   minRpm = minRpm || defaults.minRpm || 2.00;
   var minGross  = defaults.minGross    || 0;
