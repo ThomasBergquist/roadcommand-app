@@ -1621,7 +1621,7 @@ async function seedSharedCityCoords() {
         source:     'seed',
       };
     });
-    // Upsert in batches of 50 — safe to re-run, never conflicts
+    // Insert in batches of 50
     for (var i = 0; i < rows.length; i += 50) {
       await _supabase.from('city_coords').upsert(rows.slice(i, i + 50), { onConflict: 'city_key' });
     }
@@ -2798,7 +2798,7 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
   var totalFuel  = loadedFuel + deadFuel;
   var net        = rate - totalFuel;
   var rpm        = parseFloat((rate / miles).toFixed(2));
-  var netPerMile = parseFloat((net / (miles + deadMiles)).toFixed(2));
+  var netPerMile = parseFloat((net / miles).toFixed(2)); // loaded miles only — deadhead cost already in numerator
   var minRpm     = defaults.minRpm || 2.00;
   var minGross   = defaults.minGross || 1500;
 
@@ -3380,7 +3380,6 @@ async function fetchTruckstopLoads(forceRefresh) {
   if (_liveLoadsFetching) {
     var timeSinceFetch = Date.now() - (_liveLoadsLastFetch || 0);
     if (timeSinceFetch < 10000) {
-      // Still in-progress or stuck — never leave screen blank, re-render what we have
       if (_liveLoadsCache.length > 0) renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
       return;
     }
@@ -3393,9 +3392,8 @@ async function fetchTruckstopLoads(forceRefresh) {
     return;
   }
 
-  // Committed to a real fetch — now safe to show loading state
+  // Committed to a real fetch — now safe to wipe screen
   _liveLoadsFetching = true;
-  // Safety reset after 15 seconds no matter what
   setTimeout(function() { _liveLoadsFetching = false; }, 15000);
 
   var state    = currentState || 'WA';
@@ -3432,7 +3430,6 @@ async function fetchTruckstopLoads(forceRefresh) {
       updateStatesFromLoads(loads);
       track('live_loads_fetched', { count: loads.length, state: state });
     } else if (_liveLoadsCache.length > 0) {
-      // Worker returned empty/error but we have cached loads — show those rather than blank
       renderLiveLoadCards(_liveLoadsCache, minRpm);
     } else {
       showNoLoadsState(state);
@@ -3445,12 +3442,11 @@ async function fetchTruckstopLoads(forceRefresh) {
   _liveLoadsFetching = false;
 }
 // ── Render live load cards into both dash and loads screens ───────────────
-// ── National freight market data — queries all states for States tab ──────
+// ── National freight market data — two-pass: real volume + avg RPM ─────────
 var _nationalStatsFetching = false;
 var _nationalStatsLastFetch = 0;
 
 async function fetchNationalStateData() {
-  // Only refresh once per 30 minutes
   var now = Date.now();
   if (_nationalStatsFetching) return;
   if (_nationalStatsLastFetch && (now - _nationalStatsLastFetch) < 1800000) return;
@@ -3462,7 +3458,6 @@ async function fetchNationalStateData() {
     'MS','AL','TN','KY','IN','IL','WI','MI','OH','WV','VA',
     'NC','SC','GA','FL','PA','NY','NJ','CT','MA','ME','NH','VT','DE','MD'
   ];
-
   var STATE_NAMES = {
     WA:'Washington',OR:'Oregon',ID:'Idaho',MT:'Montana',WY:'Wyoming',
     CA:'California',NV:'Nevada',UT:'Utah',CO:'Colorado',AZ:'Arizona',
@@ -3479,58 +3474,83 @@ async function fetchNationalStateData() {
 
   var equipType = (window._rcEquipmentType || 'V').split(',')[0].trim();
   var statMap = {};
-
-  // Show loading indicator on states tab
-  var list = document.getElementById('state-list');
-  if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">🔄 Loading national freight data...</div>';
-
-  // Query states in batches of 8 parallel requests to avoid hammering the API
   var BATCH_SIZE = 8;
+
+  var list = document.getElementById('state-list');
+  if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">Loading national freight data...</div>';
+
+  // PASS 1: countOnly=true — real TotalCount from Truckstop, one cheap call per state
   for (var b = 0; b < ALL_STATES.length; b += BATCH_SIZE) {
     var batch = ALL_STATES.slice(b, b + BATCH_SIZE);
-    var promises = batch.map(function(st) {
+    var p1 = batch.map(function(st) {
       var url = _tsWorkerUrl + '/search' +
-        '?originState='   + encodeURIComponent(st) +
-        '&originCity='    + '' +
-        '&equipmentType=' + encodeURIComponent(equipType) +
-        '&hoursOld=24' +
-        '&pageSize=50' +
-        '&originRange=999' +
-        '&loadType=All';
-      return fetch(url)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data.success || !data.loads) return;
-          data.loads.forEach(function(l) {
-            if (!l.originState || l.rate <= 0 || l.miles <= 0) return;
-            var s = l.originState.toUpperCase().trim();
-            if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
-            statMap[s].volume++;
-            statMap[s].rpmSum   += l.rate / l.miles;
-            statMap[s].rpmCount += 1;
-          });
-        })
-        .catch(function() {}); // silently skip failed states
+        '?originState=' + encodeURIComponent(st) +
+        '&originCity=&equipmentType=' + encodeURIComponent(equipType) +
+        '&hoursOld=24&pageSize=1&originRange=999&loadType=All&countOnly=true';
+      return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.success) return;
+        var s = st.toUpperCase();
+        if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
+        statMap[s].volume = data.totalCount || data.count || 0;
+      }).catch(function() {});
     });
-    await Promise.all(promises);
-    // Small pause between batches to be polite to the API
-    if (b + BATCH_SIZE < ALL_STATES.length) {
-      await new Promise(function(resolve) { setTimeout(resolve, 300); });
+    await Promise.all(p1);
+    if (b + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 200); });
+  }
+
+  // Show real volumes immediately while RPM data loads
+  var interim = Object.keys(statMap).map(function(code) {
+    return { code: code, name: STATE_NAMES[code] || code, volume: statMap[code].volume, rpm: 0, trend: 'flat', maxVol: 0 };
+  });
+  if (interim.length > 0) {
+    var maxV = Math.max.apply(null, interim.map(function(s) { return s.volume; }));
+    interim.forEach(function(s) { s.maxVol = maxV; });
+    interim.sort(function(a, b) { return b.volume - a.volume; });
+    stateData = interim;
+    renderStates(stateData);
+    if (list && list.firstChild) {
+      var notice = document.createElement('div');
+      notice.style.cssText = 'padding:.4rem 1rem;text-align:center;color:#b8c8b8;font-size:.75rem;';
+      notice.textContent = 'Loading avg RPM data...';
+      list.insertBefore(notice, list.firstChild);
     }
   }
 
-  // Build stateData array from results
+  // PASS 2: top 200 loads per state for avg RPM
+  for (var b2 = 0; b2 < ALL_STATES.length; b2 += BATCH_SIZE) {
+    var batch2 = ALL_STATES.slice(b2, b2 + BATCH_SIZE);
+    var p2 = batch2.map(function(st) {
+      var url = _tsWorkerUrl + '/search' +
+        '?originState=' + encodeURIComponent(st) +
+        '&originCity=&equipmentType=' + encodeURIComponent(equipType) +
+        '&hoursOld=24&pageSize=200&originRange=999&loadType=All&sortBy=Rate&sortDescending=true';
+      return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.success || !data.loads) return;
+        var s = st.toUpperCase();
+        if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
+        data.loads.forEach(function(l) {
+          if (l.rate > 0 && l.miles > 0) {
+            statMap[s].rpmSum   += l.rate / l.miles;
+            statMap[s].rpmCount += 1;
+          }
+        });
+      }).catch(function() {});
+    });
+    await Promise.all(p2);
+    if (b2 + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 200); });
+  }
+
+  // Final render: real volume + real avg RPM
   var updated = Object.keys(statMap).map(function(code) {
     var s = statMap[code];
     var avgRpm = s.rpmCount > 0 ? s.rpmSum / s.rpmCount : 0;
     var existing = stateData.find(function(x) { return x.code === code; });
-    var trend = existing ? existing.trend : 'flat';
     return {
       code:   code,
       name:   STATE_NAMES[code] || code,
       volume: s.volume,
       rpm:    parseFloat(avgRpm.toFixed(2)),
-      trend:  trend,
+      trend:  existing ? existing.trend : 'flat',
       maxVol: 0
     };
   });
@@ -3547,15 +3567,15 @@ async function fetchNationalStateData() {
   _nationalStatsFetching = false;
 }
 
+// ── Build real state stats from live local loads ────────────────────────
 function updateStatesFromLoads(loads) {
   var statMap = {};
   loads.forEach(function(l) {
     if (!l.originState || l.rate <= 0 || l.miles <= 0) return;
     var s = l.originState.toUpperCase().trim();
-    if (!statMap[s]) statMap[s] = { code: s, volume: 0, rpmSum: 0, rpmCount: 0 };
+    if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
     statMap[s].volume++;
-    var rpm = l.rate / l.miles;
-    statMap[s].rpmSum   += rpm;
+    statMap[s].rpmSum   += l.rate / l.miles;
     statMap[s].rpmCount += 1;
   });
   var STATE_NAMES = {
@@ -3576,7 +3596,7 @@ function updateStatesFromLoads(loads) {
     var avgRpm = s.rpmCount > 0 ? s.rpmSum / s.rpmCount : 0;
     var existing = stateData.find(function(x) { return x.code === code; });
     var trend = existing ? existing.trend : 'flat';
-    return { code:code, name:STATE_NAMES[code]||code, volume:s.volume, rpm:parseFloat(avgRpm.toFixed(2)), trend:trend, maxVol:0 };
+    return { code: code, name: STATE_NAMES[code] || code, volume: s.volume, rpm: parseFloat(avgRpm.toFixed(2)), trend: trend, maxVol: 0 };
   });
   if (updated.length === 0) return;
   var maxVol = Math.max.apply(null, updated.map(function(s) { return s.volume; }));
@@ -3629,13 +3649,12 @@ function renderLiveLoadCards(loads, minRpm) {
     _liveLoadsCache = loads;
   }
 
-  // Calculate net RPM for each load (rate minus all fuel / loaded miles only)
-  // Deadhead cost is already subtracted from net profit — dividing by loaded miles only avoids double-penalizing deadhead
+  // Calculate net RPM for each load (rate minus fuel / total miles)
   loads.forEach(function(l) {
     if (l.rate > 0 && l.miles > 0) {
       var loadedFuel = Math.round((l.miles / mpg) * fuelPrice);
       var deadFuel   = l.deadheadMiles > 0 ? Math.round((l.deadheadMiles / emptyMpg) * fuelPrice) : 0;
-      l.netRpm = parseFloat(((l.rate - loadedFuel - deadFuel) / l.miles).toFixed(2));
+      l.netRpm = parseFloat(((l.rate - loadedFuel - deadFuel) / l.miles).toFixed(2)); // divide by loaded miles only
     } else {
       l.netRpm = 0;
     }
@@ -4115,21 +4134,19 @@ onAuthReady = function(firstName, userId, email) {
       clearInterval(waitForSupabase);
       // Load shared city coords first, then preferences, then loads
       loadSharedCityCoords().then(function() {
-        // Seed runs in background — does NOT block load fetch
-        seedSharedCityCoords();
+        seedSharedCityCoords(); // runs in background, does not block load fetch
         return loadPreferencesFromSupabase();
       }).then(function() {
         registerPushSubscription();
         saveLoadAlertPrefs();
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
-        // Fire national state data fetch in background — powers States tab
         setTimeout(function() { fetchNationalStateData(); }, 2000);
       }).catch(function() {
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
       });
     }
   }, 500);
-  // Fallback fetch — extended to 20s so it only fires if the chain truly stalls
+  // Fallback fetch — 20s so it only fires if chain truly stalls
   setTimeout(function() {
     if (_liveLoadsCache.length === 0) {
       console.log('Fallback load fetch firing');
