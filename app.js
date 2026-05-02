@@ -424,7 +424,23 @@ function calcHOSVerdict(miles) {
 // BROKER BADGE — auto-inject on expand (Change 2)
 // ══════════════════════════════════════════════════════════════
 
-function getBrokerBadgeHTML(brokerName) {
+function getBrokerBadgeHTML(brokerName, liveCredit, liveDays) {
+  if (!brokerName && !liveCredit) return '';
+
+  // Use live Truckstop CreditSTOP data when available
+  if (liveCredit && liveCredit !== '----') {
+    var score    = liveCredit.replace('*','').trim();
+    var scoreNum = parseInt(score) || 0;
+    var scoreClass = scoreNum >= 80 ? 'score-green' : scoreNum >= 60 ? 'score-amber' : 'score-red';
+    var daysLabel  = liveDays && liveDays !== '----' ? liveDays + 'd pay' : '? days';
+    var daysClass  = !liveDays || liveDays === '----' ? 'unknown' :
+                     parseInt(liveDays) <= 28 ? 'days-green' :
+                     parseInt(liveDays) <= 40 ? 'days-amber' : 'days-red';
+    return '<span class="broker-badge ' + scoreClass + '">Credit: ' + score + '</span>' +
+           '<span class="broker-badge ' + daysClass + '">' + daysLabel + '</span>';
+  }
+
+  // Fall back to BROKER_DB
   if (!brokerName) return '';
   var q = brokerName.toLowerCase().trim();
   var match = null;
@@ -751,27 +767,48 @@ function lookupBroker() {
   result.style.display = "block";
 }
 
-var LANE_RATES = {
-  "WA-CA":2.45,"WA-OR":1.95,"WA-ID":2.05,"WA-UT":2.25,"WA-NV":2.35,"WA-TX":2.55,"WA-CO":2.35,"WA-AZ":2.40,"WA-MT":2.10,
-  "OR-CA":2.30,"OR-ID":2.00,"OR-WA":1.95,"OR-UT":2.20,"OR-TX":2.50,"OR-CO":2.30,
-  "ID-WA":2.05,"ID-OR":2.00,"ID-UT":2.10,"ID-CA":2.40,"ID-TX":2.48,"ID-MT":2.00,"ID-CO":2.20,
-  "UT-WA":2.25,"UT-CA":2.38,"UT-TX":2.30,"UT-NV":2.12,"UT-ID":2.10,"UT-CO":2.05,"UT-AZ":2.15,
-  "CA-WA":2.20,"CA-OR":2.15,"CA-NV":1.90,"CA-AZ":1.95,"CA-UT":2.05,"CA-TX":2.35,
-  "TX-WA":2.60,"TX-CA":2.40,"TX-UT":2.25,"TX-OK":1.85,"TX-NM":1.90,"TX-CO":2.20,"TX-KS":1.95,
-  "NV-CA":1.85,"NV-WA":2.30,"NV-UT":2.05,"NV-AZ":1.95,
-  "MT-WA":2.15,"MT-ID":2.00,"MT-UT":2.20,"MT-CO":2.25,"MT-WY":2.10,
-  "CO-WA":2.35,"CO-CA":2.42,"CO-TX":2.20,"CO-UT":2.05,"CO-KS":2.00,"CO-NM":2.05,
-  "AZ-CA":2.00,"AZ-NV":1.90,"AZ-UT":2.10,"AZ-TX":2.25,"AZ-NM":2.00,
-  "NM-TX":1.90,"NM-CO":2.05,"NM-AZ":2.00,"NM-CA":2.20,
-  "WY-WA":2.20,"WY-UT":2.05,"WY-CO":2.10,"WY-MT":2.10,
-  "OK-TX":1.85,"OK-KS":1.80,"OK-CO":2.00,
-  "KS-TX":1.90,"KS-CO":2.00,"KS-OK":1.80,
-};
-
 // ══════════════════════════════════════════════════════════════
 // GET SCRIPT — merged Rate Coach + AI Script (Change 3)
 // ══════════════════════════════════════════════════════════════
 var _aiScriptGenerating = false;
+
+// Fetch live booked rate estimate from Truckstop Rate Insights
+async function fetchLaneRate(originState, destState, miles, equipType) {
+  try {
+    var url = 'https://truckstop-search.wild-sunset-1d5f.workers.dev/rates' +
+      '?originState=' + encodeURIComponent(originState) +
+      '&destState='   + encodeURIComponent(destState) +
+      '&miles='       + encodeURIComponent(miles || 500) +
+      '&equipmentCode=' + encodeURIComponent(equipType || 'V');
+    var res  = await fetch(url);
+    var data = await res.json();
+    if (data.success && data.rate) {
+      // Rate Insights returns predictedRate, low, high
+      var rate = data.rate;
+      var predictedRpm = rate.predictedRate ? parseFloat((rate.predictedRate / miles).toFixed(2)) : null;
+      var lowRpm       = rate.low           ? parseFloat((rate.low           / miles).toFixed(2)) : null;
+      var highRpm      = rate.high          ? parseFloat((rate.high          / miles).toFixed(2)) : null;
+      return { predictedRpm, lowRpm, highRpm, predictedTotal: rate.predictedRate, low: rate.low, high: rate.high, source: 'live' };
+    }
+  } catch(e) {
+    console.log('Rate Insights unavailable, using fallback');
+  }
+  // Fallback to static rates
+  var LANE_RATES = {
+    "WA-CA":2.45,"WA-OR":1.95,"WA-ID":2.05,"WA-UT":2.25,"WA-NV":2.35,"WA-TX":2.55,"WA-CO":2.35,"WA-AZ":2.40,"WA-MT":2.10,
+    "OR-CA":2.30,"OR-ID":2.00,"OR-WA":1.95,"OR-UT":2.20,"OR-TX":2.50,"OR-CO":2.30,
+    "ID-WA":2.05,"ID-OR":2.00,"ID-UT":2.10,"ID-CA":2.40,"ID-TX":2.48,"ID-MT":2.00,"ID-CO":2.20,
+    "UT-WA":2.25,"UT-CA":2.38,"UT-TX":2.30,"UT-NV":2.12,"UT-ID":2.10,"UT-CO":2.05,"UT-AZ":2.15,
+    "CA-WA":2.20,"CA-OR":2.15,"CA-NV":1.90,"CA-AZ":1.95,"CA-UT":2.05,"CA-TX":2.35,
+    "TX-WA":2.60,"TX-CA":2.40,"TX-UT":2.25,"TX-OK":1.85,"TX-NM":1.90,"TX-CO":2.20,"TX-KS":1.95,
+    "NV-CA":1.85,"NV-WA":2.30,"NV-UT":2.05,"NV-AZ":1.95,
+    "MT-WA":2.15,"MT-ID":2.00,"MT-UT":2.20,"MT-CO":2.25,"MT-WY":2.10,
+    "CO-WA":2.35,"CO-CA":2.42,"CO-TX":2.20,"CO-UT":2.05,"CO-KS":2.00,"CO-NM":2.05,
+  };
+  var key = originState + '-' + destState;
+  var rpm = LANE_RATES[key] || LANE_RATES[destState + '-' + originState] || 2.15;
+  return { predictedRpm: rpm, lowRpm: rpm - 0.20, highRpm: rpm + 0.20, predictedTotal: Math.round(rpm * miles), source: 'static' };
+}
 
 async function getScript() {
   if (_aiScriptGenerating) return;
@@ -783,18 +820,43 @@ async function getScript() {
   if (!origin || !dest || !offer || !miles) { alert("Fill in origin, destination, offer, and miles first."); return; }
   track('negotiation_script_requested', { origin: origin, dest: dest, offer: offer, miles: miles, broker: broker });
 
-  var key = origin + "-" + dest, revKey = dest + "-" + origin;
-  var marketRpm = LANE_RATES[key] || LANE_RATES[revKey] || 2.15;
-  var marketTotal = Math.round(marketRpm * miles);
-  var offerRpm = offer / miles;
-  var counterRpm = Math.max(marketRpm, offerRpm + 0.15);
+  var output = document.getElementById("neg-script-output");
+  if (!output) return;
+
+  // Show loading state while fetching live rates
+  output.innerHTML = '<div style="color:var(--green);font-size:.85rem;padding:.5rem 0;">📊 Fetching live market rates for this lane...</div>';
+  output.style.display = "block";
+
+  // Extract state codes from origin/dest
+  var originState = origin.trim().toUpperCase().slice(-2);
+  var destState   = dest.trim().toUpperCase().slice(-2);
+  if (origin.length === 2) originState = origin.toUpperCase();
+  if (dest.length === 2)   destState   = dest.toUpperCase();
+
+  // Fetch live rate from Truckstop Rate Insights
+  var equipType  = (window._rcEquipmentType || 'V').split(',')[0].trim();
+  var liveRate   = await fetchLaneRate(originState, destState, miles, equipType);
+
+  var marketRpm   = liveRate.predictedRpm || 2.15;
+  var marketTotal = liveRate.predictedTotal || Math.round(marketRpm * miles);
+  var offerRpm    = offer / miles;
+  var counterRpm  = Math.max(marketRpm, offerRpm + 0.15);
   var counterTotal = Math.round(counterRpm * miles);
-  var gap = marketTotal - offer;
+  var gap  = marketTotal - offer;
   var diff = offerRpm - marketRpm;
+
   var assessment;
   if (diff >= 0.15)       { assessment = "✅ Strong Offer — Above Market"; }
   else if (diff >= -0.10) { assessment = "⚠️ At Market — Push Back Once"; }
   else                    { assessment = "❌ Below Market — Hold Firm"; }
+
+  var rateSourceLabel = liveRate.source === 'live'
+    ? '📡 Live Truckstop Rate Insights'
+    : '📋 Estimated (Rate Insights unavailable)';
+
+  var rangeDisplay = (liveRate.lowRpm && liveRate.highRpm)
+    ? ' (range: $' + liveRate.lowRpm.toFixed(2) + ' – $' + liveRate.highRpm.toFixed(2) + '/mi)'
+    : '';
 
   var brokerInfo = "", brokerRec = "";
   if (broker) {
@@ -806,9 +868,6 @@ async function getScript() {
     }
   }
 
-  var output = document.getElementById("neg-script-output");
-  if (!output) return;
-
   var scoreColor = diff >= 0.15 ? "var(--green)" : diff >= -0.10 ? "var(--amber)" : "var(--red)";
   output.innerHTML =
     '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.8rem;margin-bottom:.8rem;">' +
@@ -818,13 +877,14 @@ async function getScript() {
         '<div class="metric" style="padding:.6rem;"><div class="metric-val" style="font-size:1.1rem;color:var(--green);">$' + counterTotal.toLocaleString() + '</div><div class="metric-label">Counter At</div></div>' +
       '</div>' +
       '<div style="font-size:.82rem;font-weight:bold;color:' + scoreColor + ';margin-bottom:.3rem;">' + assessment + '</div>' +
+      '<div style="font-size:.72rem;color:#b8c8b8;margin-bottom:.3rem;">' + rateSourceLabel + rangeDisplay + '</div>' +
       (brokerRec ? '<div style="font-size:.78rem;color:#b8c8b8;font-style:italic;">💡 ' + brokerRec + '</div>' : '') +
     '</div>' +
     '<div id="neg-ai-output"><div style="color:var(--green);font-size:.85rem;padding:.5rem 0;">🤖 Building your script...</div></div>';
-  output.style.display = "block";
+
   _aiScriptGenerating = true;
 
-  var prompt = "You are an expert freight broker negotiation coach helping an owner-operator trucker get the best rate. Generate a word-for-word phone script for this situation:\n\nLoad details:\n- Origin: " + origin + "\n- Destination: " + dest + "\n- Miles: " + miles + "\n- Broker offer: $" + offer + " ($" + offerRpm.toFixed(2) + "/mile)\n- Market rate for this lane: $" + marketTotal + " ($" + marketRpm.toFixed(2) + "/mile)\n- Gap: $" + Math.abs(gap) + " " + (gap > 0 ? "below market" : "above market") + (broker ? "\n- Broker name: " + broker : "") + (brokerInfo ? "\n- " + brokerInfo : "") + "\n\nGenerate a confident, natural-sounding phone script that:\n1. Acknowledges the offer professionally\n2. Uses market data as leverage\n3. Makes a specific counter-offer at market rate\n4. Includes a psychological close\n5. Has a fallback position if they push back\n\nFormat as: [Opening] then [Counter] then [Close] then [If they push back]. Keep it conversational, confident, and under 150 words total.";
+  var prompt = "You are an expert freight broker negotiation coach helping an owner-operator trucker get the best rate. Generate a word-for-word phone script for this situation:\n\nLoad details:\n- Origin: " + origin + "\n- Destination: " + dest + "\n- Miles: " + miles + "\n- Broker offer: $" + offer + " ($" + offerRpm.toFixed(2) + "/mile)\n- Market rate for this lane: $" + marketTotal + " ($" + marketRpm.toFixed(2) + "/mile)" + rangeDisplay + "\n- Data source: " + (liveRate.source === 'live' ? 'Live Truckstop Rate Insights (actual recent booked rates)' : 'Estimated market rate') + "\n- Gap: $" + Math.abs(gap) + " " + (gap > 0 ? "below market" : "above market") + (broker ? "\n- Broker name: " + broker : "") + (brokerInfo ? "\n- " + brokerInfo : "") + "\n\nGenerate a confident, natural-sounding phone script that:\n1. Acknowledges the offer professionally\n2. Uses market data as leverage\n3. Makes a specific counter-offer at market rate\n4. Includes a psychological close\n5. Has a fallback position if they push back\n\nFormat as: [Opening] then [Counter] then [Close] then [If they push back]. Keep it conversational, confident, and under 150 words total.";
 
   var aiOutputEl = document.getElementById("neg-ai-output");
   try {
@@ -959,7 +1019,10 @@ function recalcPanel(panelId, rate, miles) {
   // ── AUTO: Broker badge (Change 2) ──────────────────────────
   var brokerBadgeEl = document.getElementById("broker-badge_" + panelId);
   if (brokerBadgeEl && broker) {
-    brokerBadgeEl.innerHTML = getBrokerBadgeHTML(broker);
+    var liveLoad   = _liveLoadsCache.find(function(l) { return 'live_' + l.id === panelId; });
+    var liveCredit = liveLoad ? (liveLoad.credit || null) : null;
+    var liveDays   = liveLoad ? (liveLoad.days2Pay || null) : null;
+    brokerBadgeEl.innerHTML = getBrokerBadgeHTML(broker, liveCredit, liveDays);
   }
 
   // ── AUTO: HOS verdict (Change 1) ───────────────────────────
@@ -2678,17 +2741,33 @@ async function callAI(prompt, maxTokens) {
 }
 
 async function showDailyBriefing() {
-  var today = new Date().toDateString(), lastShown = '';
-  try { lastShown = localStorage.getItem('rc-briefing-date') || ''; } catch(e) {}
+  var today = new Date().toDateString(), lastShown = '', cachedText = '';
+  try {
+    lastShown  = localStorage.getItem('rc-briefing-date') || '';
+    cachedText = localStorage.getItem('rc-briefing-text') || '';
+  } catch(e) {}
+
+  // If already shown today and we have cached text, just display it
+  if (lastShown === today && cachedText) {
+    showBriefingBanner(cachedText);
+    return;
+  }
+  // If already shown today but no cached text, skip (avoid API call)
   if (lastShown === today) return;
+
   var outstanding = invoices.filter(function(i) { return i.status !== 'paid'; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
-  var overdue = invoices.filter(function(i) { return i.status !== 'paid' && new Date(i.dueDate) < new Date(); }).reduce(function(sum, i) { return sum + i.amount; }, 0);
-  var maintDue = maintItems.filter(function(m) { return (m.currentOdo - m.lastOdo) >= (m.interval * 0.85); }).map(function(m) { return m.name; }).join(', ');
+  var overdue     = invoices.filter(function(i) { return i.status !== 'paid' && new Date(i.dueDate) < new Date(); }).reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var maintDue    = maintItems.filter(function(m) { return (m.currentOdo - m.lastOdo) >= (m.interval * 0.85); }).map(function(m) { return m.name; }).join(', ');
+
   var prompt = "You are RoadCommand, a dispatcher assistant for an owner-operator trucker. Generate a brief, friendly morning dispatch briefing in 2-3 sentences max. Be direct and practical.\n\nContext:\n- Driver: " + (window._rcUserFirstName||'Driver') + "\n- Location: " + (currentCity||'Unknown') + ", " + (currentState||'') + "\n- Current diesel price: $" + (defaults.fuelPrice?defaults.fuelPrice.toFixed(3):'?') + "/gal\n- Outstanding invoices: $" + outstanding.toLocaleString() + (overdue > 0 ? " ($" + overdue.toLocaleString() + " overdue)" : "") + (maintDue ? "\n- Maintenance due soon: " + maintDue : "") + "\n- Current region: " + (currentRegion||'Unknown') + "\n\nGenerate a morning briefing. Mention any overdue invoices or maintenance issues if present. End with one piece of tactical advice for today.";
+
   try {
     var text = await callAI(prompt, 150);
     showBriefingBanner(text);
-    try { localStorage.setItem('rc-briefing-date', today); } catch(e) {}
+    try {
+      localStorage.setItem('rc-briefing-date', today);
+      localStorage.setItem('rc-briefing-text', text);
+    } catch(e) {}
   } catch(e) { console.log('Daily briefing unavailable:', e.message); }
 }
 
