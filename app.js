@@ -3375,7 +3375,11 @@ async function fetchTruckstopLoads(forceRefresh) {
   // Never block — always reset flag after 10 seconds max
   if (_liveLoadsFetching) {
     var timeSinceFetch = Date.now() - (_liveLoadsLastFetch || 0);
-    if (timeSinceFetch < 10000) return; // only block if recent
+    if (timeSinceFetch < 10000) {
+      // Still in-progress or stuck — never leave screen blank, re-render what we have
+      if (_liveLoadsCache.length > 0) renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+      return;
+    }
     _liveLoadsFetching = false; // reset stuck flag
   }
 
@@ -3385,6 +3389,7 @@ async function fetchTruckstopLoads(forceRefresh) {
     return;
   }
 
+  // Committed to a real fetch — now safe to show loading state
   _liveLoadsFetching = true;
   // Safety reset after 15 seconds no matter what
   setTimeout(function() { _liveLoadsFetching = false; }, 15000);
