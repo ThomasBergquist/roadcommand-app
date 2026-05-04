@@ -1945,7 +1945,7 @@ async function _fetchFuelPriceLive(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
@@ -3838,16 +3838,18 @@ function renderLiveLoadCards(loads, minRpm) {
   if (hotBadge) hotBadge.textContent = hotCount + ' HOT';
 
   // Inject into dash screen — top 15 only
+  var TS_BADGE = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:.4rem;padding:.5rem .6rem;opacity:.5;"><span style="font-size:.62rem;color:#b8c8b8;letter-spacing:.03em;">Powered by</span><img src="/icons/Truckstop_Logo_-_Single_Color_White.png" alt="Truckstop" style="height:14px;width:auto;vertical-align:middle;"></div>';
+
   var dashCardBody = document.getElementById('dash-live-loads');
   if (dashCardBody) {
     dashCardBody.innerHTML = allLoads.length > 0
-      ? dashCards
+      ? dashCards + TS_BADGE
       : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads near you right now. Checking every 5 minutes.</div></div>';
   }
 
   // Inject into loads screen — all loads
   var loadsLive = document.getElementById('loads-screen-live');
-  if (loadsLive) loadsLive.innerHTML = allCards;
+  if (loadsLive) loadsLive.innerHTML = allCards + TS_BADGE;
 
   // Re-inject profit bars
   injectProfitBars();
