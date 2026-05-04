@@ -706,6 +706,19 @@ async function loadPreferencesFromSupabase() {
     });
     if (data.equipment_type) { var el = document.getElementById('p-equipment'); if (el) el.value = data.equipment_type; }
     if (data.pickup_date_filter !== undefined) { var el = document.getElementById('p-pickup-date'); if (el) el.value = data.pickup_date_filter; }
+
+    // Also load MC number from profiles table
+    try {
+      var profRes = await _supabase.from('profiles').select('mc_number').eq('user_id', window._rcUserId).single();
+      if (!profRes.error && profRes.data && profRes.data.mc_number) {
+        var mc = profRes.data.mc_number.toString().replace(/^MC-?/i, '').trim();
+        window._rcMCNumber = mc;
+        localStorage.setItem('rc-mc-number', mc);
+        var mcInput = document.getElementById('set-mc-number');
+        if (mcInput) mcInput.value = 'MC-' + mc;
+        setTimeout(function() { loadFMCSAProfile(); }, 2000);
+      }
+    } catch(e) {}
     Object.keys(fields).forEach(function(id) {
       var el = document.getElementById(id);
       if (el && fields[id]) el.value = fields[id];
