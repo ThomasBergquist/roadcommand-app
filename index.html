@@ -49,7 +49,7 @@
     <div style="margin-bottom:1.2rem;"><div class="form-label">Your First Name *</div><input class="auth-input" id="profile-firstname" type="text" placeholder="Levi" autocomplete="given-name"></div>
     <div style="margin-bottom:1.2rem;"><div class="form-label">Co-Driver Name (optional)</div><input class="auth-input" id="profile-codriver" type="text" placeholder="Dylan"></div>
     <div style="margin-bottom:1.2rem;"><div class="form-label">Truck Year</div><input class="auth-input" id="profile-year" type="text" placeholder="2018"></div>
-    <div style="margin-bottom:1.2rem;"><div class="form-label">Truck Make & Model</div><input class="auth-input" id="profile-model" type="text" placeholder="Peterbilt 579"></div>
+    <div style="margin-bottom:1.2rem;"><div class="form-label">Truck Make &amp; Model</div><input class="auth-input" id="profile-model" type="text" placeholder="Peterbilt 579"></div>
     <button class="auth-btn" id="profile-save-btn" onclick="saveProfile()">Save and Enter RoadCommand</button>
     <div style="text-align:center;font-size:.75rem;color:#b8c8b8;">You can update this anytime in Settings</div>
   </div>
@@ -69,10 +69,10 @@
   <div class="screen active" id="screen-dash">
     <div class="weather-strip" id="weather-strip">
       <div class="weather-row" id="weather-main" onclick="refreshWeather()">
-        <span class="weather-icon" id="weather-icon">🌤️</span>
+        <span class="weather-icon" id="weather-icon">&#x1F324;&#xFE0F;</span>
         <div class="weather-text">
           <div class="weather-title" id="weather-title">Fetching road conditions...</div>
-          <div class="weather-sub" id="weather-sub">Tap to refresh · Based on your GPS location</div>
+          <div class="weather-sub" id="weather-sub">Tap to refresh &middot; Based on your GPS location</div>
         </div>
         <span class="weather-time" id="weather-time"></span>
       </div>
@@ -88,52 +88,45 @@
         <div class="live-label"><span class="live-dot" id="fuel-dot"></span>Diesel Price</div>
         <div class="live-value" id="fuel-value">Loading...</div>
         <div class="live-sub" id="fuel-sub">Fetching regional price</div>
-        <div style="font-size:.62rem;color:var(--green);opacity:.7;margin-top:.15rem;">⛽ Tap to report pump price</div>
+        <div style="font-size:.62rem;color:var(--green);opacity:.7;margin-top:.15rem;">&#x26FD; Tap to report pump price</div>
       </div>
     </div>
-    <!-- AUTHORITY HEALTH CARD -->
     <div class="card" id="authority-health-card" style="display:none;margin-bottom:.8rem;border-color:var(--green-border);"></div>
-
-    <!-- COMMAND SCORE CARD -->
     <div class="card" id="command-score-card" style="margin-bottom:1rem;"></div>
-
     <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
       <input class="form-input" id="dash-odometer" type="number" placeholder="Odometer (miles)" style="width:70%;font-size:.82rem;">
       <button class="btn btn-outline" onclick="updateOdometer()" style="width:28%;white-space:nowrap;font-size:.75rem;">Update Odo</button>
     </div>
-
-    <!-- HOS HOURS INPUT — Change 1 -->
     <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
-      <input class="form-input" id="dash-hos-hours" type="number" min="0" max="11" step="0.5" placeholder="My available HOS hours (0–11)" style="flex:1;font-size:.82rem;">
+      <input class="form-input" id="dash-hos-hours" type="number" min="0" max="11" step="0.5" placeholder="My available HOS hours (0-11)" style="flex:1;font-size:.82rem;">
       <button class="btn btn-outline" id="hos-save-btn" onclick="saveHOSHours()" style="white-space:nowrap;font-size:.75rem;">Save</button>
     </div>
-
+    <!-- Dashboard metrics — populated by updateDashboardStats() on load -->
     <div class="dash-grid">
-      <div class="metric"><div class="metric-val">$4,820</div><div class="metric-label">Week Revenue</div></div>
-      <div class="metric"><div class="metric-val amber">$1.94</div><div class="metric-label">RPM This Week</div></div>
-      <div class="metric"><div class="metric-val">2,481</div><div class="metric-label">Miles This Week</div></div>
-      <div class="metric"><div class="metric-val red">$1,240</div><div class="metric-label">Est. Fuel Cost</div></div>
+      <div class="metric"><div class="metric-val" id="dash-week-rev">&#x2014;</div><div class="metric-label">Week Revenue</div></div>
+      <div class="metric"><div class="metric-val amber" id="dash-week-rpm">&#x2014;</div><div class="metric-label">RPM This Week</div></div>
+      <div class="metric"><div class="metric-val" id="dash-week-miles">&#x2014;</div><div class="metric-label">Miles This Week</div></div>
+      <div class="metric"><div class="metric-val red" id="dash-week-fuel">&#x2014;</div><div class="metric-label">Est. Fuel Cost</div></div>
     </div>
     <div class="card">
       <div class="card-header">
-        <div class="card-title">🔥 Live Loads Near You</div><button class="btn-outline" onclick="refreshLoads()" style="font-size:.7rem;padding:.2rem .5rem;border-radius:3px;">🔄 Refresh</button>
-        <span class="load-tag tag-hot">2 New</span>
+        <div class="card-title">&#x1F525; Live Loads Near You</div>
+        <button class="btn-outline" onclick="refreshLoads()" style="font-size:.7rem;padding:.2rem .5rem;border-radius:3px;">&#x1F504; Refresh</button>
       </div>
       <div style="padding:.5rem .8rem;" id="dash-live-loads">
-        <!-- Live loads injected by fetchTruckstopLoads() -->
-        <div style="padding:1rem;text-align:center;color:var(--green);font-size:.85rem;">🔄 Getting GPS location to find loads near you...</div>
+        <div style="padding:1rem;text-align:center;color:var(--green);font-size:.85rem;">&#x1F504; Getting GPS location to find loads near you...</div>
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">📍 Position & Fuel Details</div></div>
+      <div class="card-header"><div class="card-title">&#x1F4CD; Position &amp; Fuel Details</div></div>
       <div class="card-body">
         <div class="form-row" style="margin-bottom:.8rem;">
-          <div><div class="lm-label">Region</div><div class="lm-val" style="font-size:.9rem;margin-top:.3rem;" id="region-display">—</div></div>
-          <div><div class="lm-label">Price Updated</div><div class="lm-val" style="font-size:.9rem;margin-top:.3rem;" id="fuel-updated">—</div></div>
+          <div><div class="lm-label">Region</div><div class="lm-val" style="font-size:.9rem;margin-top:.3rem;" id="region-display">&#x2014;</div></div>
+          <div><div class="lm-label">Price Updated</div><div class="lm-val" style="font-size:.9rem;margin-top:.3rem;" id="fuel-updated">&#x2014;</div></div>
         </div>
         <div class="form-row">
-          <div><div class="lm-label">Coordinates</div><div class="lm-val" style="font-size:.82rem;margin-top:.3rem;" id="coords-display">—</div></div>
-          <div><div class="lm-label">EIA Region</div><div class="lm-val" style="font-size:.82rem;margin-top:.3rem;" id="eia-region">—</div></div>
+          <div><div class="lm-label">Coordinates</div><div class="lm-val" style="font-size:.82rem;margin-top:.3rem;" id="coords-display">&#x2014;</div></div>
+          <div><div class="lm-label">EIA Region</div><div class="lm-val" style="font-size:.82rem;margin-top:.3rem;" id="eia-region">&#x2014;</div></div>
         </div>
         <div class="divider"></div>
         <div class="form-group" style="margin-bottom:0;">
@@ -149,38 +142,36 @@
 
   <!-- LOADS SCREEN -->
   <div class="screen" id="screen-loads">
-    <div class="section-head"><div class="section-label">— Load Board</div><div class="section-title">Manage Your Loads</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Load Board</div><div class="section-title">Manage Your Loads</div></div>
     <div style="display:flex;gap:.5rem;margin-bottom:1rem;overflow-x:auto;padding-bottom:.3rem;">
       <button class="btn btn-green btn-sm" onclick="filterLoads('all')" id="filter-all">All</button>
-      <button class="btn btn-outline btn-sm" onclick="filterLoads('hot')" id="filter-hot">🔥 Hot</button>
-      <button class="btn btn-outline btn-sm" onclick="filterLoads('watch')" id="filter-watch">👁 Watching</button>
-      <button class="btn btn-outline btn-sm" onclick="filterLoads('booked')" id="filter-booked">✓ Booked</button>
+      <button class="btn btn-outline btn-sm" onclick="filterLoads('hot')" id="filter-hot">&#x1F525; Hot</button>
+      <button class="btn btn-outline btn-sm" onclick="filterLoads('watch')" id="filter-watch">&#x1F441; Watching</button>
+      <button class="btn btn-outline btn-sm" onclick="filterLoads('booked')" id="filter-booked">&#x2713; Booked</button>
     </div>
-    <!-- Live loads injected here by renderLiveLoadCards() -->
-    <div id="loads-screen-live" style="min-height:200px;">
-    </div>
-        <button class="btn btn-outline" style="margin-top:.5rem;" onclick="showAddLoad()">+ Add Load Manually</button>
+    <div id="loads-screen-live" style="min-height:200px;"></div>
+    <button class="btn btn-outline" style="margin-top:.5rem;" onclick="showAddLoad()">+ Add Load Manually</button>
     <div id="add-load-form" style="display:none;margin-top:1rem;">
       <div class="card">
         <div class="card-header"><div class="card-title">Add New Load</div></div>
         <div class="card-body">
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Origin</label><input class="form-input" placeholder="City, State"></div>
-            <div class="form-group"><label class="form-label">Destination</label><input class="form-input" placeholder="City, State"></div>
+            <div class="form-group"><label class="form-label">Origin</label><input class="form-input" id="new-load-origin" placeholder="City, State"></div>
+            <div class="form-group"><label class="form-label">Destination</label><input class="form-input" id="new-load-dest" placeholder="City, State"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Rate ($)</label><input class="form-input" type="number" placeholder="2500"></div>
-            <div class="form-group"><label class="form-label">Miles</label><input class="form-input" type="number" placeholder="800"></div>
+            <div class="form-group"><label class="form-label">Rate ($)</label><input class="form-input" id="new-load-rate" type="number" placeholder="2500"></div>
+            <div class="form-group"><label class="form-label">Miles</label><input class="form-input" id="new-load-miles" type="number" placeholder="800"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Broker Name</label><input class="form-input" placeholder="Broker or company"></div>
+            <div class="form-group"><label class="form-label">Broker Name</label><input class="form-input" id="new-load-broker" placeholder="Broker or company"></div>
             <div class="form-group"><label class="form-label">Broker Phone</label><input class="form-input" type="tel" placeholder="(555) 000-0000" id="new-load-phone"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Pickup Date</label><input class="form-input" type="date"></div>
-            <div class="form-group"><label class="form-label">Weight (lbs)</label><input class="form-input" type="number" placeholder="40000"></div>
+            <div class="form-group"><label class="form-label">Pickup Date</label><input class="form-input" id="new-load-pickup" type="date"></div>
+            <div class="form-group"><label class="form-label">Weight (lbs)</label><input class="form-input" id="new-load-weight" type="number" placeholder="40000"></div>
           </div>
-          <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" placeholder="Commodity, special instructions, lumper fees..."></textarea></div>
+          <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="new-load-notes" placeholder="Commodity, special instructions, lumper fees..."></textarea></div>
           <button class="btn btn-green" onclick="saveLoad()">Save Load</button>
         </div>
       </div>
@@ -189,7 +180,7 @@
 
   <!-- CALCULATOR -->
   <div class="screen" id="screen-calc">
-    <div class="section-head"><div class="section-label">— Profit Calculator</div><div class="section-title">Know Before You Book</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Profit Calculator</div><div class="section-title">Know Before You Book</div></div>
     <div class="card">
       <div class="card-header"><div class="card-title">Load Details</div><button class="tool-help-btn" onclick="showHelp('calc')">? How</button></div>
       <div class="card-body">
@@ -209,47 +200,36 @@
       </div>
     </div>
     <div class="calc-result" id="calc-result" style="display:none;">
-      <div class="calc-row"><span class="label">Gross Rate</span><span class="val" id="r-gross">—</span></div>
-      <div class="calc-row"><span class="label">Broker Fee</span><span class="val" id="r-broker">—</span></div>
-      <div class="calc-row"><span class="label">Fuel Cost</span><span class="val" id="r-fuel">—</span></div>
-      <div class="calc-row"><span class="label">Other Costs</span><span class="val" id="r-other">—</span></div>
-      <div class="calc-row total" id="r-total-row"><span class="label">Net Profit</span><span class="val" id="r-net">—</span></div>
+      <div class="calc-row"><span class="label">Gross Rate</span><span class="val" id="r-gross">&#x2014;</span></div>
+      <div class="calc-row"><span class="label">Broker Fee</span><span class="val" id="r-broker">&#x2014;</span></div>
+      <div class="calc-row"><span class="label">Fuel Cost</span><span class="val" id="r-fuel">&#x2014;</span></div>
+      <div class="calc-row"><span class="label">Other Costs</span><span class="val" id="r-other">&#x2014;</span></div>
+      <div class="calc-row total" id="r-total-row"><span class="label">Net Profit</span><span class="val" id="r-net">&#x2014;</span></div>
       <div class="divider"></div>
-      <div class="calc-row"><span class="label">Rate Per Mile (loaded)</span><span class="val" id="r-rpm">—</span></div>
-      <div class="calc-row"><span class="label">Net Per Mile (all miles)</span><span class="val" id="r-npm">—</span></div>
-      <div class="calc-row"><span class="label">Verdict</span><span class="val" id="r-verdict">—</span></div>
+      <div class="calc-row"><span class="label">Rate Per Mile (loaded)</span><span class="val" id="r-rpm">&#x2014;</span></div>
+      <div class="calc-row"><span class="label">Net Per Mile (all miles)</span><span class="val" id="r-npm">&#x2014;</span></div>
+      <div class="calc-row"><span class="label">Verdict</span><span class="val" id="r-verdict">&#x2014;</span></div>
     </div>
-    <div class="alert alert-amber" style="margin-top:.8rem;"><div class="alert-icon">💡</div><div>Your minimum is set to <strong>$2.00/mi</strong>. Change in Parameters.</div></div>
+    <!-- Min RPM alert — updated dynamically by clearPlaceholderValues() -->
+    <div class="alert alert-amber" style="margin-top:.8rem;" id="calc-min-alert"><div class="alert-icon">&#x1F4A1;</div><div>Your minimum is set to <strong id="calc-min-rpm-display">$2.00/mi</strong>. Change in Parameters.</div></div>
   </div>
 
   <!-- STATE VOLUME TRACKER -->
   <div class="screen" id="screen-states">
-    <div class="section-head"><div class="section-label">— State Volume Tracker</div><div class="section-title">Where The Loads Are</div></div>
-    <div class="alert alert-green"><div class="alert-icon">📊</div><div>Track which states have the most available loads. Log loads manually to build your personal data — or connect the API to auto-populate.</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; State Volume Tracker</div><div class="section-title">Where The Loads Are</div></div>
+    <div class="alert alert-green"><div class="alert-icon">&#x1F4CA;</div><div>Live freight market data updated every 30 minutes from Truckstop. Pull down to refresh.</div></div>
     <div class="state-controls">
       <button class="state-filter-btn active" onclick="sortStates('volume',this)">By Volume</button>
       <button class="state-filter-btn" onclick="sortStates('rpm',this)">By Avg RPM</button>
       <button class="state-filter-btn" onclick="sortStates('trend',this)">Trending Up</button>
     </div>
     <div class="state-list" id="state-list"></div>
-    <div class="add-state-form" style="margin-top:1rem;">
-      <div class="add-state-title">+ Log Load Volume for a State</div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">State</label><select class="form-select" id="new-state-code"><option value="">Select State</option><option>WA</option><option>OR</option><option>ID</option><option>MT</option><option>WY</option><option>UT</option><option>NV</option><option>CA</option><option>CO</option><option>AZ</option><option>NM</option><option>TX</option><option>OK</option><option>KS</option><option>NE</option><option>SD</option><option>ND</option><option>MN</option></select></div>
-        <div class="form-group"><label class="form-label">Loads Available</label><input class="form-input" type="number" id="new-state-volume" placeholder="e.g. 24"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Avg Rate/Mile ($)</label><input class="form-input" type="number" id="new-state-rpm" placeholder="e.g. 2.15" step="0.01"></div>
-        <div class="form-group"><label class="form-label">Trend</label><select class="form-select" id="new-state-trend"><option value="up">↑ Going Up</option><option value="flat" selected>→ Flat</option><option value="down">↓ Going Down</option></select></div>
-      </div>
-      <button class="btn btn-green" onclick="addStateData()">Log This State</button>
-    </div>
   </div>
 
   <!-- PARAMETERS -->
   <div class="screen" id="screen-params">
-    <div class="section-head"><div class="section-label">— Your Parameters</div><div class="section-title">Set Your Standards</div></div>
-    <div class="alert alert-green"><div class="alert-icon">✓</div><div>These parameters filter your loads. Only loads that match show as Hot. When API is connected, these become live alert triggers.</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Your Parameters</div><div class="section-title">Set Your Standards</div></div>
+    <div class="alert alert-green"><div class="alert-icon">&#x2713;</div><div>These parameters filter your loads. Only loads that match show as Hot. When API is connected, these become live alert triggers.</div></div>
     <div class="card">
       <div class="card-header"><div class="card-title">Rate Requirements</div></div>
       <div class="card-body">
@@ -273,7 +253,7 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">Equipment & Load</div></div>
+      <div class="card-header"><div class="card-title">Equipment &amp; Load</div></div>
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Max Weight (lbs)</label><input class="form-input" id="p-maxweight" type="number" placeholder="44000"></div>
@@ -319,24 +299,24 @@
     </div>
     <button class="btn btn-green" onclick="saveParams()">Save Parameters</button>
     <div style="height:.8rem;"></div>
-    <div class="alert alert-green"><div class="alert-icon">✅</div><div><strong>Truckstop API Connected</strong><br>Your parameters are live filters. Save to instantly refresh your load board with matching loads.</div></div>
+    <div class="alert alert-green"><div class="alert-icon">&#x2705;</div><div><strong>Truckstop API Connected</strong><br>Your parameters are live filters. Save to instantly refresh your load board with matching loads.</div></div>
   </div>
 
   <!-- LOGBOOK -->
   <div class="screen" id="screen-log">
-    <div class="section-head"><div class="section-label">— Logbook</div><div class="section-title">Your Run History</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Logbook</div><div class="section-title">Your Run History</div></div>
+    <!-- YTD metrics — populated by updateDashboardStats() -->
     <div class="dash-grid" style="margin-bottom:1rem;">
-      <div class="metric"><div class="metric-val" id="log-ytd-rev">$48,200</div><div class="metric-label">YTD Revenue</div></div>
-      <div class="metric"><div class="metric-val amber">$2.08</div><div class="metric-label">YTD Avg RPM</div></div>
-      <div class="metric"><div class="metric-val">23,180</div><div class="metric-label">YTD Miles</div></div>
-      <div class="metric"><div class="metric-val">47</div><div class="metric-label">Loads Completed</div></div>
+      <div class="metric"><div class="metric-val" id="log-ytd-rev">&#x2014;</div><div class="metric-label">YTD Revenue</div></div>
+      <div class="metric"><div class="metric-val amber" id="log-ytd-rpm">&#x2014;</div><div class="metric-label">YTD Avg RPM</div></div>
+      <div class="metric"><div class="metric-val" id="log-ytd-miles">&#x2014;</div><div class="metric-label">YTD Miles</div></div>
+      <div class="metric"><div class="metric-val" id="log-ytd-loads">&#x2014;</div><div class="metric-label">Loads Completed</div></div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">Recent Runs</div></div>
+      <!-- Populated by renderLogbook() from invoices table -->
       <div class="card-body" style="padding:.5rem 0;" id="run-list">
-        <div class="log-item" style="padding:.8rem 1rem;"><div class="log-top"><div class="log-route">Kennewick, WA → Salt Lake City, UT</div><div class="log-date">Apr 5–6</div></div><div class="log-stats"><div class="log-stat">Rate: <strong>$2,750</strong></div><div class="log-stat">Miles: <strong>1,298</strong></div><div class="log-stat">RPM: <strong>$2.12</strong></div></div></div>
-        <div class="log-item" style="padding:.8rem 1rem;"><div class="log-top"><div class="log-route">Portland, OR → Moses Lake, WA</div><div class="log-date">Apr 2–3</div></div><div class="log-stats"><div class="log-stat">Rate: <strong>$1,950</strong></div><div class="log-stat">Miles: <strong>942</strong></div><div class="log-stat">RPM: <strong>$2.07</strong></div></div></div>
-        <div class="log-item" style="padding:.8rem 1rem;"><div class="log-top"><div class="log-route">Boise, ID → Spokane, WA</div><div class="log-date">Mar 29–30</div></div><div class="log-stats"><div class="log-stat">Rate: <strong>$1,620</strong></div><div class="log-stat">Miles: <strong>788</strong></div><div class="log-stat">RPM: <strong>$2.06</strong></div></div></div>
+        <div style="padding:1rem;text-align:center;color:#b8c8b8;font-size:.82rem;">Loading your run history...</div>
       </div>
     </div>
     <button class="btn btn-outline" onclick="showAddRun()">+ Log Completed Run</button>
@@ -363,17 +343,12 @@
     </div>
   </div>
 
-  <!-- DISPATCHER SCREEN — Changes 3 and 5 applied
-       REMOVED: Lane Planner, Nearest Load Finder, Load Document Tracker, ai-script-section
-       CHANGED: Rate Coach button → getScript(), output div → neg-script-output
-  -->
+  <!-- DISPATCHER SCREEN -->
   <div class="screen" id="screen-negotiate">
-    <div class="section-head"><div class="section-label">— Dispatcher</div><div class="section-title">Your Dispatcher Brain</div></div>
-    <div class="alert alert-green"><div class="alert-icon">🧠</div><div>Enter any load details to get broker intel, market rate data, and a word-for-word negotiation script before you dial.</div></div>
-
-    <!-- BROKER SCORECARD -->
+    <div class="section-head"><div class="section-label">&#x2014; Dispatcher</div><div class="section-title">Your Dispatcher Brain</div></div>
+    <div class="alert alert-green"><div class="alert-icon">&#x1F9E0;</div><div>Enter any load details to get broker intel, market rate data, and a word-for-word negotiation script before you dial.</div></div>
     <div class="card">
-      <div class="card-header"><div class="card-title">🏦 Broker Scorecard</div><button class="tool-help-btn" onclick="showHelp('broker')">? How</button></div>
+      <div class="card-header"><div class="card-title">&#x1F3E6; Broker Scorecard</div><button class="tool-help-btn" onclick="showHelp('broker')">? How</button></div>
       <div class="card-body">
         <div class="form-group">
           <label class="form-label">Broker Name or MC Number</label>
@@ -393,10 +368,8 @@
         </div>
       </div>
     </div>
-
-    <!-- RATE NEGOTIATION COACH — merged with AI Script (Change 3) -->
     <div class="card">
-      <div class="card-header"><div class="card-title">📈 Rate Coach + Get Script</div><button class="tool-help-btn" onclick="showHelp('negotiate')">? How</button></div>
+      <div class="card-header"><div class="card-title">&#x1F4C8; Rate Coach + Get Script</div><button class="tool-help-btn" onclick="showHelp('negotiate')">? How</button></div>
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Origin State</label><select class="form-select" id="neg-origin"><option value="">Select</option><option>WA</option><option>OR</option><option>ID</option><option>MT</option><option>WY</option><option>UT</option><option>NV</option><option>CA</option><option>CO</option><option>AZ</option><option>TX</option><option>OK</option><option>NM</option><option>KS</option><option>NE</option></select></div>
@@ -409,29 +382,23 @@
         <div class="form-row" style="margin-bottom:.8rem;">
           <div class="form-group"><label class="form-label">Broker Name (optional)</label><input class="form-input" id="neg-broker-name" placeholder="CH Robinson"></div>
         </div>
-        <!-- Single button replaces two-step flow -->
-        <button class="btn btn-green" onclick="getScript()">🤖 Get Script</button>
-        <!-- Combined output — market summary + AI script in one div -->
+        <button class="btn btn-green" onclick="getScript()">&#x1F916; Get Script</button>
         <div id="neg-script-output" style="display:none;margin-top:.9rem;"></div>
       </div>
     </div>
-
-    <!-- ROUTE INTELLIGENCE -->
     <div class="card" style="margin-top:.8rem;">
-      <div class="card-header"><div class="card-title">🗺️ Route Intelligence</div></div>
+      <div class="card-header"><div class="card-title">&#x1F5FA;&#xFE0F; Route Intelligence</div></div>
       <div class="card-body">
-        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">Get AI tactical briefing before you arrive at a destination — rates, backhaul strategy, timing tips.</div>
+        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">Get AI tactical briefing before you arrive at a destination.</div>
         <div class="form-group"><label class="form-label">Destination City</label><input class="form-input" id="route-intel-dest" placeholder="Portland, OR"></div>
-        <button class="btn btn-green" id="route-intel-btn" onclick="getRouteIntel()">🗺️ Get Route Intel</button>
+        <button class="btn btn-green" id="route-intel-btn" onclick="getRouteIntel()">&#x1F5FA;&#xFE0F; Get Route Intel</button>
         <div id="route-intel-output" style="display:none;"></div>
       </div>
     </div>
-
-    <!-- HOS CHECKER — kept standalone for edge cases -->
     <div class="card" style="margin-top:.8rem;">
-      <div class="card-header"><div class="card-title">⏱️ HOS Load Checker</div><button class="tool-help-btn" onclick="showHelp('hos')">? How</button></div>
+      <div class="card-header"><div class="card-title">&#x23F1;&#xFE0F; HOS Load Checker</div><button class="tool-help-btn" onclick="showHelp('hos')">? How</button></div>
       <div class="card-body">
-        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.6rem;">Set your available hours on the Dashboard for auto-verdicts on every load card. Use this tool for specific pickup-window calculations.</div>
+        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.6rem;">Set your available hours on the Dashboard for auto-verdicts on every load card.</div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">My Available Hours</label><input class="form-input" id="hos-hours" type="number" placeholder="8" step="0.5"></div>
           <div class="form-group"><label class="form-label">Miles to Deliver</label><input class="form-input" id="hos-miles" type="number" placeholder="600"></div>
@@ -446,29 +413,24 @@
     </div>
   </div>
 
-  <!-- FMCSA AUTHORITY HEALTH SCREEN -->
-  <div class="screen" id="screen-fmcsa">
-    <!-- Populated by JS -->
-  </div>
-
-  <!-- TOOLS SCREEN -->
+  <div class="screen" id="screen-fmcsa"></div>
   <div class="screen" id="screen-tools">
-    <div class="section-head"><div class="section-label">— Operations Tools</div><div class="section-title">Plan Smart. Stay Legal.</div></div>
-    <div class="alert alert-green"><div class="alert-icon">👆</div><div>These tools are also available in the <strong>Dispatcher</strong> tab from the More menu.</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Operations Tools</div><div class="section-title">Plan Smart. Stay Legal.</div></div>
+    <div class="alert alert-green"><div class="alert-icon">&#x1F446;</div><div>These tools are also available in the <strong>Dispatcher</strong> tab from the More menu.</div></div>
   </div>
 
   <!-- MONEY SCREEN -->
   <div class="screen" id="screen-money">
-    <div class="section-head"><div class="section-label">— Money Tracker</div><div class="section-title">Every Dollar. Accounted For.</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Money Tracker</div><div class="section-title">Every Dollar. Accounted For.</div></div>
     <div class="dash-grid" style="margin-bottom:.8rem;">
       <div class="metric"><div class="metric-val" id="money-outstanding">$0</div><div class="metric-label">Outstanding</div></div>
       <div class="metric"><div class="metric-val amber" id="money-overdue">$0</div><div class="metric-label">Overdue</div></div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">➕ Log Invoice</div><button class="tool-help-btn" onclick="showHelp('invoice')">? How</button></div>
+      <div class="card-header"><div class="card-title">&#x2795; Log Invoice</div><button class="tool-help-btn" onclick="showHelp('invoice')">? How</button></div>
       <div class="card-body">
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Select Broker</label><select class="form-select" id="inv-broker-select" onchange="onBrokerSelectChange()"><option value="">— Select or type below —</option></select></div>
+          <div class="form-group"><label class="form-label">Select Broker</label><select class="form-select" id="inv-broker-select" onchange="onBrokerSelectChange()"><option value="">&#x2014; Select or type below &#x2014;</option></select></div>
           <div class="form-group"><label class="form-label">Amount ($)</label><input class="form-input" id="inv-amount" type="number" placeholder="2500"></div>
         </div>
         <div class="form-row">
@@ -485,41 +447,41 @@
         <button class="btn btn-green" onclick="addInvoice()">Add Invoice</button>
       </div>
     </div>
-    <button class="reopen-loadback-btn" onclick="reopenLoadback()">🔄 View Return Loads From Last Booked Load</button>
+    <button class="reopen-loadback-btn" onclick="reopenLoadback()">&#x1F504; View Return Loads From Last Booked Load</button>
     <div class="card" style="margin-top:.8rem;">
-      <div class="card-header"><div class="card-title">📊 Weekly Business Summary</div></div>
+      <div class="card-header"><div class="card-title">&#x1F4CA; Weekly Business Summary</div></div>
       <div class="card-body">
         <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">AI-generated performance review based on your actual invoice and broker data.</div>
-        <button class="btn btn-green" id="weekly-summary-btn" onclick="generateWeeklySummary()">📊 Generate Weekly Summary</button>
+        <button class="btn btn-green" id="weekly-summary-btn" onclick="generateWeeklySummary()">&#x1F4CA; Generate Weekly Summary</button>
         <div id="weekly-summary-output" style="display:none;"></div>
       </div>
     </div>
     <div class="card" style="margin-top:.8rem;">
-      <div class="card-header"><div class="card-title">📦 Tax Export</div></div>
+      <div class="card-header"><div class="card-title">&#x1F4E6; Tax Export</div></div>
       <div class="card-body">
-        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">Export invoices with BOL and Rate Con attachments organized by month for your accountant.</div>
+        <div style="font-size:.82rem;color:#b8c8b8;margin-bottom:.8rem;">Export invoices organized by month for your accountant.</div>
         <div class="form-row" style="margin-bottom:.8rem;">
           <div class="form-group"><label class="form-label">Month</label><select class="form-select" id="tax-export-month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
           <div class="form-group"><label class="form-label">Year</label><input class="form-input" id="tax-export-year" type="number" value="2026"></div>
         </div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-          <button class="btn btn-green" id="tax-export-btn" onclick="exportMonthlyTax(document.getElementById('tax-export-year').value,document.getElementById('tax-export-month').value)" style="flex:1;">📦 Export Month</button>
-          <button class="btn btn-outline" id="tax-year-export-btn" onclick="exportYearlyTax(document.getElementById('tax-export-year').value)" style="flex:1;">📦 Export Full Year</button>
+          <button class="btn btn-green" id="tax-export-btn" onclick="exportMonthlyTax(document.getElementById('tax-export-year').value,document.getElementById('tax-export-month').value)" style="flex:1;">&#x1F4E6; Export Month</button>
+          <button class="btn btn-outline" id="tax-year-export-btn" onclick="exportYearlyTax(document.getElementById('tax-export-year').value)" style="flex:1;">&#x1F4E6; Export Full Year</button>
         </div>
       </div>
     </div>
     <div class="section-label" style="margin:.8rem 0 .5rem;">Active Invoices</div>
     <div id="invoice-list">
-      <div class="alert alert-amber"><div class="alert-icon">📋</div><div>No invoices logged yet. Add your first invoice above to start tracking payments.</div></div>
+      <div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No invoices logged yet. Add your first invoice above to start tracking payments.</div></div>
     </div>
   </div>
 
   <!-- SETTINGS SCREEN -->
   <div class="screen" id="screen-settings">
-    <div class="section-head"><div class="section-label">— Preferences</div><div class="section-title">Settings</div></div>
-    <div class="alert alert-green" style="margin-bottom:1rem;"><div class="alert-icon">💡</div><div>Changes apply instantly and are saved to your device.</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Preferences</div><div class="section-title">Settings</div></div>
+    <div class="alert alert-green" style="margin-bottom:1rem;"><div class="alert-icon">&#x1F4A1;</div><div>Changes apply instantly and are saved to your device.</div></div>
     <div class="card">
-      <div class="card-header"><div class="card-title">📝 Text Size</div></div>
+      <div class="card-header"><div class="card-title">&#x1F4DD; Text Size</div></div>
       <div class="card-body">
         <div style="margin-bottom:.8rem;"><div class="settings-label">Choose Your Text Size</div><div class="settings-sub">Larger text is easier to read in the cab</div></div>
         <div class="text-size-btns" style="flex-wrap:wrap;gap:.5rem;">
@@ -531,17 +493,17 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">🌗 Display Mode</div></div>
+      <div class="card-header"><div class="card-title">&#x1F317; Display Mode</div></div>
       <div class="card-body">
         <div class="color-scheme-btns">
-          <button class="scheme-btn active" id="scheme-dark" onclick="setScheme('dark',this)" style="background:#1c1f1c;color:#f0f5f0;">🌑 Dark</button>
-          <button class="scheme-btn" id="scheme-night" onclick="setScheme('night',this)" style="background:#050505;color:#f0f5f0;">🌚 Night</button>
-          <button class="scheme-btn" id="scheme-contrast" onclick="setScheme('contrast',this)" style="background:#000;color:#fff;border-color:rgba(255,255,255,.4);">⚡ High Contrast</button>
+          <button class="scheme-btn active" id="scheme-dark" onclick="setScheme('dark',this)" style="background:#1c1f1c;color:#f0f5f0;">&#x1F311; Dark</button>
+          <button class="scheme-btn" id="scheme-night" onclick="setScheme('night',this)" style="background:#050505;color:#f0f5f0;">&#x1F31A; Night</button>
+          <button class="scheme-btn" id="scheme-contrast" onclick="setScheme('contrast',this)" style="background:#000;color:#fff;border-color:rgba(255,255,255,.4);">&#x26A1; High Contrast</button>
         </div>
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">🚛 Your Truck</div></div>
+      <div class="card-header"><div class="card-title">&#x1F69B; Your Truck</div></div>
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Driver Name</label><input class="form-input" id="set-name" placeholder="Your name" value=""></div>
@@ -559,11 +521,11 @@
           </div>
         </div>
         <button class="btn btn-green" onclick="saveTruckInfo()">Save Truck Info</button>
-        <button class="btn btn-outline" onclick="saveMCNumber()" style="margin-top:.5rem;">🛡️ Load FMCSA Profile</button>
+        <button class="btn btn-outline" onclick="saveMCNumber()" style="margin-top:.5rem;">&#x1F6E1;&#xFE0F; Load FMCSA Profile</button>
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">⛽ Fuel Defaults</div></div>
+      <div class="card-header"><div class="card-title">&#x26FD; Fuel Defaults</div></div>
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Loaded MPG</label><input class="form-input" id="set-mpg" type="number" value="6.5" step="0.1"></div>
@@ -580,21 +542,28 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">ℹ️ About RoadCommand</div></div>
+      <div class="card-header"><div class="card-title">&#x1F4B3; Subscription</div></div>
+      <div class="card-body">
+        <div style="font-size:.85rem;color:#b8c8b8;margin-bottom:.8rem;">Manage your RoadCommand subscription.</div>
+        <button class="btn btn-green" onclick="showBillingScreen()">&#x1F9FE; Manage Subscription</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">&#x2139;&#xFE0F; About RoadCommand</div></div>
       <div class="card-body">
         <div style="font-size:.88rem;color:#ffd04d;opacity:.85;line-height:1.8;">
-          <div>Version 1.0 · Built for owner-operators</div>
+          <div>Version 1.0 &middot; Built for owner-operators</div>
           <div>Live diesel prices via U.S. EIA</div>
           <div>GPS via OpenStreetMap / Nominatim</div>
           <div style="margin-top:.5rem;color:var(--green);font-style:italic;">"Built in a Peterbilt. Not a boardroom."</div>
         </div>
-        <button class="btn btn-outline" style="margin-top:.8rem;" onclick="startTutorial()">▶ Replay Tutorial</button>
+        <button class="btn btn-outline" style="margin-top:.8rem;" onclick="startTutorial()">&#x25B6; Replay Tutorial</button>
       </div>
     </div>
     <div class="card" id="feedback-card">
-      <div class="card-header"><div class="card-title">📣 Send Feedback</div></div>
+      <div class="card-header"><div class="card-title">&#x1F4E3; Send Feedback</div></div>
       <div class="card-body">
-        <div class="form-group" style="margin-bottom:.8rem;"><label class="form-label">Type</label><select class="form-select" id="feedback-type"><option value="Bug">🐛 Bug Report</option><option value="Feature">💡 Feature Request</option><option value="General">💬 General Feedback</option></select></div>
+        <div class="form-group" style="margin-bottom:.8rem;"><label class="form-label">Type</label><select class="form-select" id="feedback-type"><option value="Bug">&#x1F41B; Bug Report</option><option value="Feature">&#x1F4A1; Feature Request</option><option value="General">&#x1F4AC; General Feedback</option></select></div>
         <div class="form-group" style="margin-bottom:.8rem;"><label class="form-label">Your Feedback</label><textarea class="form-input" id="feedback-msg" rows="4" placeholder="Describe the bug or feature request..." style="resize:vertical;"></textarea></div>
         <button class="btn btn-green" onclick="submitFeedback()">Send Feedback</button>
       </div>
@@ -603,14 +572,14 @@
 
   <!-- MAINTENANCE SCREEN -->
   <div class="screen" id="screen-maint">
-    <div class="section-head"><div class="section-label">— Maintenance Tracker</div><div class="section-title">Keep It Rolling</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Maintenance Tracker</div><div class="section-title">Keep It Rolling</div></div>
     <div class="maint-cost-banner">
       <div><div class="maint-cost-label">Est. Maintenance Cost/Mile</div><div style="font-size:.7rem;color:#ffd04d;opacity:.7;margin-top:.1rem;">Based on your service intervals</div></div>
       <div class="maint-cost-val" id="maint-cpm">$0.18/mi</div>
     </div>
     <div id="maint-list"></div>
     <div class="card" style="margin-top:.8rem;">
-      <div class="card-header"><div class="card-title">➕ Add / Update Service Item</div></div>
+      <div class="card-header"><div class="card-title">&#x2795; Add / Update Service Item</div></div>
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Service Item</label><select class="form-select" id="maint-type"><option>Oil Change</option><option>Tire Rotation</option><option>Brake Inspection</option><option>Tire Replacement</option><option>Air Filter</option><option>Fuel Filter</option><option>Coolant Flush</option><option>Transmission Service</option><option>DPF Cleaning</option><option>DEF System</option><option>Annual DOT Inspection</option><option>Custom</option></select></div>
@@ -627,12 +596,12 @@
         <button class="btn btn-green" onclick="saveMaintItem()">Save Service Item</button>
       </div>
     </div>
-    <div class="alert alert-amber" style="margin-top:.8rem;"><div class="alert-icon">💡</div><div>Your maintenance cost per mile is automatically added to profit calculations so your net profit reflects your true operating cost.</div></div>
+    <div class="alert alert-amber" style="margin-top:.8rem;"><div class="alert-icon">&#x1F4A1;</div><div>Your maintenance cost per mile is automatically added to profit calculations so your net profit reflects your true operating cost.</div></div>
   </div>
 
   <!-- BROKERS SCREEN -->
   <div class="screen" id="screen-brokers">
-    <div class="section-head"><div class="section-label">— Broker Vault</div><div class="section-title">Your Broker Network</div></div>
+    <div class="section-head"><div class="section-label">&#x2014; Broker Vault</div><div class="section-title">Your Broker Network</div></div>
     <div class="dash-grid" style="margin-bottom:.8rem;">
       <div class="metric"><div class="metric-val" id="broker-total-outstanding">$0</div><div class="metric-label">Outstanding</div></div>
       <div class="metric"><div class="metric-val red" id="broker-total-overdue">$0</div><div class="metric-label">Overdue</div></div>
@@ -662,7 +631,7 @@
       <input class="form-input" id="broker-vault-search" placeholder="Search brokers by name or MC#" oninput="searchBrokers()" style="flex:1;">
     </div>
     <div id="broker-list">
-      <div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">🏦</div><div>No brokers added yet. Add your first broker above.</div></div>
+      <div class="alert alert-amber" style="margin-top:.5rem;"><div class="alert-icon">&#x1F3E6;</div><div>No brokers added yet. Add your first broker above.</div></div>
     </div>
   </div>
 
@@ -676,23 +645,23 @@
   <div class="more-drawer-handle"></div>
   <div class="more-drawer-title">More Tools</div>
   <div class="more-drawer-grid">
-    <button class="more-drawer-btn" onclick="showScreen('negotiate',this)"><span class="more-drawer-icon">🤝</span><span class="more-drawer-label">Dispatcher</span></button>
-    <button class="more-drawer-btn" onclick="showScreen('fmcsa',this)"><span class="more-drawer-icon">🛡️</span><span class="more-drawer-label">Authority</span></button>
-    <button class="more-drawer-btn" onclick="showScreen('states',this)"><span class="more-drawer-icon">🗺️</span><span class="more-drawer-label">States</span></button>
-    <button class="more-drawer-btn" onclick="showScreen('params',this)"><span class="more-drawer-icon">⚙️</span><span class="more-drawer-label">Params</span></button>
-    <button class="more-drawer-btn" onclick="showScreen('log',this)"><span class="more-drawer-icon">📋</span><span class="more-drawer-label">Log</span></button>
-    <button class="more-drawer-btn" onclick="showScreen('maint',this)"><span class="more-drawer-icon">🔩</span><span class="more-drawer-label">Maint</span></button>
-    <button class="more-drawer-btn" onclick="showScreen('settings',this)"><span class="more-drawer-icon">🔧</span><span class="more-drawer-label">Settings</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('negotiate',this)"><span class="more-drawer-icon">&#x1F91D;</span><span class="more-drawer-label">Dispatcher</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('fmcsa',this)"><span class="more-drawer-icon">&#x1F6E1;&#xFE0F;</span><span class="more-drawer-label">Authority</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('states',this)"><span class="more-drawer-icon">&#x1F5FA;&#xFE0F;</span><span class="more-drawer-label">States</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('params',this)"><span class="more-drawer-icon">&#x2699;&#xFE0F;</span><span class="more-drawer-label">Params</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('log',this)"><span class="more-drawer-icon">&#x1F4CB;</span><span class="more-drawer-label">Log</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('maint',this)"><span class="more-drawer-icon">&#x1F529;</span><span class="more-drawer-label">Maint</span></button>
+    <button class="more-drawer-btn" onclick="showScreen('settings',this)"><span class="more-drawer-icon">&#x1F527;</span><span class="more-drawer-label">Settings</span></button>
   </div>
 </div>
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav" style="display:none;" id="bottom-nav">
-  <button class="nav-btn active" data-screen="dash" onclick="showScreen('dash',this)"><span class="nav-icon">📊</span>Dash</button>
-  <button class="nav-btn" data-screen="loads" onclick="showScreen('loads',this)"><span class="nav-icon">🚛</span>Loads</button>
-  <button class="nav-btn" data-screen="money" onclick="showScreen('money',this)"><span class="nav-icon">💵</span>Money</button>
-  <button class="nav-btn" data-screen="brokers" onclick="showScreen('brokers',this)"><span class="nav-icon">🏦</span>Brokers</button>
-  <button class="nav-btn" id="more-nav-btn" onclick="toggleMoreDrawer(event)"><span class="nav-icon">☰</span>More</button>
+  <button class="nav-btn active" data-screen="dash" onclick="showScreen('dash',this)"><span class="nav-icon">&#x1F4CA;</span>Dash</button>
+  <button class="nav-btn" data-screen="loads" onclick="showScreen('loads',this)"><span class="nav-icon">&#x1F69B;</span>Loads</button>
+  <button class="nav-btn" data-screen="money" onclick="showScreen('money',this)"><span class="nav-icon">&#x1F4B5;</span>Money</button>
+  <button class="nav-btn" data-screen="brokers" onclick="showScreen('brokers',this)"><span class="nav-icon">&#x1F3E6;</span>Brokers</button>
+  <button class="nav-btn" id="more-nav-btn" onclick="toggleMoreDrawer(event)"><span class="nav-icon">&#x2630;</span>More</button>
 </nav>
 
 <!-- BROKER DETAIL PANEL -->
@@ -700,7 +669,7 @@
   <div class="loadback-sheet">
     <div class="loadback-header">
       <div class="loadback-title" id="broker-detail-name">Broker</div>
-      <button class="loadback-close" onclick="closeBrokerDetail()">✕</button>
+      <button class="loadback-close" onclick="closeBrokerDetail()">&#x2715;</button>
     </div>
     <div id="broker-detail-content"></div>
   </div>
@@ -714,12 +683,12 @@
       <div class="tutorial-step-count" id="t-step-count">Step 1 of 9</div>
     </div>
     <div class="tutorial-body" id="t-body"></div>
-    <div class="tutorial-tap-hint">👆 Tap anywhere to continue</div>
+    <div class="tutorial-tap-hint">&#x1F446; Tap anywhere to continue</div>
     <div class="tutorial-dots" id="t-dots"></div>
     <div class="tutorial-footer">
       <button class="btn-tutorial-skip" onclick="event.stopPropagation();skipTutorial()">Skip</button>
-      <button class="btn-tutorial-back" id="t-back-btn" onclick="event.stopPropagation();prevTutorialStep()" style="display:none;">← Back</button>
-      <button class="btn-tutorial-next" id="t-next-btn" onclick="event.stopPropagation();nextTutorialStep()">Tap anywhere →</button>
+      <button class="btn-tutorial-back" id="t-back-btn" onclick="event.stopPropagation();prevTutorialStep()" style="display:none;">&#x2190; Back</button>
+      <button class="btn-tutorial-next" id="t-next-btn" onclick="event.stopPropagation();nextTutorialStep()">Tap anywhere &#x2192;</button>
     </div>
   </div>
 </div>
@@ -727,7 +696,7 @@
 <!-- HELP MODAL -->
 <div class="help-modal-overlay hidden" id="help-modal-overlay" onclick="closeHelpModal(event)">
   <div class="help-modal" id="help-modal">
-    <div class="help-modal-title"><span id="help-modal-title-text">How to use this tool</span><button class="help-modal-close" onclick="closeHelpModal()">✕</button></div>
+    <div class="help-modal-title"><span id="help-modal-title-text">How to use this tool</span><button class="help-modal-close" onclick="closeHelpModal()">&#x2715;</button></div>
     <div id="help-modal-body"></div>
   </div>
 </div>
@@ -736,8 +705,8 @@
 <div class="loadback-panel" id="loadback-panel" onclick="closeLoadback(event)">
   <div class="loadback-sheet" id="loadback-sheet">
     <div class="loadback-header">
-      <div class="loadback-title">🔄 Return Load Finder</div>
-      <button class="loadback-close" onclick="closeLoadbackDirect()">✕</button>
+      <div class="loadback-title">&#x1F504; Return Load Finder</div>
+      <button class="loadback-close" onclick="closeLoadbackDirect()">&#x2715;</button>
     </div>
     <div id="loadback-content"></div>
   </div>
@@ -747,12 +716,12 @@
 <div id="fuel-report-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:900;align-items:flex-end;padding:1rem;">
   <div style="background:var(--surface);border:1px solid var(--green-border);border-radius:8px;width:100%;max-width:480px;margin:0 auto;padding:1.5rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-      <div style="font-size:1rem;font-weight:bold;color:var(--green);">⛽ Report Pump Price</div>
-      <button onclick="closeFuelModal()" style="background:none;border:none;color:#b8c8b8;font-size:1.2rem;cursor:pointer;">✕</button>
+      <div style="font-size:1rem;font-weight:bold;color:var(--green);">&#x26FD; Report Pump Price</div>
+      <button onclick="closeFuelModal()" style="background:none;border:none;color:#b8c8b8;font-size:1.2rem;cursor:pointer;">&#x2715;</button>
     </div>
     <div style="font-size:.85rem;color:#b8c8b8;margin-bottom:1rem;line-height:1.6;">What did you pay at the pump? Your report helps all RoadCommand drivers in your area get accurate local prices.</div>
     <div style="margin-bottom:1rem;"><label class="form-label">Diesel Price ($/gal)</label><input class="form-input" id="crowd-fuel-input" type="number" step="0.01" placeholder="4.25" style="font-size:1.2rem;text-align:center;"></div>
-    <div style="font-size:.75rem;color:#b8c8b8;margin-bottom:1rem;">📍 Your GPS location will be attached to this report. Reports are anonymous and averaged with nearby drivers.</div>
+    <div style="font-size:.75rem;color:#b8c8b8;margin-bottom:1rem;">&#x1F4CD; Your GPS location will be attached to this report. Reports are anonymous and averaged with nearby drivers.</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
       <button class="btn btn-green" onclick="submitFuelPrice()" style="flex:1;min-width:160px;">Submit Price Report</button>
       <button class="btn btn-outline" onclick="closeFuelModal()" style="flex:1;min-width:80px;">Cancel</button>
