@@ -855,6 +855,30 @@ document.addEventListener('DOMContentLoaded', function() {
 // Live broker credit cache — populated from Truckstop SOAP load data as loads come in
 var _brokerCreditCache = {};
 
+// Session broker block list — brokers hidden for this session only
+var _blockedBrokers = new Set();
+
+function blockBroker(brokerName) {
+  if (!brokerName) return;
+  _blockedBrokers.add(brokerName.toLowerCase().trim());
+  // Re-render loads without the blocked broker
+  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
+    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+  }
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#ffd04d;padding:.6rem 1.2rem;border-radius:20px;font-size:.82rem;font-weight:bold;z-index:9999;border:1px solid rgba(255,208,77,.3);white-space:nowrap;';
+  toast.textContent = '🚫 ' + brokerName + ' hidden for this session';
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 3000);
+}
+
+function unblockAllBrokers() {
+  _blockedBrokers.clear();
+  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
+    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+  }
+}
+
 function cacheBrokerCredit(brokerName, credit, days2Pay) {
   if (!brokerName || (!credit && !days2Pay)) return;
   var key = brokerName.toLowerCase().trim();
@@ -1338,6 +1362,36 @@ function bookLoad(btn, origin, dest, rate, miles, broker, phone) {
     card.querySelectorAll(".load-tag").forEach(function(t) { t.className = "load-tag tag-booked"; t.textContent = "Booked"; });
   }
 
+  // Grab pickup date from load card panel for ETA calculation
+  var panel = btn.closest('.load-expand-panel') || btn.closest('[data-pickup]');
+  var pickupDate = null;
+  if (panel) {
+    // Look for pickup date in the panel
+    var pickupEl = panel.querySelector('[data-pickupdate]') || panel.querySelector('.pickup-date-val');
+    if (pickupEl) pickupDate = pickupEl.textContent.trim();
+    // Also check load card for pickup date text
+    if (!pickupDate) {
+      var cardEl = btn.closest('.load-card');
+      if (cardEl) {
+        var pickupText = cardEl.innerHTML.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+        if (pickupText) pickupDate = pickupText[1];
+      }
+    }
+  }
+  // Store for use in saveBookedLoadForLoadback
+  if (pickupDate) {
+    try {
+      // Convert M/D/YY to YYYY-MM-DD
+      var parts = pickupDate.split('/');
+      if (parts.length === 3) {
+        var yr = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+        window._lastBookedPickup = yr + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
+      }
+    } catch(e) { window._lastBookedPickup = null; }
+  } else {
+    window._lastBookedPickup = null;
+  }
+
   // Show actual pay confirmation modal
   showBookConfirmModal(origin, dest, rate, miles, broker, phone);
 }
@@ -1502,11 +1556,16 @@ async function saveBookedLoadForLoadback(origin, dest, rate, miles, broker) {
     var destCity  = destParts[0].trim();
     var destState = destParts.length > 1 ? destParts[1].trim() : '';
 
-    // Calculate ETA based on miles and avg speed
-    var avgSpeed  = 55;
+    // Calculate ETA based on pickup date + drive time (not today)
+    var avgSpeed     = defaults.speed || 55;
     var drivingHours = miles / avgSpeed;
-    var etaDate   = new Date();
-    etaDate.setHours(etaDate.getHours() + Math.ceil(drivingHours));
+    // HOS: 11 hrs driving per day max, so calculate calendar days
+    var drivingDays  = Math.ceil(drivingHours / 11);
+    // Start from pickup date if available, otherwise today
+    var pickupStr = window._lastBookedPickup || null;
+    var etaDate   = pickupStr ? new Date(pickupStr + 'T12:00:00') : new Date();
+    // Add driving days to pickup date
+    etaDate.setDate(etaDate.getDate() + drivingDays);
 
     await _supabase.from('booked_loads').upsert({
       user_id:        window._rcUserId,
@@ -4272,6 +4331,30 @@ function renderLiveLoadCards(loads, minRpm) {
   }
 
   // Calculate net RPM for each load (rate minus fuel / total miles)
+  // Filter out session-blocked brokers
+  if (_blockedBrokers.size > 0) {
+    loads = loads.filter(function(l) {
+      return !l.broker || !_blockedBrokers.has(l.broker.toLowerCase().trim());
+    });
+    // Show unblock banner on dash
+    var existing = document.getElementById('broker-block-banner');
+    if (!existing) {
+      var banner = document.createElement('div');
+      banner.id = 'broker-block-banner';
+      banner.style.cssText = 'background:#1a1200;border:1px solid rgba(255,208,77,.3);border-radius:6px;padding:.4rem .8rem;margin:.4rem 0;display:flex;align-items:center;justify-content:space-between;font-size:.75rem;';
+      banner.innerHTML = '<span style="color:#ffd04d;">🚫 <span id="broker-block-count">' + _blockedBrokers.size + '</span> broker(s) hidden this session</span>' +
+        '<button onclick="unblockAllBrokers()" style="background:none;border:1px solid rgba(255,208,77,.3);color:#ffd04d;border-radius:4px;padding:.15rem .4rem;font-size:.7rem;cursor:pointer;">Show All</button>';
+      var dashLoads = document.getElementById('dash-live-loads');
+      if (dashLoads) dashLoads.parentNode.insertBefore(banner, dashLoads);
+    } else {
+      var countEl = document.getElementById('broker-block-count');
+      if (countEl) countEl.textContent = _blockedBrokers.size;
+    }
+  } else {
+    var banner = document.getElementById('broker-block-banner');
+    if (banner) banner.remove();
+  }
+
   // Cache broker credit data from live loads
   loads.forEach(function(l) {
     if (l.broker && (l.credit || l.days2Pay)) {
@@ -4395,6 +4478,7 @@ function renderLiveLoadCards(loads, minRpm) {
           '<button class="load-action-btn call-btn" onclick="callBroker(\'' + bestPhone + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
           '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + bestPhone + '\')"><span class="btn-icon">✓</span>Book</button>' +
           '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
+          (load.broker ? '<button class="load-action-btn" onclick="blockBroker(this.dataset.broker)" data-broker="' + (load.broker||'').replace(/"/g,'&quot;') + '" style="font-size:.7rem;color:#ff7e7e;border-color:rgba(255,126,126,.3);padding:.3rem .5rem;">🚫 Hide</button>' : '') +
         '</div>' +
       '</div>';
     }).join('');
@@ -4657,7 +4741,7 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
           '<span class="loadback-stat">Net: <strong>$' + l.returnNet.toLocaleString() + '</strong></span>' +
           '<span class="loadback-stat">Round Trip: <strong style="color:var(--green)">$' + l.roundTripNet.toLocaleString() + '</strong></span>' +
         '</div>' +
-        '<div class="loadback-date">📅 Available around arrival · ' + (l.equipment || 'V') + '</div>' +
+        '<div class="loadback-date">📅 Pickup: ' + (l.pickupDate || 'Flexible') + ' · Available around your arrival · ' + (l.equipment || 'V') + '</div>' +
         '<div class="lb-actions">' +
           (l.contactPhone ? '<button class="lb-call-btn" onclick="callBroker(\'' + l.contactPhone + '\',\'' + (l.broker || 'Broker') + '\')">📞 Call ' + (l.broker || 'Broker') + '</button>' : '') +
           '<button class="lb-book-btn" onclick="addReturnLoad(\'' + l.route + '\',' + l.miles + ',' + l.rate + ')">✓ Add to Loads</button>' +
