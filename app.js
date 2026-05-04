@@ -3442,22 +3442,11 @@ async function fetchTruckstopLoads(forceRefresh) {
   _liveLoadsFetching = false;
 }
 // ── Render live load cards into both dash and loads screens ───────────────
-// ── National freight market data — two-pass: real volume + avg RPM ─────────
-var _nationalStatsFetching = false;
-var _nationalStatsLastFetch = 0;
-
+// ── National freight market data — reads from Supabase state_stats table ──
+// Data is collected by rc-push-worker cron every 30 min — no direct API calls
 async function fetchNationalStateData() {
-  var now = Date.now();
-  if (_nationalStatsFetching) return;
-  if (_nationalStatsLastFetch && (now - _nationalStatsLastFetch) < 1800000) return;
-  _nationalStatsFetching = true;
+  if (!window._supabaseReady || !window._supabase) return;
 
-  var ALL_STATES = [
-    'WA','OR','ID','MT','WY','CA','NV','UT','CO','AZ','NM',
-    'TX','OK','KS','NE','SD','ND','MN','IA','MO','AR','LA',
-    'MS','AL','TN','KY','IN','IL','WI','MI','OH','WV','VA',
-    'NC','SC','GA','FL','PA','NY','NJ','CT','MA','ME','NH','VT','DE','MD'
-  ];
   var STATE_NAMES = {
     WA:'Washington',OR:'Oregon',ID:'Idaho',MT:'Montana',WY:'Wyoming',
     CA:'California',NV:'Nevada',UT:'Utah',CO:'Colorado',AZ:'Arizona',
@@ -3472,103 +3461,61 @@ async function fetchNationalStateData() {
     DE:'Delaware',MD:'Maryland'
   };
 
-  var equipType = (window._rcEquipmentType || 'V').split(',')[0].trim();
-  var statMap = {};
-  var BATCH_SIZE = 4; // conservative — Truckstop rate limits aggressive parallel requests
-
   var list = document.getElementById('state-list');
-  if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">Loading national freight data...</div>';
+  if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">Loading freight market data...</div>';
 
-  // PASS 1: countOnly=true — real TotalCount from Truckstop, one cheap call per state
-  for (var b = 0; b < ALL_STATES.length; b += BATCH_SIZE) {
-    var batch = ALL_STATES.slice(b, b + BATCH_SIZE);
-    var p1 = batch.map(function(st) {
-      var url = _tsWorkerUrl + '/search' +
-        '?originState=' + encodeURIComponent(st) +
-        '&originCity=&equipmentType=' + encodeURIComponent(equipType) +
-        '&hoursOld=24&pageSize=1&originRange=999&loadType=All&countOnly=true';
-      return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-        if (!data.success) return;
-        var s = st.toUpperCase();
-        if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
-        statMap[s].volume = data.totalCount || data.count || 0;
-      }).catch(function() {});
-    });
-    await Promise.all(p1);
-    if (b + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 1000); });
-  }
+  try {
+    var result = await window._supabase
+      .from('state_stats')
+      .select('*')
+      .order('volume', { ascending: false });
 
-  // Show real volumes immediately while RPM data loads
-  var interim = Object.keys(statMap).map(function(code) {
-    return { code: code, name: STATE_NAMES[code] || code, volume: statMap[code].volume, rpm: 0, trend: 'flat', maxVol: 0 };
-  });
-  if (interim.length > 0) {
-    var maxV = Math.max.apply(null, interim.map(function(s) { return s.volume; }));
-    interim.forEach(function(s) { s.maxVol = maxV; });
-    interim.sort(function(a, b) { return b.volume - a.volume; });
-    stateData = interim;
-    renderStates(stateData);
-    if (list && list.firstChild) {
-      var notice = document.createElement('div');
-      notice.style.cssText = 'padding:.4rem 1rem;text-align:center;color:#b8c8b8;font-size:.75rem;';
-      notice.textContent = 'Loading avg RPM data...';
-      list.insertBefore(notice, list.firstChild);
+    if (result.error) throw result.error;
+    var rows = result.data || [];
+
+    if (rows.length === 0) {
+      // Table exists but no data yet — push worker hasn't run yet
+      if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#b8c8b8;font-size:.85rem;">Market data is being collected — check back in a few minutes.</div>';
+      return;
     }
-  }
 
-  // PASS 2: top 200 loads per state for avg RPM
-  for (var b2 = 0; b2 < ALL_STATES.length; b2 += BATCH_SIZE) {
-    var batch2 = ALL_STATES.slice(b2, b2 + BATCH_SIZE);
-    var p2 = batch2.map(function(st) {
-      var url = _tsWorkerUrl + '/search' +
-        '?originState=' + encodeURIComponent(st) +
-        '&originCity=&equipmentType=' + encodeURIComponent(equipType) +
-        '&hoursOld=24&pageSize=200&originRange=999&loadType=All&sortBy=Rate&sortDescending=true';
-      return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-        if (!data.success || !data.loads) return;
-        var s = st.toUpperCase();
-        if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
-        data.loads.forEach(function(l) {
-          if (l.rate > 0 && l.miles > 0) {
-            statMap[s].rpmSum   += l.rate / l.miles;
-            statMap[s].rpmCount += 1;
-          }
-        });
-      }).catch(function() {});
+    var maxVol = Math.max.apply(null, rows.map(function(r) { return r.volume || 0; }));
+    var updated = rows.map(function(r) {
+      return {
+        code:   r.state_code,
+        name:   STATE_NAMES[r.state_code] || r.state_code,
+        volume: r.volume || 0,
+        rpm:    parseFloat((r.avg_rpm || 0).toFixed(2)),
+        trend:  'flat',
+        maxVol: maxVol
+      };
     });
-    await Promise.all(p2);
-    if (b2 + BATCH_SIZE < ALL_STATES.length) await new Promise(function(r) { setTimeout(r, 1000); });
-  }
 
-  // Final render: real volume + real avg RPM
-  var updated = Object.keys(statMap).map(function(code) {
-    var s = statMap[code];
-    var avgRpm = s.rpmCount > 0 ? s.rpmSum / s.rpmCount : 0;
-    var existing = stateData.find(function(x) { return x.code === code; });
-    return {
-      code:   code,
-      name:   STATE_NAMES[code] || code,
-      volume: s.volume,
-      rpm:    parseFloat(avgRpm.toFixed(2)),
-      trend:  existing ? existing.trend : 'flat',
-      maxVol: 0
-    };
-  });
-
-  if (updated.length > 0) {
-    var maxVol = Math.max.apply(null, updated.map(function(s) { return s.volume; }));
-    updated.forEach(function(s) { s.maxVol = maxVol; });
-    updated.sort(function(a, b) { return b.volume - a.volume; });
     stateData = updated;
     renderStates(stateData);
-    _nationalStatsLastFetch = Date.now();
-  }
 
-  _nationalStatsFetching = false;
+    // Show last updated time
+    if (list && rows[0] && rows[0].updated_at) {
+      var updatedAt = new Date(rows[0].updated_at);
+      var minutesAgo = Math.round((Date.now() - updatedAt.getTime()) / 60000);
+      var notice = document.createElement('div');
+      notice.style.cssText = 'padding:.3rem 1rem;text-align:right;color:#b8c8b8;font-size:.7rem;';
+      notice.textContent = 'Updated ' + minutesAgo + ' min ago · refreshes every 30 min';
+      list.appendChild(notice);
+    }
+
+  } catch(e) {
+    console.error('State stats load error:', e);
+    if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#b8c8b8;font-size:.85rem;">Could not load market data.</div>';
+  }
 }
 
-// ── Build real state stats from live local loads ────────────────────────
+
+// ── Update only the current origin state in stateData from live loads ───
+// Does NOT replace national data — only refreshes the state you are in
 function updateStatesFromLoads(loads) {
+  if (!loads || loads.length === 0) return;
+  // Only tally the origin state of the current search (should all be same state)
   var statMap = {};
   loads.forEach(function(l) {
     if (!l.originState || l.rate <= 0 || l.miles <= 0) return;
@@ -3599,10 +3546,15 @@ function updateStatesFromLoads(loads) {
     return { code: code, name: STATE_NAMES[code] || code, volume: s.volume, rpm: parseFloat(avgRpm.toFixed(2)), trend: trend, maxVol: 0 };
   });
   if (updated.length === 0) return;
-  var maxVol = Math.max.apply(null, updated.map(function(s) { return s.volume; }));
-  updated.forEach(function(s) { s.maxVol = maxVol; });
-  updated.sort(function(a, b) { return b.volume - a.volume; });
-  stateData = updated;
+  // Merge into existing stateData — only update states present in local loads
+  updated.forEach(function(u) {
+    var idx = stateData.findIndex(function(s) { return s.code === u.code; });
+    if (idx >= 0) {
+      stateData[idx].rpm = u.rpm; // update RPM from live data
+      // Only update volume if we dont have national data (volume would be small)
+      if (stateData[idx].volume <= 10) stateData[idx].volume = u.volume;
+    }
+  });
   renderStates(stateData);
 }
 
