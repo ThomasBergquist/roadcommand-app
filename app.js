@@ -72,6 +72,8 @@ function onAuthReady(firstName, userId, email) {
   setTimeout(loadBrokers, 800);
   setTimeout(loadInvoices, 1000);
   setTimeout(loadMaintItems, 1200);
+  // Check subscription status
+  setTimeout(function() { checkSubscriptionStatus(userId, email); }, 1500);
 }
 
 function submitFeedback() {
@@ -3457,6 +3459,206 @@ function toggleCommandDetail() {
   var d = document.getElementById('command-detail');
   if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
 }
+
+
+// ══════════════════════════════════════════════════════════════
+// SUBSCRIPTION & BILLING
+// ══════════════════════════════════════════════════════════════
+var _billingWorker = 'https://stripe-billing-worker.wild-sunset-1d5f.workers.dev';
+var _subStatus     = null;
+
+async function checkSubscriptionStatus(userId, email) {
+  if (!userId) return;
+  try {
+    // Always read from Supabase — source of truth
+    var result = await window._supabase
+      .from('profiles')
+      .select('subscription_status,subscription_expires')
+      .eq('user_id', userId)
+      .single();
+
+    if (result.error || !result.data) return;
+
+    var status  = result.data.subscription_status || 'trial';
+    var expires = result.data.subscription_expires;
+    _subStatus  = status;
+
+    // Beta users always have full access
+    if (status === 'beta') return;
+
+    // Check if trial or subscription has expired
+    var now      = new Date();
+    var expDate  = expires ? new Date(expires) : null;
+    var isExpired = expDate && expDate < now;
+
+    if (status === 'active' && !isExpired) return; // paid and current
+    if (status === 'trial'  && !isExpired) {
+      // Show trial banner with days remaining
+      var daysLeft = expDate ? Math.ceil((expDate - now) / 86400000) : 14;
+      showTrialBanner(daysLeft);
+      return;
+    }
+
+    // Expired — show paywall
+    showPaywall(status === 'trial' ? 'trial_expired' : 'subscription_expired');
+
+  } catch(e) {
+    console.error('Subscription check error:', e);
+  }
+}
+
+function showTrialBanner(daysLeft) {
+  // Only show if not already there
+  if (document.getElementById('trial-banner')) return;
+  var banner = document.createElement('div');
+  banner.id  = 'trial-banner';
+  banner.style.cssText = 'background:linear-gradient(90deg,#1a2e1a,#0d1f0d);border-bottom:1px solid var(--green-border);padding:.5rem 1rem;display:flex;align-items:center;justify-content:space-between;font-size:.75rem;position:sticky;top:0;z-index:500;';
+  banner.innerHTML = '<span style="color:#ffd04d;">⏳ ' + daysLeft + ' day' + (daysLeft !== 1 ? 's' : '') + ' left in your free trial</span>' +
+    '<button onclick="showBillingScreen()" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.25rem .6rem;font-size:.72rem;font-weight:bold;cursor:pointer;">Subscribe $197/mo</button>';
+  var main = document.querySelector('.main');
+  if (main) main.insertBefore(banner, main.firstChild);
+}
+
+function showPaywall(reason) {
+  // Blur the main content and show paywall overlay
+  var overlay = document.getElementById('paywall-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'paywall-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+    document.body.appendChild(overlay);
+  }
+  var isTrialExpired = reason === 'trial_expired';
+  overlay.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:12px;max-width:420px;width:100%;padding:2rem;text-align:center;">' +
+      '<div style="font-size:2rem;margin-bottom:.8rem;">🚛</div>' +
+      '<div style="font-size:1.2rem;font-weight:bold;color:var(--green);margin-bottom:.5rem;">RoadCommand</div>' +
+      '<div style="font-size:.9rem;color:#ffd04d;margin-bottom:.5rem;">' +
+        (isTrialExpired ? 'Your 14-day trial has ended' : 'Your subscription has expired') +
+      '</div>' +
+      '<div style="font-size:.82rem;color:#b8c8b8;margin-bottom:1.5rem;line-height:1.6;">' +
+        'Subscribe to keep access to live loads, AI dispatch, push notifications, and everything else built for owner-operators.' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:.7rem;margin-bottom:1rem;">' +
+        '<button onclick="startCheckout(&quot;monthly&quot;)" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:.9rem;font-size:.95rem;font-weight:bold;cursor:pointer;">$197 / month<br><span style=\"font-size:.72rem;font-weight:normal;opacity:.8;\">14-day free trial included</span></button>' +
+        '<button onclick="startCheckout(&quot;annual&quot;)" style="background:transparent;color:var(--green);border:1px solid var(--green-border);border-radius:8px;padding:.9rem;font-size:.95rem;cursor:pointer;">$1,970 / year<br><span style=\"font-size:.72rem;opacity:.7;\">Save $394 — 2 months free</span></button>' +
+      '</div>' +
+      '<div style="font-size:.7rem;color:#b8c8b8;">Cancel anytime · No contracts · Built for owner-operators</div>' +
+    '</div>';
+}
+
+function showBillingScreen() {
+  // Remove trial banner if present
+  var banner = document.getElementById('trial-banner');
+  if (banner) banner.remove();
+
+  var overlay = document.getElementById('billing-screen-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'billing-screen-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:8000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
+    document.body.appendChild(overlay);
+  }
+
+  var status = _subStatus || 'trial';
+  var isBeta = status === 'beta';
+  var isActive = status === 'active';
+
+  overlay.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:12px;max-width:440px;width:100%;padding:2rem;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">' +
+        '<div style="font-size:1rem;font-weight:bold;color:var(--green);">🧾 Subscription</div>' +
+        '<button onclick="document.getElementById(&quot;billing-screen-overlay&quot;).remove()" style="background:none;border:none;color:#b8c8b8;font-size:1.2rem;cursor:pointer;">✕</button>' +
+      '</div>' +
+
+      // Current status
+      '<div style="background:#0d1f0d;border:1px solid var(--green-border);border-radius:8px;padding:1rem;margin-bottom:1.2rem;">' +
+        '<div style="font-size:.75rem;color:#b8c8b8;margin-bottom:.3rem;">Current Plan</div>' +
+        '<div style="font-size:1rem;font-weight:bold;color:' + (isBeta ? '#ffd04d' : isActive ? 'var(--green)' : '#ff7e7e') + ';">' +
+          (isBeta ? '⭐ Beta Access — Lifetime Free' : isActive ? '✅ Active Subscription' : '⏳ Free Trial') +
+        '</div>' +
+      '</div>' +
+
+      (isBeta || isActive ? '' :
+        // Plans
+        '<div style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:1.2rem;">' +
+          '<button onclick="startCheckout(&quot;monthly&quot;)" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:.9rem;font-size:.9rem;font-weight:bold;cursor:pointer;text-align:left;">' +
+            '<div>Monthly — $197/mo</div>' +
+            '<div style=\"font-size:.72rem;font-weight:normal;opacity:.8;\">14-day free trial · Cancel anytime</div>' +
+          '</button>' +
+          '<button onclick="startCheckout(&quot;annual&quot;)" style="background:transparent;color:var(--green);border:1px solid var(--green-border);border-radius:8px;padding:.9rem;font-size:.9rem;cursor:pointer;text-align:left;">' +
+            '<div>Annual — $1,970/yr <span style=\"background:#ffd04d;color:#000;font-size:.65rem;padding:.1rem .3rem;border-radius:3px;margin-left:.3rem;\">SAVE $394</span></div>' +
+            '<div style=\"font-size:.72rem;opacity:.7;\">2 months free · Best value</div>' +
+          '</button>' +
+        '</div>'
+      ) +
+
+      (isActive ?
+        '<button onclick="openBillingPortal()" style="width:100%;background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.7rem;font-size:.82rem;cursor:pointer;">Manage Subscription / Cancel</button>'
+        : ''
+      ) +
+
+      '<div style="margin-top:1rem;font-size:.7rem;color:#b8c8b8;text-align:center;">Secured by Stripe · Cancel anytime · No contracts</div>' +
+    '</div>';
+}
+
+async function startCheckout(plan) {
+  if (!window._rcUserId || !window._rcUserEmail) return;
+  var btn = event && event.target;
+  if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
+
+  try {
+    var res  = await fetch(_billingWorker + '/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: window._rcUserId,
+        email:  window._rcUserEmail,
+        plan:   plan
+      })
+    });
+    var data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert('Could not start checkout. Please try again.');
+      if (btn) { btn.textContent = plan === 'monthly' ? '$197 / month' : '$1,970 / year'; btn.disabled = false; }
+    }
+  } catch(e) {
+    alert('Checkout error. Please try again.');
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+async function openBillingPortal() {
+  if (!window._rcUserId) return;
+  try {
+    var res  = await fetch(_billingWorker + '/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: window._rcUserId })
+    });
+    var data = await res.json();
+    if (data.url) window.location.href = data.url;
+  } catch(e) {
+    alert('Could not open billing portal. Please try again.');
+  }
+}
+
+// Handle return from Stripe checkout
+(function checkBillingReturn() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('billing') === 'success') {
+    history.replaceState({}, '', window.location.pathname);
+    setTimeout(function() {
+      var overlay = document.getElementById('paywall-overlay');
+      if (overlay) overlay.remove();
+      var banner = document.getElementById('trial-banner');
+      if (banner) banner.remove();
+      alert('Welcome to RoadCommand! Your subscription is active. Go make some money. 🚛');
+    }, 1000);
+  }
+})();
 
 // Hook into onAuthReady and loadInvoices
 var _origOnAuthReady = onAuthReady;
