@@ -67,6 +67,8 @@ function onAuthReady(firstName, userId, email) {
   loadSavedPreferences();
   renderMaint();
   refreshWeather();
+  // Clear hardcoded placeholder values so they show — before real data loads
+  clearPlaceholderValues();
   setTimeout(startGPS, 500);
   setTimeout(checkFirstTime, 700);
   setTimeout(loadBrokers, 800);
@@ -212,11 +214,104 @@ function skipLoad(btn) {
   setTimeout(() => card.remove(), 300);
 }
 
+function clearPlaceholderValues() {
+  // Clear hardcoded dashboard metrics
+  var metricCards = document.querySelectorAll('#screen-dash .metric-val');
+  metricCards.forEach(function(el) { el.textContent = '—'; });
+
+  // Clear hardcoded logbook YTD metrics
+  var logMetrics = document.querySelectorAll('#screen-log .metric-val');
+  logMetrics.forEach(function(el) { el.textContent = '—'; });
+
+  // Clear hardcoded logbook sample runs
+  var runList = document.getElementById('run-list');
+  if (runList) runList.innerHTML = '<div style="padding:1rem;text-align:center;color:#b8c8b8;font-size:.82rem;">Loading your run history...</div>';
+
+  // Update calculator minimum alert to show real value
+  var calcAlerts = document.querySelectorAll('#screen-calc .alert');
+  calcAlerts.forEach(function(el) {
+    if (el.textContent.indexOf('minimum is set') >= 0) {
+      var minRpm = defaults.minRpm || 2.00;
+      el.querySelector('div:last-child').innerHTML = 'Your minimum is set to <strong>$' + minRpm.toFixed(2) + '/mi</strong>. Change in Parameters.';
+    }
+  });
+}
+
 function showAddLoad() {
   const f = document.getElementById('add-load-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
-function saveLoad() { alert('Load saved!'); document.getElementById('add-load-form').style.display = 'none'; }
+async function saveLoad() {
+  var form    = document.getElementById('add-load-form');
+  var inputs  = form.querySelectorAll('input, textarea, select');
+  var origin  = form.querySelectorAll('input')[0].value.trim();
+  var dest    = form.querySelectorAll('input')[1].value.trim();
+  var rate    = parseFloat(form.querySelectorAll('input')[2].value) || 0;
+  var miles   = parseInt(form.querySelectorAll('input')[3].value) || 0;
+  var broker  = form.querySelectorAll('input')[4].value.trim();
+  var phone   = document.getElementById('new-load-phone').value.trim();
+  var pickup  = form.querySelectorAll('input')[6].value;
+  var weight  = parseInt(form.querySelectorAll('input')[7].value) || 0;
+  var notes   = form.querySelector('textarea') ? form.querySelector('textarea').value.trim() : '';
+
+  if (!origin || !dest) { alert('Origin and destination are required.'); return; }
+
+  // Build a manual load object that matches the live load card format
+  var manualLoad = {
+    id:          'manual-' + Date.now(),
+    originCity:  origin.split(',')[0].trim(),
+    originState: (origin.split(',')[1] || '').trim(),
+    destCity:    dest.split(',')[0].trim(),
+    destState:   (dest.split(',')[1] || '').trim(),
+    rate:        rate,
+    miles:       miles,
+    weight:      weight,
+    broker:      broker,
+    brokerPhone: phone,
+    pickupDate:  pickup,
+    notes:       notes,
+    rpm:         miles > 0 && rate > 0 ? parseFloat((rate / miles).toFixed(2)) : 0,
+    deadheadMiles: 0,
+    equipment:   window._rcEquipmentType || 'F',
+    loadType:    'Full',
+    credit:      '',
+    days2Pay:    '',
+    age:         '0',
+    manual:      true,
+  };
+
+  // Add to live loads cache and re-render
+  if (!_liveLoadsCache) _liveLoadsCache = [];
+  _liveLoadsCache.push(manualLoad);
+  renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+
+  // Save to booked_loads if rate > 0 so it shows in invoice history
+  if (rate > 0 && window._rcUserId && window._supabaseReady) {
+    try {
+      await window._supabase.from('booked_loads').insert({
+        user_id:    window._rcUserId,
+        origin:     origin,
+        destination: dest,
+        rate:       rate,
+        miles:      miles,
+        broker:     broker,
+        eta_date:   pickup || new Date().toISOString().split('T')[0],
+        active:     false,
+      });
+    } catch(e) { console.error('Save manual load error:', e); }
+  }
+
+  // Clear form and hide
+  inputs.forEach(function(el) { el.value = ''; });
+  form.style.display = 'none';
+
+  // Show toast
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:.6rem 1.2rem;border-radius:20px;font-size:.82rem;font-weight:bold;z-index:9999;';
+  toast.textContent = '✅ Load added';
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 2500);
+}
 function showAddRun() {
   const f = document.getElementById('add-run-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
@@ -763,17 +858,59 @@ var BROKER_DB = {
   "landstar":      { score:"A+", days:21, flags:[{t:"good",i:"✅",m:"Top tier credit"},{t:"good",i:"✅",m:"Agent based — negotiate with agent directly"}], rec:"Push the agent for an extra 5 to 10 percent. They have flexibility." },
 };
 
-function lookupBroker() {
+async function lookupBroker() {
   var q = document.getElementById("broker-search").value.trim().toLowerCase();
   var result = document.getElementById("broker-result");
   if (!q) return;
+
+  // First check your own broker vault in Supabase
   var match = null;
-  var keys = Object.keys(BROKER_DB);
-  for (var k = 0; k < keys.length; k++) {
-    if (q.indexOf(keys[k]) >= 0 || keys[k].indexOf(q) >= 0) { match = BROKER_DB[keys[k]]; break; }
+  if (window._supabaseReady && window._rcUserId) {
+    try {
+      var vaultRes = await window._supabase
+        .from('brokers')
+        .select('*')
+        .eq('user_id', window._rcUserId);
+      if (!vaultRes.error && vaultRes.data) {
+        var vaultMatch = vaultRes.data.find(function(b) {
+          var name = (b.name || '').toLowerCase();
+          var mc   = (b.mc_number || '').toLowerCase();
+          return name.indexOf(q) >= 0 || q.indexOf(name) >= 0 || mc === q || mc === 'mc-' + q;
+        });
+        if (vaultMatch) {
+          // Build match from your real broker data
+          var invData = invoices ? invoices.filter(function(i) { return (i.broker_name || '').toLowerCase().indexOf((vaultMatch.name || '').toLowerCase()) >= 0; }) : [];
+          var avgDays = invData.length > 0 ? Math.round(invData.reduce(function(sum, i) {
+            if (i.invoice_date && i.paid_date) {
+              return sum + Math.round((new Date(i.paid_date) - new Date(i.invoice_date)) / 86400000);
+            }
+            return sum + parseInt(vaultMatch.payment_terms || 30);
+          }, 0) / invData.length) : parseInt(vaultMatch.payment_terms || 30);
+          match = {
+            score: '★ Vault',
+            days:  avgDays,
+            flags: [
+              { t:'good', i:'📋', m:'In your broker vault — ' + invData.length + ' invoice' + (invData.length !== 1 ? 's' : '') + ' on record' },
+              { t:'good', i:'📞', m:'Phone: ' + (vaultMatch.phone || 'not saved') },
+              vaultMatch.notes ? { t:'warn', i:'📝', m:vaultMatch.notes } : null
+            ].filter(Boolean),
+            rec: 'From your vault. Payment terms: Net ' + (vaultMatch.payment_terms || 30) + '. ' + (vaultMatch.notes || '')
+          };
+        }
+      }
+    } catch(e) {}
   }
+
+  // Fall back to BROKER_DB if not in vault
   if (!match) {
-    match = { score:"N/A", days:"?", flags:[{t:"warn",i:"⚠️",m:"Broker not in database — verify on Truckstop"},{t:"warn",i:"⚠️",m:"Check credit score before loading"},{t:"warn",i:"⚠️",m:"Get signed rate confirmation before accepting"}], rec:"Unknown broker. Check their Truckstop credit rating. Always get payment terms in writing." };
+    var keys = Object.keys(BROKER_DB);
+    for (var k = 0; k < keys.length; k++) {
+      if (q.indexOf(keys[k]) >= 0 || keys[k].indexOf(q) >= 0) { match = BROKER_DB[keys[k]]; break; }
+    }
+  }
+
+  if (!match) {
+    match = { score:"N/A", days:"?", flags:[{t:"warn",i:"⚠️",m:"Not in your vault or database"},{t:"warn",i:"⚠️",m:"Check credit score on Truckstop before loading"},{t:"warn",i:"⚠️",m:"Get signed rate confirmation before accepting"}], rec:"Unknown broker. Check their Truckstop credit rating. Always get payment terms in writing." };
   }
   var scoreColor = match.score.indexOf("A") === 0 ? "var(--green)" : match.score.indexOf("B") === 0 ? "var(--amber)" : "var(--red)";
   var daysColor  = match.days <= 28 ? "var(--green)" : match.days <= 35 ? "var(--amber)" : "var(--red)";
@@ -1960,7 +2097,7 @@ async function _fetchFuelPriceLive(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
@@ -2009,7 +2146,21 @@ renderStates(stateData); injectProfitBars(); loadSavedPreferences(); renderMaint
     if (!pulling) return; pulling = false;
     var dist = e.changedTouches[0].clientY - startY;
     indicator.style.transform = 'translateY(-100%)'; indicator.textContent = 'Pull to refresh';
-    if (dist > 60) { indicator.textContent = 'Refreshing...'; indicator.style.transform = 'translateY(0)'; startGPS(); refreshWeather(); setTimeout(function() { indicator.style.transform = 'translateY(-100%)'; }, 1500); }
+    if (dist > 60) {
+      indicator.textContent = 'Refreshing...';
+      indicator.style.transform = 'translateY(0)';
+      // Check which screen is active and refresh accordingly
+      var statesScreen = document.getElementById('screen-states');
+      if (statesScreen && statesScreen.classList.contains('active')) {
+        // On states tab — force refresh national data from Supabase
+        _nationalStatsLastFetch = 0; // clear cache so it re-fetches
+        fetchNationalStateData();
+      } else {
+        startGPS();
+        refreshWeather();
+      }
+      setTimeout(function() { indicator.style.transform = 'translateY(-100%)'; }, 1500);
+    }
     startY = 0;
   }, { passive: true });
 })();
@@ -3684,8 +3835,43 @@ onAuthReady = function(firstName, userId, email) {
 var _origLoadInvoices = loadInvoices;
 loadInvoices = async function() {
   await _origLoadInvoices();
-  setTimeout(function() { updateDashboardStats(); renderCommandScore(); }, 500);
+  setTimeout(function() { updateDashboardStats(); renderCommandScore(); renderLogbook(); }, 500);
 };
+
+function renderLogbook() {
+  var logList = document.getElementById('run-list');
+  if (!logList) return;
+  if (!invoices || invoices.length === 0) {
+    logList.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">📋</div><div>No completed runs yet. Book loads and log invoices to build your history.</div></div>';
+    return;
+  }
+  // Sort by invoice date descending — most recent first
+  var sorted = invoices.slice().sort(function(a, b) {
+    return new Date(b.invoice_date || b.date || 0) - new Date(a.invoice_date || a.date || 0);
+  });
+  // Show last 10
+  var recent = sorted.slice(0, 10);
+  logList.innerHTML = recent.map(function(inv) {
+    var rpm    = inv.miles > 0 && inv.amount > 0 ? '$' + (inv.amount / inv.miles).toFixed(2) + '/mi' : '—';
+    var date   = inv.invoice_date || inv.date || '';
+    var status = inv.status === 'paid'
+      ? '<span style="color:var(--green);font-size:.7rem;">✅ Paid</span>'
+      : inv.status === 'overdue'
+        ? '<span style="color:var(--red);font-size:.7rem;">⚠️ Overdue</span>'
+        : '<span style="color:var(--amber);font-size:.7rem;">⏳ Pending</span>';
+    return '<div class="log-item" style="padding:.8rem 1rem;">' +
+      '<div class="log-top">' +
+        '<div class="log-route">' + (inv.broker_name || inv.broker || 'Unknown Broker') + '</div>' +
+        '<div class="log-date">' + (date ? new Date(date).toLocaleDateString('en-US', {month:'short',day:'numeric'}) : '—') + '</div>' +
+      '</div>' +
+      '<div class="log-stats">' +
+        '<div class="log-stat">Rate: <strong>$' + (parseFloat(inv.amount) || 0).toLocaleString() + '</strong></div>' +
+        '<div class="log-stat">Ref: <strong>' + (inv.ref || '—') + '</strong></div>' +
+        '<div class="log-stat">' + status + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 // TRUCKSTOP LIVE LOAD INTEGRATION
