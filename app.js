@@ -3261,23 +3261,103 @@ function loadSavedMCNumber() {
 // ══════════════════════════════════════════════════════════════
 // LIVE DASHBOARD STATS
 // ══════════════════════════════════════════════════════════════
-function updateDashboardStats() {
-  if (!invoices || !invoices.length) return;
-  var now = new Date();
+async function updateDashboardStats() {
+  var now     = new Date();
   var weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  var weekRevenue = invoices.filter(function(i) { return i.status === 'paid' && new Date(i.date) >= weekAgo; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
-  var outstanding = invoices.filter(function(i) { return i.status !== 'paid'; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
-  var monthRevenue = invoices.filter(function(i) { return i.status === 'paid' && new Date(i.date) >= monthStart; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
+
+  // ── Revenue from invoices ─────────────────────────────────
+  var weekRevenue  = 0;
+  var outstanding  = 0;
+  if (invoices && invoices.length) {
+    weekRevenue = invoices
+      .filter(function(i) { return new Date(i.invoice_date || i.date) >= weekAgo; })
+      .reduce(function(sum, i) { return sum + (parseFloat(i.amount) || 0); }, 0);
+    outstanding = invoices
+      .filter(function(i) { return i.status !== 'paid'; })
+      .reduce(function(sum, i) { return sum + (parseFloat(i.amount) || 0); }, 0);
+  }
+
+  // ── Miles + fuel from booked_loads this week ──────────────
+  var weekMiles    = 0;
+  var weekFuelCost = 0;
+  var weekRpm      = 0;
+  try {
+    if (window._supabaseReady && window._rcUserId) {
+      var bookedRes = await window._supabase
+        .from('booked_loads')
+        .select('rate,miles,eta_date,created_at')
+        .eq('user_id', window._rcUserId)
+        .gte('created_at', weekAgo.toISOString());
+      if (!bookedRes.error && bookedRes.data && bookedRes.data.length > 0) {
+        bookedRes.data.forEach(function(l) {
+          weekMiles += parseFloat(l.miles) || 0;
+        });
+      }
+    }
+  } catch(e) { /* non-critical */ }
+
+  // Fuel cost from miles
+  var mpg       = defaults.mpg       || 6.5;
+  var fuelPrice = defaults.fuelPrice || 4.25;
+  weekFuelCost  = Math.round((weekMiles / mpg) * fuelPrice);
+
+  // RPM = revenue / miles
+  weekRpm = weekMiles > 0 && weekRevenue > 0 ? weekRevenue / weekMiles : 0;
+
+  // ── Update logbook YTD stats ─────────────────────────────
+  var ytdStart  = new Date(now.getFullYear(), 0, 1);
+  var ytdRev    = 0;
+  var ytdLoads  = 0;
+  if (invoices && invoices.length) {
+    invoices.forEach(function(i) {
+      if (new Date(i.invoice_date || i.date) >= ytdStart) {
+        ytdRev += parseFloat(i.amount) || 0;
+        ytdLoads++;
+      }
+    });
+  }
+  var ytdRevEl = document.getElementById('log-ytd-rev');
+  if (ytdRevEl) ytdRevEl.textContent = '$' + ytdRev.toLocaleString();
+  var ytdLoadsEl = document.querySelectorAll('#screen-log .metric-val');
+  // Update logbook metrics if on that screen
+  var logMetrics = document.querySelectorAll('#screen-log .metric');
+  logMetrics.forEach(function(card) {
+    var label = card.querySelector('.metric-label');
+    var val   = card.querySelector('.metric-val');
+    if (!label || !val) return;
+    var labelText = label.textContent.toLowerCase();
+    if (labelText.includes('ytd revenue'))      val.textContent = '$' + ytdRev.toLocaleString();
+    if (labelText.includes('loads completed'))   val.textContent = ytdLoads;
+  });
+
+  // ── Update metric cards ───────────────────────────────────
   var metricCards = document.querySelectorAll('#screen-dash .metric');
   metricCards.forEach(function(card) {
     var label = card.querySelector('.metric-label');
     var val   = card.querySelector('.metric-val');
     if (!label || !val) return;
     var labelText = label.textContent.toLowerCase();
-    if (labelText.includes('week revenue')) { val.textContent = '$' + weekRevenue.toLocaleString(); val.className = 'metric-val' + (weekRevenue > 0 ? '' : ' red'); }
-    if (labelText.includes('outstanding'))  { val.textContent = '$' + outstanding.toLocaleString(); val.className = 'metric-val' + (outstanding > 0 ? ' amber' : ''); }
-    if (labelText.includes('month revenue') || labelText.includes('this month')) { val.textContent = '$' + monthRevenue.toLocaleString(); }
+
+    if (labelText.includes('week revenue')) {
+      val.textContent = '$' + weekRevenue.toLocaleString();
+      val.className   = 'metric-val' + (weekRevenue > 0 ? '' : ' red');
+    }
+    if (labelText.includes('rpm this week')) {
+      val.textContent = weekRpm > 0 ? '$' + weekRpm.toFixed(2) : '—';
+      val.className   = 'metric-val' + (weekRpm >= (defaults.minRpm || 2.0) ? '' : ' amber');
+    }
+    if (labelText.includes('miles this week')) {
+      val.textContent = weekMiles > 0 ? weekMiles.toLocaleString() : '—';
+      val.className   = 'metric-val';
+    }
+    if (labelText.includes('est. fuel') || labelText.includes('fuel cost')) {
+      val.textContent = weekFuelCost > 0 ? '$' + weekFuelCost.toLocaleString() : '—';
+      val.className   = 'metric-val red';
+    }
+    if (labelText.includes('outstanding')) {
+      val.textContent = '$' + outstanding.toLocaleString();
+      val.className   = 'metric-val' + (outstanding > 0 ? ' amber' : '');
+    }
   });
 }
 
