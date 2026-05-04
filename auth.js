@@ -161,7 +161,6 @@ function enterApp(profile) {
   document.getElementById('main-app').style.display   = '';
   document.getElementById('bottom-nav').style.display = '';
 
-  window._rcEIAWorker = 'https://eia-diesel-price.wild-sunset-1d5f.workers.dev';
   window._rcAIWorker  = 'https://roadcommand-ai.wild-sunset-1d5f.workers.dev';
 
   onAuthReady(profile.first_name, _currentUser.id, _currentUser.email);
