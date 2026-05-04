@@ -3644,8 +3644,8 @@ function renderLiveLoadCards(loads, minRpm) {
 
   var hotCount = hotLoads.length;
 
-  // Dash gets top 15 by net RPM regardless of hot/watch
-  var dashLoads  = loads.slice(0, 15);
+  // Dash shows hot loads first (meet all params), then fills with watch loads up to 15
+  var dashLoads  = hotLoads.slice(0, 15).concat(watchLoads).slice(0, 15);
   // Loads screen gets all
   var allLoads   = loads;
   clearLoadCards();
@@ -3839,12 +3839,15 @@ async function savePushSubscription(subscription) {
   if (!window._rcUserId || !window._supabaseReady) return;
   var sub = subscription.toJSON();
   try {
-    await _supabase.from('push_subscriptions').upsert({
+    // Delete all old subscriptions for this user first — keeps table clean
+    await _supabase.from('push_subscriptions').delete().eq('user_id', window._rcUserId);
+    // Insert the current fresh subscription
+    await _supabase.from('push_subscriptions').insert({
       user_id:  window._rcUserId,
       endpoint: sub.endpoint,
       p256dh:   sub.keys.p256dh,
       auth:     sub.keys.auth,
-    }, { onConflict: 'user_id,endpoint' });
+    });
   } catch(err) {
     console.error('Error saving push subscription:', err);
   }
