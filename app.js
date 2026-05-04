@@ -1910,7 +1910,31 @@ function startGPS() {
   );
 }
 
+// EIA price cache — only fetch once per session per region to avoid 429 rate limits
+var _eiaPriceCache = {};
+var _eiaPriceCacheTime = {};
+var EIA_CACHE_TTL = 3600000; // 1 hour
+
 async function fetchFuelPrice(region) {
+  // Return cached price if fresh
+  var now = Date.now();
+  if (_eiaPriceCache[region] && (now - (_eiaPriceCacheTime[region] || 0)) < EIA_CACHE_TTL) {
+    var cached = _eiaPriceCache[region];
+    var fuelVal = document.getElementById('fuel-value');
+    var fuelSub = document.getElementById('fuel-sub');
+    var fuelDot = document.getElementById('fuel-dot');
+    var fuelBox = document.getElementById('fuel-box');
+    if (fuelVal) fuelVal.textContent = '$' + cached.price.toFixed(3) + '/gal';
+    if (fuelSub) fuelSub.textContent = region + ' Region · EIA Live';
+    if (fuelDot) fuelDot.className = 'live-dot green';
+    if (fuelBox) fuelBox.className = 'live-box connected';
+    defaults.fuelPrice = cached.price;
+    return;
+  }
+  return _fetchFuelPriceLive(region);
+}
+
+async function _fetchFuelPriceLive(region) {
   if (window._gpsLat && window._gpsLon) {
     var crowdResult = await fetchCrowdFuelPrice(window._gpsLat, window._gpsLon);
     if (crowdResult && crowdResult.count >= 3) { updateFuelDisplay(crowdResult.price, crowdResult.count); return; }
@@ -1921,13 +1945,16 @@ async function fetchFuelPrice(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
     if (d && d.price) { price = parseFloat(d.price); period = d.period || ''; }
     else { const rows = d?.response?.data; if (!rows || !rows.length) throw new Error('No data'); price = parseFloat(rows[0].value); period = rows[0].period || ''; }
     if (price) {
+      // Cache the result to avoid repeated EIA calls
+      _eiaPriceCache[region]     = { price: price, period: period };
+      _eiaPriceCacheTime[region] = Date.now();
       defaults.fuelPrice = price; fuelVal.textContent = '$' + price.toFixed(3) + '/gal'; fuelSub.textContent = region + ' Region · EIA Live';
       fuelDot.className = 'live-dot green'; fuelBox.className = 'live-box connected';
       if (fuelUpd) fuelUpd.textContent = 'Week of ' + period;
@@ -3285,9 +3312,9 @@ async function updateDashboardStats() {
     if (window._supabaseReady && window._rcUserId) {
       var bookedRes = await window._supabase
         .from('booked_loads')
-        .select('rate,miles,eta_date,created_at')
+        .select('rate,miles,eta_date')
         .eq('user_id', window._rcUserId)
-        .gte('created_at', weekAgo.toISOString());
+        .gte('eta_date', weekAgo.toISOString().split('T')[0]);
       if (!bookedRes.error && bookedRes.data && bookedRes.data.length > 0) {
         bookedRes.data.forEach(function(l) {
           weekMiles += parseFloat(l.miles) || 0;
