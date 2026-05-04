@@ -228,13 +228,11 @@ function clearPlaceholderValues() {
   if (runList) runList.innerHTML = '<div style="padding:1rem;text-align:center;color:#b8c8b8;font-size:.82rem;">Loading your run history...</div>';
 
   // Update calculator minimum alert to show real value
-  var calcAlerts = document.querySelectorAll('#screen-calc .alert');
-  calcAlerts.forEach(function(el) {
-    if (el.textContent.indexOf('minimum is set') >= 0) {
-      var minRpm = defaults.minRpm || 2.00;
-      el.querySelector('div:last-child').innerHTML = 'Your minimum is set to <strong>$' + minRpm.toFixed(2) + '/mi</strong>. Change in Parameters.';
-    }
-  });
+  var minRpm = defaults.minRpm || 2.00;
+  var calcMinEl = document.getElementById('calc-min-rpm-display');
+  if (calcMinEl) calcMinEl.textContent = '$' + minRpm.toFixed(2) + '/mi';
+  var settingsEl = document.getElementById('settings-minrpm-display');
+  if (settingsEl) settingsEl.textContent = '$' + minRpm.toFixed(2) + '/mi — change in Parameters';
 }
 
 function showAddLoad() {
@@ -242,17 +240,16 @@ function showAddLoad() {
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
 async function saveLoad() {
-  var form    = document.getElementById('add-load-form');
-  var inputs  = form.querySelectorAll('input, textarea, select');
-  var origin  = form.querySelectorAll('input')[0].value.trim();
-  var dest    = form.querySelectorAll('input')[1].value.trim();
-  var rate    = parseFloat(form.querySelectorAll('input')[2].value) || 0;
-  var miles   = parseInt(form.querySelectorAll('input')[3].value) || 0;
-  var broker  = form.querySelectorAll('input')[4].value.trim();
-  var phone   = document.getElementById('new-load-phone').value.trim();
-  var pickup  = form.querySelectorAll('input')[6].value;
-  var weight  = parseInt(form.querySelectorAll('input')[7].value) || 0;
-  var notes   = form.querySelector('textarea') ? form.querySelector('textarea').value.trim() : '';
+  var origin  = (document.getElementById('new-load-origin') || {}).value || '';
+  var dest    = (document.getElementById('new-load-dest') || {}).value || '';
+  var rate    = parseFloat((document.getElementById('new-load-rate') || {}).value) || 0;
+  var miles   = parseInt((document.getElementById('new-load-miles') || {}).value) || 0;
+  var broker  = (document.getElementById('new-load-broker') || {}).value || '';
+  var phone   = (document.getElementById('new-load-phone') || {}).value || '';
+  var pickup  = (document.getElementById('new-load-pickup') || {}).value || '';
+  var weight  = parseInt((document.getElementById('new-load-weight') || {}).value) || 0;
+  var notes   = (document.getElementById('new-load-notes') || {}).value || '';
+  origin = origin.trim(); dest = dest.trim(); broker = broker.trim();
 
   if (!origin || !dest) { alert('Origin and destination are required.'); return; }
 
@@ -302,8 +299,12 @@ async function saveLoad() {
   }
 
   // Clear form and hide
-  inputs.forEach(function(el) { el.value = ''; });
-  form.style.display = 'none';
+  ['new-load-origin','new-load-dest','new-load-rate','new-load-miles',
+   'new-load-broker','new-load-phone','new-load-pickup','new-load-weight','new-load-notes'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  var form = document.getElementById('add-load-form');
+  if (form) form.style.display = 'none';
 
   // Show toast
   var toast = document.createElement('div');
@@ -364,6 +365,11 @@ function calculateProfit() {
 }
 
 function saveParams() {
+  // Update settings page minRpm display
+  setTimeout(function() {
+    var settingsEl = document.getElementById('settings-minrpm-display');
+    if (settingsEl) settingsEl.textContent = '$' + (defaults.minRpm || 2.00).toFixed(2) + '/mi — change in Parameters';
+  }, 100);
   var minRpm    = parseFloat(document.getElementById('p-rpm')       && document.getElementById('p-rpm').value)       || 2.00;
   var minGross  = parseFloat(document.getElementById('p-gross')     && document.getElementById('p-gross').value)     || 0;
   var minMiles  = parseFloat(document.getElementById('p-minmi')     && document.getElementById('p-minmi').value)     || 0;
@@ -669,12 +675,12 @@ function saveFuelDefaults() {
   const mpg      = parseFloat(document.getElementById('set-mpg').value) || 6.5;
   const emptyMpg = parseFloat(document.getElementById('set-empty-mpg') ? document.getElementById('set-empty-mpg').value : 8.0) || 8.0;
   const fuel     = parseFloat(document.getElementById('set-fuel').value) || 4.25;
-  const minrpm   = parseFloat(document.getElementById('set-minrpm').value) || 2.00;
   const speed    = parseFloat(document.getElementById('set-speed').value) || 55;
+  // minRpm is owned by Parameters screen (p-rpm) — not duplicated here
+  const minrpm   = defaults.minRpm || 2.00;
   defaults.mpg       = mpg;
   defaults.emptyMpg  = emptyMpg;
   defaults.fuelPrice = fuel;
-  defaults.minRpm    = minrpm;
   const cf = document.getElementById('calc-fuel');
   const cm = document.getElementById('calc-mpg');
   if (cf) cf.value = fuel.toFixed(2);
@@ -846,6 +852,18 @@ document.addEventListener('DOMContentLoaded', function() {
 // ══════════════════════════════════════════════════════════════
 // BROKER DATABASE
 // ══════════════════════════════════════════════════════════════
+// Live broker credit cache — populated from Truckstop SOAP load data as loads come in
+var _brokerCreditCache = {};
+
+function cacheBrokerCredit(brokerName, credit, days2Pay) {
+  if (!brokerName || (!credit && !days2Pay)) return;
+  var key = brokerName.toLowerCase().trim();
+  if (!_brokerCreditCache[key]) _brokerCreditCache[key] = {};
+  if (credit   && credit   !== '----' && credit   !== '') _brokerCreditCache[key].credit  = credit;
+  if (days2Pay && days2Pay !== '----' && days2Pay !== '') _brokerCreditCache[key].days2Pay = days2Pay;
+  _brokerCreditCache[key].name = brokerName;
+}
+
 var BROKER_DB = {
   "ch robinson":   { score:"A+", days:22, flags:[{t:"good",i:"✅",m:"Pays consistently on time"},{t:"good",i:"✅",m:"Top credit rating"},{t:"warn",i:"⚠️",m:"Large volume broker — negotiate hard"}], rec:"Solid broker. Book with confidence. Push for $0.15 to $0.25 above first offer." },
   "echo global":   { score:"A",  days:27, flags:[{t:"good",i:"✅",m:"Good payment history"},{t:"warn",i:"⚠️",m:"Low first offers on competitive lanes"}], rec:"Reliable. Counter at 10 percent above their initial offer." },
@@ -901,7 +919,30 @@ async function lookupBroker() {
     } catch(e) {}
   }
 
-  // Fall back to BROKER_DB if not in vault
+  // Check live broker credit cache from Truckstop load data
+  if (!match) {
+    var cacheKeys = Object.keys(_brokerCreditCache);
+    for (var k = 0; k < cacheKeys.length; k++) {
+      if (q.indexOf(cacheKeys[k]) >= 0 || cacheKeys[k].indexOf(q) >= 0) {
+        var cached = _brokerCreditCache[cacheKeys[k]];
+        var creditVal = cached.credit || 'N/A';
+        var daysVal   = cached.days2Pay && cached.days2Pay !== '----' ? parseInt(cached.days2Pay) : '?';
+        var daysNum   = typeof daysVal === 'number' ? daysVal : 999;
+        match = {
+          score: creditVal,
+          days:  daysVal,
+          flags: [
+            { t: 'good', i: '📡', m: 'Live data from Truckstop load board' },
+            { t: daysNum <= 28 ? 'good' : daysNum <= 42 ? 'warn' : 'bad', i: '💰', m: 'Days to pay: ' + daysVal + (typeof daysVal === 'number' ? (daysNum <= 28 ? ' — fast payer' : daysNum <= 42 ? ' — average' : ' — slow payer') : '') },
+          ],
+          rec: 'Live Truckstop credit data. Credit score: ' + creditVal + '. Days to pay: ' + daysVal + '. Always get rate confirmation in writing.'
+        };
+        break;
+      }
+    }
+  }
+
+  // Fall back to BROKER_DB if not in vault or cache
   if (!match) {
     var keys = Object.keys(BROKER_DB);
     for (var k = 0; k < keys.length; k++) {
@@ -909,8 +950,54 @@ async function lookupBroker() {
     }
   }
 
+  // If still no match, try FMCSA lookup by MC number
   if (!match) {
-    match = { score:"N/A", days:"?", flags:[{t:"warn",i:"⚠️",m:"Not in your vault or database"},{t:"warn",i:"⚠️",m:"Check credit score on Truckstop before loading"},{t:"warn",i:"⚠️",m:"Get signed rate confirmation before accepting"}], rec:"Unknown broker. Check their Truckstop credit rating. Always get payment terms in writing." };
+    var mcQuery = q.replace(/^mc-?/i, '').trim();
+    if (/^\d{4,7}$/.test(mcQuery)) {
+      // Looks like an MC number — do live FMCSA lookup
+      var resultEl2 = document.getElementById('broker-result');
+      if (resultEl2) {
+        resultEl2.style.display = 'block';
+        document.getElementById('b-score').textContent = '...';
+        document.getElementById('b-days').textContent = '...';
+        document.getElementById('broker-flags').innerHTML = '<div style="color:#b8c8b8;font-size:.8rem;padding:.5rem 0;">Looking up MC-' + mcQuery + ' in FMCSA database...</div>';
+        document.getElementById('broker-rec').textContent = '';
+      }
+      try {
+        var fmcsaData = await fetchFMCSAProfile(mcQuery);
+        if (fmcsaData && fmcsaData.carrier) {
+          var carrier = fmcsaData.carrier;
+          var isAuth  = carrier.allowedToOperate === 'Y';
+          var hasInsurance = carrier.bipdInsuranceOnFile > 0;
+          var safetyRating = carrier.safetyRating || 'Not Rated';
+          var score = isAuth && hasInsurance ? 'Active' : 'Check';
+          var scoreColor = isAuth && hasInsurance ? 'var(--green)' : 'var(--amber)';
+          document.getElementById('b-score').textContent = score;
+          document.getElementById('b-score').style.color = scoreColor;
+          document.getElementById('b-days').textContent = '?';
+          document.getElementById('b-days').style.color = 'var(--amber)';
+          var flags = [
+            { t: isAuth ? 'good' : 'bad', i: isAuth ? '✅' : '❌', m: 'Operating Authority: ' + (isAuth ? 'Active' : 'NOT AUTHORIZED') },
+            { t: hasInsurance ? 'good' : 'bad', i: hasInsurance ? '✅' : '❌', m: 'Insurance on file: ' + (hasInsurance ? 'Yes ($' + (carrier.bipdInsuranceOnFile||0).toLocaleString() + ')' : 'NOT ON FILE') },
+            { t: 'warn', i: '📋', m: 'Legal Name: ' + (carrier.legalName || carrier.name || 'Unknown') },
+            { t: 'warn', i: '📍', m: 'Location: ' + (carrier.phyCity || '') + ', ' + (carrier.phyState || '') },
+            { t: 'warn', i: '🚛', m: 'Power Units: ' + (carrier.totalPowerUnits || '?') + ' · Drivers: ' + (carrier.totalDrivers || '?') },
+          ];
+          document.getElementById('broker-flags').innerHTML = flags.map(function(f) {
+            return '<div class="broker-flag"><span class="flag-icon">' + f.i + '</span><span class="flag-' + f.t + '">' + f.m + '</span></div>';
+          }).join('');
+          var rec = isAuth && hasInsurance
+            ? 'FMCSA verified carrier. Check payment terms before loading. Get rate confirmation in writing.'
+            : 'WARNING: Authority or insurance issues found. Verify carefully before loading.';
+          document.getElementById('broker-rec').textContent = '💡 ' + rec;
+          return; // Skip the normal render below
+        }
+      } catch(e) {}
+      // FMCSA lookup failed
+      match = { score:'N/A', days:'?', flags:[{t:'warn',i:'⚠️',m:'MC-' + mcQuery + ' not found in FMCSA database'},{t:'warn',i:'⚠️',m:'Verify on Truckstop before loading'},{t:'warn',i:'⚠️',m:'Get signed rate confirmation before accepting'}], rec:'Unknown carrier. Verify authority and insurance before loading.' };
+    } else {
+      match = { score:'N/A', days:'?', flags:[{t:'warn',i:'⚠️',m:'Not in your vault or database'},{t:'warn',i:'⚠️',m:'Search by MC number for FMCSA lookup'},{t:'warn',i:'⚠️',m:'Get signed rate confirmation before accepting'}], rec:'Try entering the MC number for a live FMCSA authority check.' };
+    }
   }
   var scoreColor = match.score.indexOf("A") === 0 ? "var(--green)" : match.score.indexOf("B") === 0 ? "var(--amber)" : "var(--red)";
   var daysColor  = match.days <= 28 ? "var(--green)" : match.days <= 35 ? "var(--amber)" : "var(--red)";
@@ -3010,16 +3097,80 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     }
   }
 
+  // Calculate maintenance CPM from saved items
+  var maintCpm = 0;
+  try {
+    var maintEl = document.getElementById('maint-cpm');
+    if (maintEl) maintCpm = parseFloat(maintEl.textContent.replace(/[^0-9.]/g,'')) || 0;
+  } catch(e) {}
+  var totalCostPerMile = parseFloat((((totalFuel / miles) + maintCpm)).toFixed(2));
+
+  // Get lane market data from stateData (live from Supabase state_stats)
+  var originState = broker ? '' : '';
+  // Extract origin state from load card context if available
+  var laneMarketRpm = null;
+  var laneMarketSource = '';
+  try {
+    // Try LANE_RATES static table for this specific lane
+    var laneKey = null;
+    var panelEl = document.getElementById('panel-' + panelId);
+    if (panelEl) {
+      var routeEl = panelEl.querySelector('.load-route, .load-header');
+      if (routeEl) {
+        var routeText = routeEl.textContent || '';
+        var stateMatch = routeText.match(/,\s*([A-Z]{2})\s*[→>]/);
+        var destMatch  = routeText.match(/[→>]\s*[\w\s]+,\s*([A-Z]{2})/);
+        if (stateMatch && destMatch) {
+          laneKey = stateMatch[1] + '-' + destMatch[1];
+          var LANE_RATES_REF = {
+            'WA-CA':2.45,'WA-OR':1.95,'WA-ID':2.05,'WA-UT':2.25,'WA-NV':2.35,'WA-TX':2.55,'WA-CO':2.35,'WA-AZ':2.40,'WA-MT':2.10,
+            'OR-CA':2.30,'OR-ID':2.00,'OR-WA':1.95,'OR-UT':2.20,'OR-TX':2.50,'OR-CO':2.30,
+            'ID-WA':2.05,'ID-OR':2.00,'ID-UT':2.10,'ID-CA':2.40,'ID-TX':2.48,'ID-MT':2.00,'ID-CO':2.20,
+            'UT-WA':2.25,'UT-CA':2.38,'UT-TX':2.30,'UT-NV':2.12,'UT-ID':2.10,'UT-CO':2.05,'UT-AZ':2.15,
+            'CA-WA':2.20,'CA-OR':2.15,'CA-NV':1.90,'CA-AZ':1.95,'CA-UT':2.05,'CA-TX':2.35,
+            'TX-WA':2.60,'TX-CA':2.40,'TX-UT':2.25,'TX-OK':1.85,'TX-NM':1.90,'TX-CO':2.20,'TX-KS':1.95,
+            'NV-CA':1.85,'NV-WA':2.30,'NV-UT':2.05,'NV-AZ':1.95,
+            'MT-WA':2.15,'MT-ID':2.00,'MT-UT':2.20,'MT-CO':2.25,'MT-WY':2.10,
+            'CO-WA':2.35,'CO-CA':2.42,'CO-TX':2.20,'CO-UT':2.05,'CO-KS':2.00,'CO-NM':2.05,
+          };
+          if (LANE_RATES_REF[laneKey]) {
+            laneMarketRpm = LANE_RATES_REF[laneKey];
+            laneMarketSource = 'historical lane average';
+          }
+          // Override with live stateData if available
+          var originSt = stateMatch[1];
+          var liveState = stateData.find(function(s) { return s.code === originSt; });
+          if (liveState && liveState.rpm > 0) {
+            laneMarketRpm = liveState.rpm;
+            laneMarketSource = 'live Truckstop market data (last 30 min)';
+          }
+        }
+      }
+    }
+  } catch(e) {}
+
+  var laneContext = laneMarketRpm
+    ? '- Current market avg for this origin: $' + laneMarketRpm.toFixed(2) + '/mi (' + laneMarketSource + ')\n'
+    : '';
+
   var prompt =
-    "You are a freight dispatcher advising an owner-operator trucker. Give a quick TAKE IT or PASS recommendation with ONE sentence of reasoning. Be blunt and specific with numbers.\n\n" +
-    "LOAD DETAILS:\n" +
+    "You are a freight dispatcher advising an owner-operator flatbed trucker. Give a TAKE IT or PASS recommendation with ONE sentence of reasoning. Be blunt and use only the numbers provided — do not invent breakeven thresholds.\n\n" +
+    "DRIVER PARAMETERS:\n" +
+    "- Minimum rate per mile: $" + minRpm + "/mi (set by driver)\n" +
+    "- Minimum gross: $" + minGross + "\n" +
+    "- Fuel: $" + fuelPrice + "/gal · Loaded MPG: " + mpg + " · Empty MPG: " + emptyMpg + "\n" +
+    "- Maintenance cost: $" + maintCpm.toFixed(2) + "/mi\n" +
+    "- All-in cost per loaded mile: $" + totalCostPerMile + "/mi\n\n" +
+    "MARKET DATA:\n" +
+    laneContext +
+    "\nLOAD DETAILS:\n" +
     "- Gross rate: $" + rate + " — " + grossStatus + "\n" +
     "- Miles: " + miles + " loaded + " + deadMiles + " deadhead\n" +
     "- Rate per mile: $" + rpm + " — " + rpmStatus + "\n" +
     "- Loaded fuel: $" + loadedFuel + " · Deadhead fuel: $" + deadFuel + "\n" +
-    "- Net after all fuel: $" + net + " ($" + netPerMile + "/mi all-in)\n" +
+    "- Net after fuel: $" + net + " ($" + netPerMile + "/mi net)\n" +
     "- Broker: " + (broker || "unknown") + (brokerInfo ? " — " + brokerInfo : "") + "\n\n" +
-    "Reply format: TAKE IT or PASS — [one sentence with the key number that drives your decision]";
+    "Reply format: TAKE IT or PASS — [one sentence citing the specific number that drives your decision]";
 
   try {
     var text = await callAI(prompt, 80);
@@ -3551,6 +3702,17 @@ async function updateDashboardStats() {
       val.textContent = '$' + outstanding.toLocaleString();
       val.className   = 'metric-val' + (outstanding > 0 ? ' amber' : '');
     }
+  // Also update by ID for the new named elements
+  var byId = {
+    'dash-week-rev':   { val: '$' + weekRevenue.toLocaleString(), cls: 'metric-val' + (weekRevenue > 0 ? '' : ' red') },
+    'dash-week-rpm':   { val: weekRpm > 0 ? '$' + weekRpm.toFixed(2) : '—', cls: 'metric-val' + (weekRpm >= (defaults.minRpm||2.0) ? '' : ' amber') },
+    'dash-week-miles': { val: weekMiles > 0 ? weekMiles.toLocaleString() : '—', cls: 'metric-val' },
+    'dash-week-fuel':  { val: weekFuelCost > 0 ? '$' + weekFuelCost.toLocaleString() : '—', cls: 'metric-val red' },
+  };
+  Object.keys(byId).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.textContent = byId[id].val; el.className = byId[id].cls; }
+  });
   });
 }
 
@@ -4110,6 +4272,13 @@ function renderLiveLoadCards(loads, minRpm) {
   }
 
   // Calculate net RPM for each load (rate minus fuel / total miles)
+  // Cache broker credit data from live loads
+  loads.forEach(function(l) {
+    if (l.broker && (l.credit || l.days2Pay)) {
+      cacheBrokerCredit(l.broker, l.credit, l.days2Pay);
+    }
+  });
+
   loads.forEach(function(l) {
     if (l.rate > 0 && l.miles > 0) {
       var loadedFuel = Math.round((l.miles / mpg) * fuelPrice);
