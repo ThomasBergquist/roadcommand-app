@@ -2280,7 +2280,7 @@ async function _fetchFuelPriceLive(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
@@ -3252,25 +3252,31 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     ? '- Current market avg for this origin: $' + laneMarketRpm.toFixed(2) + '/mi (' + laneMarketSource + ')\n'
     : '';
 
+  // Pre-compute everything so AI cannot invent its own numbers
+  var trueNetProfit  = Math.round(net - (maintCpm * miles));
+  var trueNetPerMile = parseFloat((trueNetProfit / miles).toFixed(2));
+  var maintCost      = Math.round(maintCpm * miles);
+  var meetsRpm       = parseFloat(rpm) >= parseFloat(minRpm);
+  var meetsGross     = minGross > 0 ? trueNetProfit >= minGross : true;
+  var recommendVerdict = meetsRpm && meetsGross ? 'TAKE IT' : 'PASS';
+
   var prompt =
-    "You are a freight dispatcher advising an owner-operator flatbed trucker. Give a TAKE IT or PASS recommendation with ONE sentence of reasoning. Be blunt and use only the numbers provided — do not invent breakeven thresholds.\n\n" +
-    "DRIVER PARAMETERS:\n" +
-    "- Minimum rate per mile: $" + minRpm + "/mi (set by driver)\n" +
-    "- Minimum gross: $" + minGross + "\n" +
-    "- Fuel: $" + fuelPrice + "/gal · Loaded MPG: " + mpg + " · Empty MPG: " + emptyMpg + "\n" +
-    "- Maintenance/overhead cost: $" + maintCpm.toFixed(2) + "/mi (not included in net — subtract from net profit)\n" +
-    "- Total cost per loaded mile (fuel + maintenance): $" + totalCostPerMile + "/mi (for context only — fuel already removed from net)\n\n" +
-    "MARKET DATA:\n" +
-    laneContext +
-    "\nLOAD DETAILS:\n" +
-    "- Gross rate: $" + rate + " — " + grossStatus + "\n" +
-    "- Miles: " + miles + " loaded + " + deadMiles + " deadhead\n" +
-    "- Rate per mile: $" + rpm + " — " + rpmStatus + "\n" +
-    "- Loaded fuel: $" + loadedFuel + " · Deadhead fuel: $" + deadFuel + "\n" +
-    "- Net after fuel: $" + net + " ($" + netPerMile + "/mi) — fuel already deducted, still need to cover $" + maintCpm.toFixed(2) + "/mi maintenance\n" +
-    "- True net after fuel AND maintenance: $" + Math.round(net - (maintCpm * miles)) + " ($" + Math.max(0, netPerMile - maintCpm).toFixed(2) + "/mi)\n" +
-    "- Broker: " + (broker || "unknown") + (brokerInfo ? " — " + brokerInfo : "") + "\n\n" +
-    "Reply format: TAKE IT or PASS — [one sentence citing the specific number that drives your decision]";
+    "You are a freight dispatcher for an owner-operator flatbed trucker. Your job is to explain the load decision in ONE sentence using only these pre-calculated numbers. DO NOT invent any numbers, miles, or thresholds not listed below.\n\n" +
+    "PRE-CALCULATED RESULTS (use ONLY these):\n" +
+    "- Gross rate: $" + rate + "\n" +
+    "- Loaded miles: " + miles + " (deadhead: " + deadMiles + ")\n" +
+    "- Rate/mile: $" + rpm + "/mi (driver minimum: $" + minRpm + "/mi)\n" +
+    "- Fuel cost: $" + (loadedFuel + deadFuel) + " total ($" + loadedFuel + " loaded + $" + deadFuel + " deadhead)\n" +
+    "- Net after fuel: $" + net + "\n" +
+    "- Maintenance cost: $" + maintCost + " ($" + maintCpm.toFixed(2) + "/mi x " + miles + " loaded miles)\n" +
+    "- TRUE NET after fuel and maintenance: $" + trueNetProfit + " ($" + trueNetPerMile + "/mi)\n" +
+    "- Driver minimum gross: $" + minGross + "\n" +
+    "- Meets RPM minimum: " + (meetsRpm ? 'YES' : 'NO') + "\n" +
+    "- Meets gross minimum: " + (meetsGross ? 'YES' : 'NO') + "\n" +
+    (laneContext ? "- " + laneContext : "") +
+    "- Broker: " + (broker || "unknown") + (brokerInfo ? " (" + brokerInfo + ")" : "") + "\n\n" +
+    "VERDICT: " + recommendVerdict + "\n\n" +
+    "Write exactly: '" + recommendVerdict + " — [one sentence explaining why using the specific dollar amounts above]'";
 
   try {
     var text = await callAI(prompt, 80);
@@ -4174,8 +4180,8 @@ async function renderLogbook() {
           '<div class="log-stat">' + status + '</div>' +
         '</div>' +
         '<div style="margin-top:.4rem;">' +
-        '<div style="margin-top:.4rem;">' +
           '<button data-id="' + inv.id + '" onclick="deleteInvoice(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.2rem .5rem;font-size:.7rem;cursor:pointer;">&#x2715; Delete Invoice</button>' +
+        '</div>' +
       '</div>';
     }).join('');
   }
