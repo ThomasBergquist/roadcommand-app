@@ -449,7 +449,7 @@
         <button class="btn btn-green" onclick="addInvoice()">Add Invoice</button>
       </div>
     </div>
-    <button class="reopen-loadback-btn" onclick="reopenLoadback()">&#x1F504; View Return Loads From Last Booked Load</button>
+    <button class="reopen-loadback-btn" onclick="openLoadbackScreen()">&#x1F504; Find Return Loads at My Destination</button>
     <div class="card" style="margin-top:.8rem;">
       <div class="card-header"><div class="card-title">&#x1F4CA; Weekly Business Summary</div></div>
       <div class="card-body">
@@ -661,6 +661,24 @@
     </div>
   </div>
 
+  <!-- LOADBACK SCREEN -->
+  <div class="screen" id="screen-loadback">
+    <div class="section-head">
+      <div class="section-label">&#x2014; Return Load Finder</div>
+      <div class="section-title">Loads at Your Destination</div>
+    </div>
+    <div id="loadback-screen-header" style="margin-bottom:.8rem;"></div>
+    <div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap;" id="loadback-filter-bar">
+      <button class="btn btn-green btn-sm" onclick="sortLoadback('roundtrip')" id="lb-sort-roundtrip">Best Round Trip</button>
+      <button class="btn btn-outline btn-sm" onclick="sortLoadback('rpm')" id="lb-sort-rpm">Best RPM</button>
+      <button class="btn btn-outline btn-sm" onclick="sortLoadback('rate')" id="lb-sort-rate">Highest Rate</button>
+      <button class="btn btn-outline btn-sm" onclick="sortLoadback('miles')" id="lb-sort-miles">Longest Miles</button>
+    </div>
+    <div id="loadback-screen-loads" style="min-height:200px;">
+      <div style="padding:2rem;text-align:center;color:#b8c8b8;font-size:.85rem;">Loading return loads...</div>
+    </div>
+  </div>
+
 </div><!-- end main -->
 
 <!-- MORE DRAWER OVERLAY -->
@@ -678,6 +696,7 @@
     <button class="more-drawer-btn" onclick="showScreen('log',this)"><span class="more-drawer-icon">&#x1F4CB;</span><span class="more-drawer-label">Log</span></button>
     <button class="more-drawer-btn" onclick="showScreen('maint',this)"><span class="more-drawer-icon">&#x1F529;</span><span class="more-drawer-label">Maint</span></button>
     <button class="more-drawer-btn" onclick="showScreen('settings',this)"><span class="more-drawer-icon">&#x1F527;</span><span class="more-drawer-label">Settings</span></button>
+    <button class="more-drawer-btn" onclick="openLoadbackScreen()"><span class="more-drawer-icon">&#x1F504;</span><span class="more-drawer-label">Loadback</span></button>
   </div>
 </div>
 

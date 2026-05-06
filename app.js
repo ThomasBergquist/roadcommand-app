@@ -2301,7 +2301,7 @@ async function _fetchFuelPriceLive(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
@@ -4805,6 +4805,187 @@ if ('serviceWorker' in navigator) {
 // ══════════════════════════════════════════════════════════════════════════
 // LIVE LOADBACK — Real return loads based on arrival ETA
 // ══════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════
+// LOADBACK SCREEN — Full dedicated page for return loads
+// ══════════════════════════════════════════════════════════════════════════
+var _loadbackScreenLoads = [];
+var _loadbackCurrentSort = 'roundtrip';
+var _loadbackCurrentLoad = null;
+
+async function openLoadbackScreen() {
+  // Get current active load
+  var activeLoad = null;
+  if (window._lastLoadback) {
+    activeLoad = window._lastLoadback;
+  } else if (window._rcUserId && window._supabaseReady) {
+    try {
+      var res = await window._supabase.from('booked_loads').select('*')
+        .eq('user_id', window._rcUserId).eq('active', true)
+        .order('eta_date', { ascending: false }).limit(1);
+      if (res.data && res.data[0]) {
+        var l = res.data[0];
+        activeLoad = { origin: l.origin, dest: l.destination, rate: l.rate, miles: l.miles, broker: l.broker, phone: '' };
+      } else {
+        // Fall back to most recent
+        var res2 = await window._supabase.from('booked_loads').select('*')
+          .eq('user_id', window._rcUserId).order('eta_date', { ascending: false }).limit(1);
+        if (res2.data && res2.data[0]) {
+          var l = res2.data[0];
+          activeLoad = { origin: l.origin, dest: l.destination, rate: l.rate, miles: l.miles, broker: l.broker, phone: '' };
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (!activeLoad) {
+    alert('No booked load found. Book a load first.');
+    return;
+  }
+
+  _loadbackCurrentLoad = activeLoad;
+
+  // Navigate to loadback screen
+  showScreen('loadback', null);
+
+  // Show header with current load info
+  var destParts = (activeLoad.dest || '').split(',');
+  var destCity  = destParts[0].trim();
+  var destState = destParts.length > 1 ? destParts[1].trim() : '';
+
+  var header = document.getElementById('loadback-screen-header');
+  if (header) {
+    header.innerHTML =
+      '<div style="background:#0d1f0d;border:1px solid var(--green-border);border-radius:8px;padding:.8rem 1rem;">' +
+        '<div style="font-size:.72rem;color:#b8c8b8;margin-bottom:.2rem;">CURRENT LOAD</div>' +
+        '<div style="font-weight:bold;color:var(--green);">' + (activeLoad.origin || '?') + ' &#x2192; ' + (activeLoad.dest || '?') + '</div>' +
+        '<div style="font-size:.78rem;color:#b8c8b8;margin-top:.2rem;">$' + (activeLoad.rate||0).toLocaleString() + ' &middot; ' + (activeLoad.miles||0) + ' mi &middot; searching for return loads at <strong style="color:#ffd04d;">' + destCity + ', ' + destState + '</strong></div>' +
+      '</div>';
+  }
+
+  // Show loading state
+  var loadsEl = document.getElementById('loadback-screen-loads');
+  if (loadsEl) loadsEl.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--green);font-size:.85rem;">&#x1F504; Searching Truckstop for loads at ' + destCity + ', ' + destState + '...</div>';
+
+  // Fetch loads
+  if (!destState) { if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x26A0;&#xFE0F;</div><div>Could not determine destination state from: ' + activeLoad.dest + '</div></div>'; return; }
+
+  try {
+    var equipType = window._rcEquipmentType || 'F';
+    var url = _tsWorkerUrl + '/search' +
+      '?originState=' + encodeURIComponent(destState) +
+      '&originCity='  + encodeURIComponent(destCity) +
+      '&equipmentType=' + encodeURIComponent(equipType) +
+      '&hoursOld=48&pageSize=50&originRange=150&loadType=All';
+
+    var res  = await fetch(url);
+    var data = await res.json();
+
+    if (!data.success || !data.loads || !data.loads.length) {
+      if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads found at ' + destCity + ', ' + destState + ' right now. Check back closer to your arrival date.</div></div>';
+      return;
+    }
+
+    var fuelPrice = defaults.fuelPrice || 4.25;
+    var mpg       = defaults.mpg       || 6.5;
+    var emptyMpg  = defaults.emptyMpg  || 8.0;
+    var outNet    = (activeLoad.rate||0) - Math.round(((activeLoad.miles||0) / mpg) * fuelPrice);
+    var minRpm    = defaults.minRpm    || 2.00;
+
+    _loadbackScreenLoads = data.loads
+      .filter(function(l) { return l.rate > 0 && l.miles > 0; })
+      .map(function(l) {
+        var dhFromDest = getDeadheadMilesFromCity(destCity, destState, l.originCity, l.originState) || 0;
+        var dhFuel     = dhFromDest > 0 ? Math.round((dhFromDest / emptyMpg) * fuelPrice) : 0;
+        var returnFuel = Math.round((l.miles / mpg) * fuelPrice);
+        var returnNet  = l.rate - returnFuel - dhFuel;
+        var roundTripNet = outNet + returnNet;
+        return Object.assign({}, l, {
+          returnNet:    returnNet,
+          roundTripNet: roundTripNet,
+          dhFromDest:   dhFromDest,
+          returnFuel:   returnFuel,
+        });
+      });
+
+    renderLoadbackScreen(_loadbackCurrentSort);
+
+  } catch(err) {
+    console.error('Loadback screen error:', err);
+    if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x26A0;&#xFE0F;</div><div>Error fetching loads: ' + (err.message||'unknown') + '</div></div>';
+  }
+}
+
+function sortLoadback(sortKey) {
+  _loadbackCurrentSort = sortKey;
+  // Update button states
+  ['roundtrip','rpm','rate','miles'].forEach(function(k) {
+    var btn = document.getElementById('lb-sort-' + k);
+    if (btn) btn.className = k === sortKey ? 'btn btn-green btn-sm' : 'btn btn-outline btn-sm';
+  });
+  renderLoadbackScreen(sortKey);
+}
+
+function renderLoadbackScreen(sortKey) {
+  var loadsEl = document.getElementById('loadback-screen-loads');
+  if (!loadsEl || !_loadbackScreenLoads.length) return;
+
+  var minRpm  = defaults.minRpm || 2.00;
+  var sorted  = _loadbackScreenLoads.slice().sort(function(a, b) {
+    if (sortKey === 'rpm')      return b.rpm - a.rpm;
+    if (sortKey === 'rate')     return b.rate - a.rate;
+    if (sortKey === 'miles')    return b.miles - a.miles;
+    return b.roundTripNet - a.roundTripNet; // default: roundtrip
+  });
+
+  var meetsMin = sorted.filter(function(l) { return l.rpm >= minRpm; });
+  var belowMin = sorted.filter(function(l) { return l.rpm < minRpm; });
+
+  function buildCard(l, i) {
+    var meetsRpm = l.rpm >= minRpm;
+    var bestPhone = l.contactPhone || l.brokerPhone || '';
+    var pickupStr = l.pickupDate ? '&#x1F4C5; Pickup: ' + l.pickupDate : '&#x1F4C5; Pickup: flexible';
+    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi deadhead' : 'near pickup';
+    return '<div class="loadback-card" style="margin-bottom:.7rem;border-left:3px solid ' + (meetsRpm ? 'var(--green)' : 'rgba(255,255,255,.1)') + ';">' +
+      '<div class="loadback-card-top">' +
+        '<div class="loadback-route" style="font-size:.9rem;font-weight:bold;">' + (l.originCity||'?') + ', ' + (l.originState||'?') + ' &#x2192; ' + (l.destCity||'?') + ', ' + (l.destState||'?') + '</div>' +
+        '<div class="loadback-rate" style="color:' + (meetsRpm ? 'var(--green)' : 'var(--amber)') + ';">$' + (l.rate||0).toLocaleString() + '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin:.4rem 0;font-size:.78rem;">' +
+        '<div><div style="color:#b8c8b8;font-size:.65rem;">RPM</div><strong style="color:' + (meetsRpm ? 'var(--green)' : 'var(--amber)') + ';">$' + (l.rpm||0).toFixed(2) + '/mi</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.65rem;">MILES</div><strong>' + (l.miles||0) + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.65rem;">NET RETURN</div><strong style="color:var(--green);">$' + (l.returnNet||0).toLocaleString() + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.65rem;">FUEL</div><strong>-$' + (l.returnFuel||0).toLocaleString() + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.65rem;">DEADHEAD</div><strong>' + dhStr + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.65rem;">ROUND TRIP</div><strong style="color:var(--green);">$' + (l.roundTripNet||0).toLocaleString() + '</strong></div>' +
+      '</div>' +
+      '<div style="font-size:.72rem;color:#b8c8b8;margin-bottom:.5rem;">' + pickupStr + ' &middot; ' + (l.broker||'Unknown Broker') + ' &middot; ' + (l.equipment||'F') + ' &middot; ' + (l.weight ? (l.weight).toLocaleString() + ' lb' : 'weight TBD') + '</div>' +
+      (l.notes ? '<div style="font-size:.72rem;color:#ffd04d;margin-bottom:.5rem;font-style:italic;">' + (l.notes||'').substring(0,120) + '</div>' : '') +
+      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">' +
+        (bestPhone ? '<button class="lb-call-btn" data-phone="' + bestPhone + '" data-broker="' + (l.broker||'Broker').replace(/"/g,'&quot;') + '" onclick="callBroker(this.dataset.phone,this.dataset.broker)" style="font-size:.75rem;">&#x1F4DE; Call</button>' : '') +
+        '<button class="lb-book-btn" onclick="addReturnLoad(\'' + (l.originCity||'') + ', ' + (l.originState||'') + '\'' + ',' + (l.miles||0) + ',' + (l.rate||0) + ')" style="font-size:.75rem;">&#x2713; Add to Loads</button>' +
+        '<button class="lb-call-btn lb-ai-btn" onclick="analyzeReturnLoad(this,\'' + (l.originCity||'') + '&#x2192;' + (l.destCity||'') + '\',' + (l.rate||0) + ',' + (l.miles||0) + ',' + (l.rpm||0).toFixed(2) + ',' + (l.returnNet||0) + ',' + (l.roundTripNet||0) + ',\'' + (l.broker||'') + '\')" style="color:#7ab8ff;border-color:rgba(122,184,255,.35);font-size:.75rem;">&#x1F916; Analyze</button>' +
+      '</div>' +
+      '<div class="lb-ai-result" style="display:none;margin-top:.5rem;padding:.5rem .7rem;border-radius:3px;font-size:.82rem;"></div>' +
+    '</div>';
+  }
+
+  var html = '';
+
+  if (meetsMin.length > 0) {
+    html += '<div style="font-size:.72rem;color:var(--green);padding:.3rem 0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">&#x2705; ' + meetsMin.length + ' loads above your $' + minRpm.toFixed(2) + '/mi minimum</div>';
+    html += meetsMin.map(function(l, i) { return buildCard(l, i); }).join('');
+  }
+
+  if (belowMin.length > 0) {
+    html += '<div style="font-size:.72rem;color:#b8c8b8;padding:.5rem 0 .3rem;text-transform:uppercase;letter-spacing:.05em;border-top:1px solid rgba(255,255,255,.08);margin-top:.5rem;">Below your minimum (' + belowMin.length + ' loads)</div>';
+    html += belowMin.map(function(l, i) { return buildCard(l, i); }).join('');
+  }
+
+  if (!html) html = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads found matching your parameters at this destination.</div></div>';
+
+  loadsEl.innerHTML = html + '<div style="margin-top:.5rem;font-size:.68rem;color:#b8c8b8;text-align:center;">Showing ' + sorted.length + ' loads &middot; Powered by Truckstop.com</div>';
+}
 
 var _origShowLoadback = showLoadback;
 showLoadback = async function(origin, dest, rate, miles, broker, phone) {
