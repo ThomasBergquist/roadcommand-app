@@ -2065,7 +2065,7 @@ var CITY_COORDS = {
   "reno":[39.5296,-119.8138],"fresno":[36.7378,-119.7871],"bakersfield":[35.3733,-119.0187],
   "san diego":[32.7157,-117.1611],"san jose":[37.3382,-121.8863],"san francisco":[37.7749,-122.4194],
   "albuquerque":[35.0844,-106.6504],"el paso":[31.7619,-106.4850],"dallas":[32.7767,-96.7970],
-  "fort worth":[32.7555,-97.3308],"houston":[29.7604,-95.3698],"san antonio":[29.4241,-98.4936],
+  "fort worth":[32.7555,-97.3308],"houston":[29.7604,-95.3698],"san antonio":[29.4241,-98.4936],"burnet":[30.7585,-98.2361],"austin":[30.2672,-97.7431],"waco":[31.5493,-97.1467],"abilene":[32.4487,-99.7331],"lubbock":[33.5779,-101.8552],"amarillo":[35.2220,-101.8313],"corpus christi":[27.8006,-97.3964],"laredo":[27.5306,-99.4803],"midland":[31.9974,-102.0779],"odessa":[31.8457,-102.3676],"tyler":[32.3513,-95.3011],"beaumont":[30.0802,-94.1266],"killeen":[31.1171,-97.7278],"temple":[31.0982,-97.3428],"wichita falls":[33.9137,-98.4934],"longview":[32.5007,-94.7405],"texarkana":[33.4251,-94.0477],
   "oklahoma city":[35.4676,-97.5164],"kansas city":[39.0997,-94.5786],"omaha":[41.2565,-95.9345],
   "minneapolis":[44.9778,-93.2650],"chicago":[41.8781,-87.6298],"st louis":[38.6270,-90.1994],
   "memphis":[35.1495,-90.0490],"nashville":[36.1627,-86.7816],"atlanta":[33.7490,-84.3880],
@@ -4896,6 +4896,8 @@ async function openLoadbackScreen() {
     var outNet    = (activeLoad.rate||0) - Math.round(((activeLoad.miles||0) / mpg) * fuelPrice);
     var minRpm    = defaults.minRpm    || 2.00;
 
+    var maxDead = defaults.maxDeadhead || 200;
+
     _loadbackScreenLoads = data.loads
       .filter(function(l) { return l.rate > 0 && l.miles > 0; })
       .map(function(l) {
@@ -4910,6 +4912,12 @@ async function openLoadbackScreen() {
           dhFromDest:   dhFromDest,
           returnFuel:   returnFuel,
         });
+      })
+      .filter(function(l) {
+        // Only apply deadhead filter when we actually calculated the distance
+        // If dhFromDest is 0 (city not in coords), show the load anyway
+        if (l.dhFromDest > 0 && maxDead > 0 && l.dhFromDest > maxDead) return false;
+        return true;
       });
 
     renderLoadbackScreen(_loadbackCurrentSort);
@@ -4949,7 +4957,7 @@ function renderLoadbackScreen(sortKey) {
     var meetsRpm = l.rpm >= minRpm;
     var bestPhone = l.contactPhone || l.brokerPhone || '';
     var pickupStr = l.pickupDate ? '&#x1F4C5; Pickup: ' + l.pickupDate : '&#x1F4C5; Pickup: flexible';
-    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi deadhead' : 'near pickup';
+    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi from dropoff' : 'within 250mi of dropoff';
     return '<div class="loadback-card" style="margin-bottom:.7rem;border-left:3px solid ' + (meetsRpm ? 'var(--green)' : 'rgba(255,255,255,.1)') + ';">' +
       '<div class="loadback-card-top">' +
         '<div class="loadback-route" style="font-size:.9rem;font-weight:bold;">' + (l.originCity||'?') + ', ' + (l.originState||'?') + ' &#x2192; ' + (l.destCity||'?') + ', ' + (l.destState||'?') + '</div>' +
@@ -4960,7 +4968,7 @@ function renderLoadbackScreen(sortKey) {
         '<div><div style="color:#b8c8b8;font-size:.65rem;">MILES</div><strong>' + (l.miles||0) + '</strong></div>' +
         '<div><div style="color:#b8c8b8;font-size:.65rem;">NET RETURN</div><strong style="color:var(--green);">$' + (l.returnNet||0).toLocaleString() + '</strong></div>' +
         '<div><div style="color:#b8c8b8;font-size:.65rem;">FUEL</div><strong>-$' + (l.returnFuel||0).toLocaleString() + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.65rem;">DEADHEAD</div><strong>' + dhStr + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.65rem;">FROM DROPOFF</div><strong>' + dhStr + '</strong></div>' +
         '<div><div style="color:#b8c8b8;font-size:.65rem;">ROUND TRIP</div><strong style="color:var(--green);">$' + (l.roundTripNet||0).toLocaleString() + '</strong></div>' +
       '</div>' +
       '<div style="font-size:.72rem;color:#b8c8b8;margin-bottom:.5rem;">' + pickupStr + ' &middot; ' + (l.broker||'Unknown Broker') + ' &middot; ' + (l.equipment||'F') + ' &middot; ' + (l.weight ? (l.weight).toLocaleString() + ' lb' : 'weight TBD') + '</div>' +
