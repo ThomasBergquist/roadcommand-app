@@ -1594,7 +1594,7 @@ async function saveBookedLoadForLoadback(origin, dest, rate, miles, broker) {
       eta_date:       etaDate.toISOString().split('T')[0],
       equipment_type: window._rcEquipmentType || 'V',
       min_rpm:        defaults.minRpm || 2.00,
-      active:         true,
+      active:         false, // set to true when driver taps 'On This Load' in Logbook
     }, { onConflict: 'user_id,destination,eta_date' });
 
     console.log('Booked load saved for Loadback notifications — destination:', dest);
