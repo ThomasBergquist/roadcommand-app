@@ -1682,9 +1682,30 @@ function addReturnLoad(route, miles, rate) {
   showScreen("loads", loadsBtn);
 }
 
-function reopenLoadback() {
-  if (window._lastLoadback) { var l = window._lastLoadback; showLoadback(l.origin, l.dest, l.rate, l.miles, l.broker, l.phone); }
-  else alert("No recent load booked yet.");
+async function reopenLoadback() {
+  // Use in-memory last loadback if available
+  if (window._lastLoadback) {
+    var l = window._lastLoadback;
+    showLoadback(l.origin, l.dest, l.rate, l.miles, l.broker, l.phone);
+    return;
+  }
+  // Fall back to active booked load from Supabase
+  if (!window._rcUserId || !window._supabaseReady) { alert('No recent load found. Book a load first.'); return; }
+  try {
+    var res = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).eq('active', true).order('eta_date', { ascending: false }).limit(1);
+    var load = res.data && res.data[0];
+    if (!load) {
+      // Try most recent regardless of active status
+      var res2 = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).order('eta_date', { ascending: false }).limit(1);
+      load = res2.data && res2.data[0];
+    }
+    if (load) {
+      window._lastLoadback = { origin: load.origin, dest: load.destination, rate: load.rate, miles: load.miles, broker: load.broker, phone: '' };
+      showLoadback(load.origin, load.destination, load.rate, load.miles, load.broker, '');
+    } else {
+      alert('No booked loads found. Book a load first.');
+    }
+  } catch(e) { alert('Could not open return load finder.'); }
 }
 
 function goToInvoice() {
@@ -2280,7 +2301,7 @@ async function _fetchFuelPriceLive(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
