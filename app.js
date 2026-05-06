@@ -4872,11 +4872,15 @@ async function openLoadbackScreen() {
 
   try {
     var equipType = window._rcEquipmentType || 'F';
+    // Search state-wide with large radius and your equipment type
+    // Use 'F' for flatbed but also check if there are other types configured
     var url = _tsWorkerUrl + '/search' +
       '?originState=' + encodeURIComponent(destState) +
-      '&originCity='  + encodeURIComponent(destCity) +
       '&equipmentType=' + encodeURIComponent(equipType) +
-      '&hoursOld=48&pageSize=50&originRange=150&loadType=All';
+      '&hoursOld=72&pageSize=100&originRange=250&loadType=All';
+    // Add city as center point for radius — not a hard filter
+    if (destCity) url += '&originCity=' + encodeURIComponent(destCity);
+    console.log('[Loadback] Searching:', url);
 
     var res  = await fetch(url);
     var data = await res.json();
