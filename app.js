@@ -342,6 +342,14 @@ function calculateProfit() {
   const rpm = rate / miles;
   const npm = net / totalMiles;
   const fmt = n => '$' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  // Get maintenance CPM from tracker
+  var maintCPM = 0;
+  var maintEl2 = document.getElementById('maint-cpm');
+  if (maintEl2) maintCPM = parseFloat(maintEl2.textContent.replace(/[^0-9.]/g,'')) || 0;
+  var maintCost = Math.round(miles * maintCPM);
+  var trueNet   = net - maintCost;
+  var trueNpm   = trueNet / totalMiles;
+
   document.getElementById('r-gross').textContent = fmt(rate);
   document.getElementById('r-broker').textContent = brokerFee > 0 ? '-' + fmt(brokerFee) : '$0.00';
   document.getElementById('r-fuel').textContent = '-' + fmt(fuelCost);
@@ -349,11 +357,18 @@ function calculateProfit() {
   document.getElementById('r-net').textContent = (net < 0 ? '-' : '') + fmt(net);
   document.getElementById('r-rpm').textContent = fmt(rpm) + '/mi';
   document.getElementById('r-npm').textContent = (npm < 0 ? '-' : '') + fmt(npm) + '/mi';
+  // Maintenance line
+  var rMaint = document.getElementById('r-maint');
+  if (rMaint) rMaint.textContent = maintCost > 0 ? '-' + fmt(maintCost) + ' ($' + maintCPM.toFixed(3) + '/mi)' : '$0.00 (set in Maint. Tracker)';
+  var rTrueNet = document.getElementById('r-true-net');
+  if (rTrueNet) { rTrueNet.textContent = (trueNet < 0 ? '-' : '') + fmt(trueNet); rTrueNet.style.color = trueNet >= 0 ? 'var(--green)' : 'var(--red)'; }
   let verdict, color;
   var minR = defaults.minRpm || 2.00;
-  if (rpm >= minR && rpm >= 2.3)  { verdict = '✅ Strong'; color = 'var(--green)'; }
-  else if (rpm >= minR)           { verdict = '⚠️ Acceptable'; color = 'var(--amber)'; }
-  else                            { verdict = '❌ Skip — Below Your Minimum'; color = 'var(--red)'; }
+  var minG = defaults.minGross || 0;
+  if (trueNet >= minG && rpm >= minR && rpm >= 2.3)  { verdict = '✅ Strong'; color = 'var(--green)'; }
+  else if (trueNet >= minG && rpm >= minR)            { verdict = '⚠️ Acceptable'; color = 'var(--amber)'; }
+  else if (rpm < minR)                               { verdict = '❌ Below Min RPM'; color = 'var(--red)'; }
+  else                                               { verdict = '❌ Below Min Gross after maintenance'; color = 'var(--red)'; }
   document.getElementById('r-verdict').textContent = verdict;
   document.getElementById('r-verdict').style.color = color;
   document.getElementById('r-total-row').className = net >= 0 ? 'calc-row total' : 'calc-row total loss';
@@ -1748,12 +1763,33 @@ function checkDeadhead(panelId, rate, miles) {
 // ══════════════════════════════════════════════════════════════
 // MAINTENANCE TRACKER
 // ══════════════════════════════════════════════════════════════
+// Default maintenance items — owner-operator realistic high-end costs
+// These are defaults shown before user enters their actual odometer readings
+// Cost = high-end realistic price for an owner-operator (no fleet discounts)
 var maintItems = [
-  { name:"Oil Change",        lastOdo:487000, interval:15000,  cost:650,  currentOdo:495000 },
-  { name:"Tire Rotation",     lastOdo:485000, interval:25000,  cost:200,  currentOdo:495000 },
-  { name:"Annual DOT Inspect",lastOdo:470000, interval:100000, cost:450,  currentOdo:495000 },
-  { name:"DPF Cleaning",      lastOdo:450000, interval:100000, cost:1200, currentOdo:495000 },
-  { name:"Brake Inspection",  lastOdo:480000, interval:30000,  cost:350,  currentOdo:495000 },
+  // Core PM items
+  { name:'Oil Change',              lastOdo:0, interval:25000,  cost:450,  currentOdo:0 },
+  { name:'Air Filter',              lastOdo:0, interval:25000,  cost:150,  currentOdo:0 },
+  { name:'Fuel Filter',             lastOdo:0, interval:25000,  cost:200,  currentOdo:0 },
+  { name:'Fifth Wheel Lubrication', lastOdo:0, interval:25000,  cost:150,  currentOdo:0 },
+  { name:'Trailer Brakes & Lights', lastOdo:0, interval:25000,  cost:200,  currentOdo:0 },
+  // 50k items
+  { name:'Air Dryer Cartridge',     lastOdo:0, interval:50000,  cost:180,  currentOdo:0 },
+  { name:'Brake Inspection',        lastOdo:0, interval:50000,  cost:350,  currentOdo:0 },
+  // 100k items
+  { name:'Tire Replacement (Full)', lastOdo:0, interval:100000, cost:6000, currentOdo:0 },
+  { name:'Annual DOT Inspection',   lastOdo:0, interval:100000, cost:2000, currentOdo:0 },
+  { name:'EGR Valve Service',       lastOdo:0, interval:100000, cost:800,  currentOdo:0 },
+  { name:'Wheel Bearing Service',   lastOdo:0, interval:100000, cost:600,  currentOdo:0 },
+  { name:'Belts & Hoses',           lastOdo:0, interval:100000, cost:500,  currentOdo:0 },
+  { name:'Battery Replacement',     lastOdo:0, interval:100000, cost:400,  currentOdo:0 },
+  { name:'Transmission Service',    lastOdo:0, interval:100000, cost:400,  currentOdo:0 },
+  { name:'DEF System Service',      lastOdo:0, interval:100000, cost:500,  currentOdo:0 },
+  // 150k items
+  { name:'DPF Cleaning',            lastOdo:0, interval:150000, cost:1000, currentOdo:0 },
+  { name:'Coolant Flush',           lastOdo:0, interval:150000, cost:400,  currentOdo:0 },
+  // Unplanned reserve — most important line item
+  { name:'Unplanned Repairs Reserve', lastOdo:0, interval:100000, cost:5000, currentOdo:0 },
 ];
 
 async function loadMaintItems() {
@@ -1786,7 +1822,8 @@ function renderMaint() {
     if (milesLeft < 0)                         { tier = "overdue"; barColor = "red";   status = "OVERDUE " + Math.abs(milesLeft).toLocaleString() + " mi"; }
     else if (milesLeft < item.interval * 0.15) { tier = "soon";    barColor = "amber"; status = "DUE IN " + milesLeft.toLocaleString() + " mi"; }
     else                                        { tier = "good";    barColor = "green"; status = "GOOD — " + milesLeft.toLocaleString() + " mi left"; }
-    return '<div class="maint-item"><div class="maint-top"><div class="maint-name">' + item.name + '</div><span class="maint-status ' + tier + '">' + status + '</span></div>' +
+    return '<div class="maint-item"><div class="maint-top"><div class="maint-name">' + item.name + '</div><span class="maint-status ' + tier + '">' + status + '</span>' +
+      '<button onclick="deleteMaintItem(this.dataset.name)" data-name="' + item.name.replace(/"/g,'&quot;') + '" style="background:none;border:none;color:#ff7e7e;font-size:.75rem;cursor:pointer;padding:0 .3rem;margin-left:.3rem;" title="Remove this item">✕</button></div>' +
       '<div class="maint-bar-wrap"><div class="maint-bar ' + barColor + '" style="width:' + pct + '%"></div></div>' +
       '<div class="maint-stats"><span class="maint-stat">Last: <strong>' + item.lastOdo.toLocaleString() + ' mi</strong></span><span class="maint-stat">Interval: <strong>' + item.interval.toLocaleString() + ' mi</strong></span><span class="maint-stat">Cost/mi: <strong>$' + cpm + '</strong></span><span class="maint-stat">Est. Cost: <strong>$' + item.cost.toLocaleString() + '</strong></span></div></div>';
   }).join("");
@@ -3162,7 +3199,10 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     var maintEl = document.getElementById('maint-cpm');
     if (maintEl) maintCpm = parseFloat(maintEl.textContent.replace(/[^0-9.]/g,'')) || 0;
   } catch(e) {}
-  var totalCostPerMile = parseFloat((((totalFuel / miles) + maintCpm)).toFixed(2));
+  // Non-fuel cost per mile only — fuel is already subtracted from net profit
+  // so we only pass maintenance/overhead to avoid double-counting in AI prompt
+  var nonFuelCostPerMile = parseFloat(maintCpm.toFixed(2));
+  var totalCostPerMile   = parseFloat((totalFuel / miles + maintCpm).toFixed(2)); // for reference only
 
   // Get lane market data from stateData (live from Supabase state_stats)
   var originState = broker ? '' : '';
@@ -3218,8 +3258,8 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     "- Minimum rate per mile: $" + minRpm + "/mi (set by driver)\n" +
     "- Minimum gross: $" + minGross + "\n" +
     "- Fuel: $" + fuelPrice + "/gal · Loaded MPG: " + mpg + " · Empty MPG: " + emptyMpg + "\n" +
-    "- Maintenance cost: $" + maintCpm.toFixed(2) + "/mi\n" +
-    "- All-in cost per loaded mile: $" + totalCostPerMile + "/mi\n\n" +
+    "- Maintenance/overhead cost: $" + maintCpm.toFixed(2) + "/mi (not included in net — subtract from net profit)\n" +
+    "- Total cost per loaded mile (fuel + maintenance): $" + totalCostPerMile + "/mi (for context only — fuel already removed from net)\n\n" +
     "MARKET DATA:\n" +
     laneContext +
     "\nLOAD DETAILS:\n" +
@@ -3227,7 +3267,8 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     "- Miles: " + miles + " loaded + " + deadMiles + " deadhead\n" +
     "- Rate per mile: $" + rpm + " — " + rpmStatus + "\n" +
     "- Loaded fuel: $" + loadedFuel + " · Deadhead fuel: $" + deadFuel + "\n" +
-    "- Net after fuel: $" + net + " ($" + netPerMile + "/mi net)\n" +
+    "- Net after fuel: $" + net + " ($" + netPerMile + "/mi) — fuel already deducted, still need to cover $" + maintCpm.toFixed(2) + "/mi maintenance\n" +
+    "- True net after fuel AND maintenance: $" + Math.round(net - (maintCpm * miles)) + " ($" + Math.max(0, netPerMile - maintCpm).toFixed(2) + "/mi)\n" +
     "- Broker: " + (broker || "unknown") + (brokerInfo ? " — " + brokerInfo : "") + "\n\n" +
     "Reply format: TAKE IT or PASS — [one sentence citing the specific number that drives your decision]";
 
@@ -4059,39 +4100,120 @@ loadInvoices = async function() {
   setTimeout(function() { updateDashboardStats(); renderCommandScore(); renderLogbook(); }, 500);
 };
 
-function renderLogbook() {
+async function deleteMaintItem(name) {
+  if (!confirm('Remove ' + name + ' from maintenance tracker?')) return;
+  maintItems = maintItems.filter(function(i) { return i.name !== name; });
+  renderMaint();
+  if (window._rcUserId && window._supabaseReady) {
+    try { await window._supabase.from('maintenance').delete().eq('user_id', window._rcUserId).eq('name', name); } catch(e) {}
+  }
+}
+
+async function renderLogbook() {
   var logList = document.getElementById('run-list');
   if (!logList) return;
-  if (!invoices || invoices.length === 0) {
-    logList.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">📋</div><div>No completed runs yet. Book loads and log invoices to build your history.</div></div>';
-    return;
+
+  // Load active booked loads from Supabase to show "on this load" status
+  var bookedLoads = [];
+  try {
+    if (window._rcUserId && window._supabaseReady) {
+      var bRes = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).order('created_at', { ascending: false });
+      if (!bRes.error && bRes.data) bookedLoads = bRes.data;
+    }
+  } catch(e) {}
+
+  var html = '';
+
+  // Show active/booked loads first
+  if (bookedLoads.length > 0) {
+    html += '<div style="font-size:.72rem;color:#b8c8b8;padding:.4rem .8rem;text-transform:uppercase;letter-spacing:.05em;">Active Loads</div>';
+    html += bookedLoads.map(function(load) {
+      var isActive = load.active;
+      var statusColor = isActive ? 'var(--green)' : '#b8c8b8';
+      var statusText  = isActive ? '🚛 En Route' : '📋 Booked';
+      return '<div class="log-item" style="padding:.8rem 1rem;border-left:3px solid ' + statusColor + ';">' +
+        '<div class="log-top">' +
+          '<div class="log-route" style="font-weight:bold;">' + (load.origin || '?') + ' → ' + (load.destination || '?') + '</div>' +
+          '<div class="log-date">' + statusText + '</div>' +
+        '</div>' +
+        '<div class="log-stats">' +
+          '<div class="log-stat">Rate: <strong>$' + (parseFloat(load.rate)||0).toLocaleString() + '</strong></div>' +
+          '<div class="log-stat">Miles: <strong>' + (load.miles||'?') + '</strong></div>' +
+          '<div class="log-stat">ETA: <strong>' + (load.eta_date || '?') + '</strong></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">' +
+          (!isActive ? '<button class="lb-active-btn" data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.3rem .7rem;font-size:.75rem;cursor:pointer;font-weight:bold;">&#x1F69B; On This Load</button>' : '') +
+          (isActive  ? '<button class="lb-inactive-btn" data-id="' + load.id + '" onclick="setLoadInactive(this.dataset.id)" style="background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:.3rem .7rem;font-size:.75rem;cursor:pointer;">&#x2713; Mark Delivered</button>' : '') +
+          '<button class="lb-del-btn" data-id="' + load.id + '" onclick="deleteBookedLoad(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.3rem .6rem;font-size:.72rem;cursor:pointer;">&#x2715; Remove</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
   }
-  // Sort by invoice date descending — most recent first
-  var sorted = invoices.slice().sort(function(a, b) {
-    return new Date(b.invoice_date || b.date || 0) - new Date(a.invoice_date || a.date || 0);
-  });
-  // Show last 10
-  var recent = sorted.slice(0, 10);
-  logList.innerHTML = recent.map(function(inv) {
-    var rpm    = inv.miles > 0 && inv.amount > 0 ? '$' + (inv.amount / inv.miles).toFixed(2) + '/mi' : '—';
-    var date   = inv.invoice_date || inv.date || '';
-    var status = inv.status === 'paid'
-      ? '<span style="color:var(--green);font-size:.7rem;">✅ Paid</span>'
-      : inv.status === 'overdue'
-        ? '<span style="color:var(--red);font-size:.7rem;">⚠️ Overdue</span>'
-        : '<span style="color:var(--amber);font-size:.7rem;">⏳ Pending</span>';
-    return '<div class="log-item" style="padding:.8rem 1rem;">' +
-      '<div class="log-top">' +
-        '<div class="log-route">' + (inv.broker_name || inv.broker || 'Unknown Broker') + '</div>' +
-        '<div class="log-date">' + (date ? new Date(date).toLocaleDateString('en-US', {month:'short',day:'numeric'}) : '—') + '</div>' +
-      '</div>' +
-      '<div class="log-stats">' +
-        '<div class="log-stat">Rate: <strong>$' + (parseFloat(inv.amount) || 0).toLocaleString() + '</strong></div>' +
-        '<div class="log-stat">Ref: <strong>' + (inv.ref || '—') + '</strong></div>' +
-        '<div class="log-stat">' + status + '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+
+  // Show invoice history
+  if (invoices && invoices.length > 0) {
+    html += '<div style="font-size:.72rem;color:#b8c8b8;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.05em;margin-top:.5rem;">Invoice History</div>';
+    var sorted = invoices.slice().sort(function(a, b) {
+      return new Date(b.invoice_date || b.date || 0) - new Date(a.invoice_date || a.date || 0);
+    });
+    html += sorted.slice(0, 10).map(function(inv) {
+      var date   = inv.invoice_date || inv.date || '';
+      var status = inv.status === 'paid'
+        ? '<span style="color:var(--green);font-size:.7rem;">✅ Paid</span>'
+        : inv.status === 'overdue'
+          ? '<span style="color:var(--red);font-size:.7rem;">⚠️ Overdue</span>'
+          : '<span style="color:var(--amber);font-size:.7rem;">⏳ Pending</span>';
+      return '<div class="log-item" style="padding:.8rem 1rem;">' +
+        '<div class="log-top">' +
+          '<div class="log-route">' + (inv.broker_name || inv.broker || 'Unknown Broker') + '</div>' +
+          '<div class="log-date">' + (date ? new Date(date).toLocaleDateString('en-US', {month:'short',day:'numeric'}) : '—') + '</div>' +
+        '</div>' +
+        '<div class="log-stats">' +
+          '<div class="log-stat">Rate: <strong>$' + (parseFloat(inv.amount)||0).toLocaleString() + '</strong></div>' +
+          '<div class="log-stat">Ref: <strong>' + (inv.ref || '—') + '</strong></div>' +
+          '<div class="log-stat">' + status + '</div>' +
+        '</div>' +
+        '<div style="margin-top:.4rem;">' +
+        '<div style="margin-top:.4rem;">' +
+          '<button data-id="' + inv.id + '" onclick="deleteInvoice(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.2rem .5rem;font-size:.7rem;cursor:pointer;">&#x2715; Delete Invoice</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  if (!html) {
+    html = '<div class="alert alert-amber"><div class="alert-icon">📋</div><div>No runs yet. Book loads and log invoices to build your history.</div></div>';
+  }
+
+  logList.innerHTML = html;
+}
+
+async function setLoadActive(loadId) {
+  try {
+    await window._supabase.from('booked_loads').update({ active: true }).eq('id', loadId).eq('user_id', window._rcUserId);
+    renderLogbook();
+    // Save loadback prefs so push worker knows where you're headed
+    saveLoadAlertPrefs();
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:.6rem 1.2rem;border-radius:20px;font-size:.82rem;font-weight:bold;z-index:9999;';
+    toast.textContent = '🚛 En Route — Loadback notifications active';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 3000);
+  } catch(e) { console.error(e); }
+}
+
+async function setLoadInactive(loadId) {
+  try {
+    await window._supabase.from('booked_loads').update({ active: false }).eq('id', loadId).eq('user_id', window._rcUserId);
+    renderLogbook();
+  } catch(e) {}
+}
+
+async function deleteBookedLoad(loadId) {
+  if (!confirm('Remove this booked load? This cannot be undone.')) return;
+  try {
+    await window._supabase.from('booked_loads').delete().eq('id', loadId).eq('user_id', window._rcUserId);
+    renderLogbook();
+  } catch(e) {}
 }
 
 // ══════════════════════════════════════════════════════════════════════════

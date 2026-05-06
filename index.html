@@ -208,6 +208,8 @@
       <div class="divider"></div>
       <div class="calc-row"><span class="label">Rate Per Mile (loaded)</span><span class="val" id="r-rpm">&#x2014;</span></div>
       <div class="calc-row"><span class="label">Net Per Mile (all miles)</span><span class="val" id="r-npm">&#x2014;</span></div>
+      <div class="calc-row"><span class="label">Maintenance Cost</span><span class="val" id="r-maint">&#x2014;</span></div>
+      <div class="calc-row total"><span class="label">True Net (after maint)</span><span class="val" id="r-true-net">&#x2014;</span></div>
       <div class="calc-row"><span class="label">Verdict</span><span class="val" id="r-verdict">&#x2014;</span></div>
     </div>
     <!-- Min RPM alert — updated dynamically by clearPlaceholderValues() -->
@@ -535,7 +537,11 @@
           <div class="form-group"><label class="form-label">Manual Fuel Price</label><input class="form-input" id="set-fuel" type="number" value="4.25" step="0.01"><div class="form-hint">Used when GPS fuel price unavailable</div></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Min Rate/Mile ($)</label><input class="form-input" id="set-minrpm" type="number" value="2.00" step="0.05"></div>
+          <div class="form-group">
+            <label class="form-label">Min Rate/Mile</label>
+            <div style="font-size:.85rem;color:var(--green);padding:.5rem 0;" id="settings-minrpm-display">Set in Parameters</div>
+            <div class="form-hint">Change this in the Parameters screen</div>
+          </div>
           <div class="form-group"><label class="form-label">Avg Speed (mph)</label><input class="form-input" id="set-speed" type="number" value="55"></div>
         </div>
         <button class="btn btn-green" onclick="saveFuelDefaults()">Save Fuel Defaults</button>
@@ -582,7 +588,27 @@
       <div class="card-header"><div class="card-title">&#x2795; Add / Update Service Item</div></div>
       <div class="card-body">
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Service Item</label><select class="form-select" id="maint-type"><option>Oil Change</option><option>Tire Rotation</option><option>Brake Inspection</option><option>Tire Replacement</option><option>Air Filter</option><option>Fuel Filter</option><option>Coolant Flush</option><option>Transmission Service</option><option>DPF Cleaning</option><option>DEF System</option><option>Annual DOT Inspection</option><option>Custom</option></select></div>
+          <div class="form-group"><label class="form-label">Service Item</label><select class="form-select" id="maint-type">
+              <option>Oil Change</option>
+              <option>Air Filter</option>
+              <option>Fuel Filter</option>
+              <option>Fifth Wheel Lubrication</option>
+              <option>Trailer Brakes &amp; Lights</option>
+              <option>Air Dryer Cartridge</option>
+              <option>Brake Inspection</option>
+              <option>Tire Replacement (Full)</option>
+              <option>Annual DOT Inspection</option>
+              <option>EGR Valve Service</option>
+              <option>Wheel Bearing Service</option>
+              <option>Belts &amp; Hoses</option>
+              <option>Battery Replacement</option>
+              <option>Transmission Service</option>
+              <option>DEF System Service</option>
+              <option>DPF Cleaning</option>
+              <option>Coolant Flush</option>
+              <option>Unplanned Repairs Reserve</option>
+              <option>Custom</option>
+            </select></div>
           <div class="form-group"><label class="form-label">Custom Name</label><input class="form-input" id="maint-custom" placeholder="If Custom selected"></div>
         </div>
         <div class="form-row">
