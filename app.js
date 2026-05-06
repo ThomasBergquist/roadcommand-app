@@ -4123,7 +4123,7 @@ async function renderLogbook() {
   var bookedLoads = [];
   try {
     if (window._rcUserId && window._supabaseReady) {
-      var bRes = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).order('created_at', { ascending: false });
+      var bRes = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).order('eta_date', { ascending: false });
       if (!bRes.error && bRes.data) bookedLoads = bRes.data;
     }
   } catch(e) {}
