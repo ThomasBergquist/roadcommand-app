@@ -992,7 +992,7 @@ async function lookupBroker() {
   // If still no match, try FMCSA lookup by MC number
   if (!match) {
     var mcQuery = q.replace(/^mc-?/i, '').trim();
-    if (/^\d{4,7}$/.test(mcQuery)) {
+    if (/^\d{4,8}$/.test(mcQuery)) {
       // Looks like an MC number — do live FMCSA lookup
       var resultEl2 = document.getElementById('broker-result');
       if (resultEl2) {
@@ -1004,8 +1004,18 @@ async function lookupBroker() {
       }
       try {
         var fmcsaData = await fetchFMCSAProfile(mcQuery);
-        if (fmcsaData && fmcsaData.carrier) {
-          var carrier = fmcsaData.carrier;
+        // Handle multiple FMCSA response structures
+        var carrier = null;
+        if (fmcsaData) {
+          if (fmcsaData.content && Array.isArray(fmcsaData.content) && fmcsaData.content[0]) {
+            carrier = fmcsaData.content[0].carrier || fmcsaData.content[0];
+          } else if (fmcsaData.carrier) {
+            carrier = fmcsaData.carrier;
+          } else if (fmcsaData.content && fmcsaData.content.carrier) {
+            carrier = fmcsaData.content.carrier;
+          }
+        }
+        if (carrier) {
           var isAuth  = carrier.allowedToOperate === 'Y';
           var hasInsurance = carrier.bipdInsuranceOnFile > 0;
           var safetyRating = carrier.safetyRating || 'Not Rated';
@@ -2301,7 +2311,7 @@ async function _fetchFuelPriceLive(region) {
   var eiaWorkerUrl = window._rcEIAWorker;
   const url = eiaWorkerUrl
     ? eiaWorkerUrl + '?region=' + encodeURIComponent(region)
-    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=2kWPj1CuJO5R9mve6S0C45KtGxk8HGpSFE3EiXGF';
+    : 'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[series][]=' + seriesId + '&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=DEMO_KEY';
   try {
     const r = await fetch(url), d = await r.json();
     var price, period;
