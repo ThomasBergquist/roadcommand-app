@@ -3863,40 +3863,139 @@ if ('serviceWorker' in navigator) {
       var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
       showScreen('loads', loadsBtn);
 
-      // Try to find and highlight the matching load card
+      // Show notification load card popup and try to highlight matching card
       setTimeout(function() {
         var rate   = data.rate;
         var route  = data.route || '';
         var loadId = data.loadId || '';
 
-        // Find card by load ID first, then by route/rate
+        // Show popup card with the notified load details
+        showNotificationLoadCard(data);
+
+        // Also try to find and highlight the matching card in the list
         var card = null;
         if (loadId) {
           card = document.querySelector('[data-load-id="' + loadId + '"]');
         }
         if (!card && route) {
-          var parts    = route.split(' to ');
+          var parts     = route.split(' to ');
           var originStr = parts[0] || '';
-          var cards    = document.querySelectorAll('.load-card');
+          var cards     = document.querySelectorAll('.load-card');
           cards.forEach(function(el) {
             if (!card && el.textContent.indexOf(originStr) >= 0 && el.textContent.indexOf('$' + rate) >= 0) {
               card = el;
             }
           });
         }
-
         if (card) {
           card.scrollIntoView({ behavior: 'smooth', block: 'center' });
           card.style.transition = 'box-shadow .3s';
           card.style.boxShadow  = '0 0 0 2px var(--green), 0 0 20px rgba(74,222,128,.4)';
           setTimeout(function() { card.style.boxShadow = ''; }, 3000);
-          // Auto-expand the card
           var expandBtn = card.querySelector('.load-expand-btn, .load-rate-col');
           if (expandBtn) expandBtn.click();
         }
       }, 800);
     }
   });
+}
+
+// ── Notification Load Card Popup ─────────────────────────────────────────
+function showNotificationLoadCard(data) {
+  // Remove existing popup if any
+  var existing = document.getElementById('notif-load-popup');
+  if (existing) existing.remove();
+
+  var route    = data.route || 'Unknown Route';
+  var rate     = data.rate  ? '$' + parseFloat(data.rate).toLocaleString() : '—';
+  var parts    = route.split(' to ');
+  var origin   = parts[0] || '';
+  var dest     = parts[1] || '';
+  var isLoadback = data.notifyType === 'loadback';
+
+  // Try to find matching card in live loads for more details
+  var liveLoad = null;
+  if (_liveLoadsCache) {
+    _liveLoadsCache.forEach(function(l) {
+      if (!liveLoad && data.rate && Math.abs((l.rate || 0) - parseFloat(data.rate)) < 50) {
+        var originMatch = origin.toLowerCase().indexOf((l.originCity || '').toLowerCase()) >= 0 ||
+                          (l.originCity || '').toLowerCase().indexOf(origin.toLowerCase().split(',')[0]) >= 0;
+        if (originMatch) liveLoad = l;
+      }
+    });
+  }
+
+  var overlay = document.createElement('div');
+  overlay.id  = 'notif-load-popup';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:8500;display:flex;align-items:flex-end;padding:1rem;';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  var rpm     = liveLoad && liveLoad.miles > 0 ? '$' + (liveLoad.rate / liveLoad.miles).toFixed(2) + '/mi' : '—';
+  var miles   = liveLoad ? liveLoad.miles : '—';
+  var broker  = liveLoad ? (liveLoad.broker || 'Unknown Broker') : 'Unknown Broker';
+  var phone   = liveLoad ? (liveLoad.contactPhone || liveLoad.brokerPhone || '') : '';
+  var pickup  = liveLoad ? (liveLoad.pickupDate || '—') : '—';
+  var net     = liveLoad && liveLoad.netRpm ? '$' + (liveLoad.netRpm * liveLoad.miles).toFixed(0) : '—';
+  var weight  = liveLoad ? (liveLoad.weight ? liveLoad.weight.toLocaleString() + ' lb' : '—') : '—';
+
+  overlay.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:12px;width:100%;max-width:480px;margin:0 auto;overflow:hidden;">' +
+      // Header
+      '<div style="background:linear-gradient(135deg,#0d1f0d,#1a2e1a);padding:1rem;border-bottom:1px solid var(--green-border);">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+          '<div>' +
+            '<div style="font-size:.65rem;color:#ffd04d;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.3rem;">' + (isLoadback ? '🔄 Loadback Alert' : '🔥 Load Alert') + '</div>' +
+            '<div style="font-size:1rem;font-weight:bold;color:#fff;">' + origin + '</div>' +
+            '<div style="font-size:.8rem;color:#b8c8b8;margin:.1rem 0;">→ ' + dest + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:1.3rem;font-weight:bold;color:var(--green);">' + rate + '</div>' +
+            '<div style="font-size:.75rem;color:var(--green);opacity:.8;">' + rpm + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      // Stats grid
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;padding:.8rem 1rem;border-bottom:1px solid rgba(255,255,255,.06);">' +
+        '<div style="text-align:center;"><div style="font-size:.62rem;color:#b8c8b8;text-transform:uppercase;">Miles</div><div style="font-weight:bold;">' + miles + '</div></div>' +
+        '<div style="text-align:center;"><div style="font-size:.62rem;color:#b8c8b8;text-transform:uppercase;">Net Profit</div><div style="font-weight:bold;color:var(--green);">' + net + '</div></div>' +
+        '<div style="text-align:center;"><div style="font-size:.62rem;color:#b8c8b8;text-transform:uppercase;">Pickup</div><div style="font-weight:bold;">' + pickup + '</div></div>' +
+        '<div style="text-align:center;"><div style="font-size:.62rem;color:#b8c8b8;text-transform:uppercase;">Broker</div><div style="font-weight:bold;font-size:.78rem;">' + broker + '</div></div>' +
+        '<div style="text-align:center;"><div style="font-size:.62rem;color:#b8c8b8;text-transform:uppercase;">Weight</div><div style="font-weight:bold;">' + weight + '</div></div>' +
+        '<div style="text-align:center;"><div style="font-size:.62rem;color:#b8c8b8;text-transform:uppercase;">Equipment</div><div style="font-weight:bold;">' + (liveLoad ? (liveLoad.equipment || 'F') : 'F') + '</div></div>' +
+      '</div>' +
+      // Action buttons
+      '<div style="display:flex;gap:.6rem;padding:.8rem 1rem;flex-wrap:wrap;">' +
+        (phone ? '<button data-phone="' + phone + '" data-broker="' + broker.replace(/"/g,'&quot;') + '" onclick="callBroker(this.dataset.phone,this.dataset.broker)" style="flex:1;background:var(--green);color:#000;border:none;border-radius:8px;padding:.7rem;font-size:.85rem;font-weight:bold;cursor:pointer;min-width:80px;">&#x1F4DE; Call</button>' : '') +
+        (liveLoad ? '<button onclick="closeNotifAndFindCard()" style="flex:1;background:transparent;color:var(--green);border:1px solid var(--green-border);border-radius:8px;padding:.7rem;font-size:.85rem;cursor:pointer;min-width:80px;">&#x1F50D; Find Card</button>' : '') +
+        '<button onclick="closeNotifPopup()" style="flex:1;background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.7rem;font-size:.85rem;cursor:pointer;min-width:80px;">&#x2715; Dismiss</button>' +
+      '</div>' +
+      '<div style="padding:.4rem 1rem .7rem;font-size:.68rem;color:#b8c8b8;text-align:center;">Tap outside to dismiss · Load may have changed since alert was sent</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+}
+
+function closeNotifPopup() {
+  var el = document.getElementById('notif-load-popup');
+  if (el) el.remove();
+}
+
+function closeNotifAndFindCard() {
+  var popup = document.getElementById('notif-load-popup');
+  var origin = popup ? (popup.querySelector('[data-origin]') || {}).dataset.origin || '' : '';
+  if (popup) popup.remove();
+  var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
+  showScreen('loads', loadsBtn);
+  setTimeout(function() {
+    var cards = document.querySelectorAll('.load-card');
+    cards.forEach(function(el) {
+      if (origin && el.textContent.indexOf(origin) >= 0) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.boxShadow = '0 0 0 2px var(--green), 0 0 20px rgba(74,222,128,.4)';
+        setTimeout(function() { el.style.boxShadow = ''; }, 3000);
+      }
+    });
+  }, 400);
 }
 
 // Handle URL params on load — for when app opens fresh from notification tap
