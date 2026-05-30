@@ -329,6 +329,8 @@ var _dhFilterLon    = null;
 var _dhFilterMaxMi  = 150;
 
 async function applyDeadheadFilter() {
+  // Dismiss keyboard on mobile before proceeding
+  document.activeElement && document.activeElement.blur();
   var cityInput = document.getElementById('dh-filter-city');
   var miInput   = document.getElementById('dh-filter-miles');
   var statusEl  = document.getElementById('dh-filter-status');
