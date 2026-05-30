@@ -1,7 +1,7 @@
 // RoadCommand Service Worker
 // Handles push notifications and app shell caching
 
-const CACHE_NAME = 'rc-v2';
+const CACHE_NAME = 'rc-v3';
 const APP_SHELL = ['/style.css', '/app.js', '/auth.js', '/manifest.json'];
 
 self.addEventListener('install', event => {
