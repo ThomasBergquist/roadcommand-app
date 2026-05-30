@@ -152,8 +152,8 @@
     <div style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center;">
       <input class="form-input" id="dh-filter-city" placeholder="Deadhead to city (e.g. Spokane, WA)" style="flex:1;min-width:0;font-size:.82rem;" onkeydown="if(event.key==='Enter'){this.blur();setTimeout(applyDeadheadFilter,100);}">
       <input class="form-input" id="dh-filter-miles" type="number" placeholder="Mi" style="width:55px;font-size:.82rem;" onkeydown="if(event.key==='Enter'){this.blur();setTimeout(applyDeadheadFilter,100);}">
-      <button class="btn btn-green btn-sm" onclick="this.blur();setTimeout(applyDeadheadFilter,100);" style="white-space:nowrap;flex-shrink:0;">&#x1F4CD; Go</button>
-      <button class="btn btn-outline btn-sm" onclick="clearDeadheadFilter()" id="dh-clear-btn" style="display:none;flex-shrink:0;">&#x2715;</button>
+      <button class="btn btn-green btn-sm" onclick="applyDeadheadFilter()" style="white-space:nowrap;flex-shrink:0;touch-action:manipulation;">&#x1F4CD; Go</button>
+      <button class="btn btn-outline btn-sm" onclick="clearDeadheadFilter()" id="dh-clear-btn" style="display:none;flex-shrink:0;touch-action:manipulation;">&#x2715;</button>
     </div>
     <div id="dh-filter-status" style="font-size:.72rem;color:#ffd04d;margin-bottom:.5rem;display:none;padding:.3rem .5rem;background:rgba(255,208,77,.1);border-radius:4px;"></div>
     <div id="loads-screen-live" style="min-height:200px;"></div>
