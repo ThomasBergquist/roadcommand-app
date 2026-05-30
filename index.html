@@ -143,12 +143,19 @@
   <!-- LOADS SCREEN -->
   <div class="screen" id="screen-loads">
     <div class="section-head"><div class="section-label">&#x2014; Load Board</div><div class="section-title">Manage Your Loads</div></div>
-    <div style="display:flex;gap:.5rem;margin-bottom:1rem;overflow-x:auto;padding-bottom:.3rem;">
+    <div style="display:flex;gap:.5rem;margin-bottom:.6rem;overflow-x:auto;padding-bottom:.3rem;">
       <button class="btn btn-green btn-sm" onclick="filterLoads('all')" id="filter-all">All</button>
       <button class="btn btn-outline btn-sm" onclick="filterLoads('hot')" id="filter-hot">&#x1F525; Hot</button>
       <button class="btn btn-outline btn-sm" onclick="filterLoads('watch')" id="filter-watch">&#x1F441; Watching</button>
       <button class="btn btn-outline btn-sm" onclick="filterLoads('booked')" id="filter-booked">&#x2713; Booked</button>
     </div>
+    <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
+      <input class="form-input" id="dh-filter-city" placeholder="Filter by deadhead to city (e.g. Spokane, WA)" style="flex:1;font-size:.8rem;">
+      <input class="form-input" id="dh-filter-miles" type="number" placeholder="Max mi" style="width:75px;font-size:.8rem;">
+      <button class="btn btn-green btn-sm" onclick="applyDeadheadFilter()" style="white-space:nowrap;">&#x1F4CD; Go</button>
+      <button class="btn btn-outline btn-sm" onclick="clearDeadheadFilter()" id="dh-clear-btn" style="display:none;">&#x2715;</button>
+    </div>
+    <div id="dh-filter-status" style="font-size:.72rem;color:#ffd04d;margin-bottom:.5rem;display:none;padding:.3rem .5rem;background:rgba(255,208,77,.1);border-radius:4px;"></div>
     <div id="loads-screen-live" style="min-height:200px;"></div>
     <button class="btn btn-outline" style="margin-top:.5rem;" onclick="showAddLoad()">+ Add Load Manually</button>
     <div id="add-load-form" style="display:none;margin-top:1rem;">

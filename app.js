@@ -67,15 +67,11 @@ function onAuthReady(firstName, userId, email) {
   loadSavedPreferences();
   renderMaint();
   refreshWeather();
-  // Clear hardcoded placeholder values so they show — before real data loads
-  clearPlaceholderValues();
   setTimeout(startGPS, 500);
   setTimeout(checkFirstTime, 700);
   setTimeout(loadBrokers, 800);
   setTimeout(loadInvoices, 1000);
   setTimeout(loadMaintItems, 1200);
-  // Check subscription status
-  setTimeout(function() { checkSubscriptionStatus(userId, email); }, 1500);
 }
 
 function submitFeedback() {
@@ -192,10 +188,6 @@ function showScreen(id, btn) {
   if ((id === 'dash' || id === 'loads') && _liveLoadsCache && _liveLoadsCache.length > 0) {
     setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 50);
   }
-  // Trigger national freight data when states tab opens
-  if (id === 'states') {
-    setTimeout(function() { fetchNationalStateData(); }, 100);
-  }
   track('tab_opened', { tab: id });
 }
 
@@ -214,105 +206,11 @@ function skipLoad(btn) {
   setTimeout(() => card.remove(), 300);
 }
 
-function clearPlaceholderValues() {
-  // Clear hardcoded dashboard metrics
-  var metricCards = document.querySelectorAll('#screen-dash .metric-val');
-  metricCards.forEach(function(el) { el.textContent = '—'; });
-
-  // Clear hardcoded logbook YTD metrics
-  var logMetrics = document.querySelectorAll('#screen-log .metric-val');
-  logMetrics.forEach(function(el) { el.textContent = '—'; });
-
-  // Clear hardcoded logbook sample runs
-  var runList = document.getElementById('run-list');
-  if (runList) runList.innerHTML = '<div style="padding:1rem;text-align:center;color:#b8c8b8;font-size:.82rem;">Loading your run history...</div>';
-
-  // Update calculator minimum alert to show real value
-  var minRpm = defaults.minRpm || 2.00;
-  var calcMinEl = document.getElementById('calc-min-rpm-display');
-  if (calcMinEl) calcMinEl.textContent = '$' + minRpm.toFixed(2) + '/mi';
-  var settingsEl = document.getElementById('settings-minrpm-display');
-  if (settingsEl) settingsEl.textContent = '$' + minRpm.toFixed(2) + '/mi — change in Parameters';
-}
-
 function showAddLoad() {
   const f = document.getElementById('add-load-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
-async function saveLoad() {
-  var origin  = (document.getElementById('new-load-origin') || {}).value || '';
-  var dest    = (document.getElementById('new-load-dest') || {}).value || '';
-  var rate    = parseFloat((document.getElementById('new-load-rate') || {}).value) || 0;
-  var miles   = parseInt((document.getElementById('new-load-miles') || {}).value) || 0;
-  var broker  = (document.getElementById('new-load-broker') || {}).value || '';
-  var phone   = (document.getElementById('new-load-phone') || {}).value || '';
-  var pickup  = (document.getElementById('new-load-pickup') || {}).value || '';
-  var weight  = parseInt((document.getElementById('new-load-weight') || {}).value) || 0;
-  var notes   = (document.getElementById('new-load-notes') || {}).value || '';
-  origin = origin.trim(); dest = dest.trim(); broker = broker.trim();
-
-  if (!origin || !dest) { alert('Origin and destination are required.'); return; }
-
-  // Build a manual load object that matches the live load card format
-  var manualLoad = {
-    id:          'manual-' + Date.now(),
-    originCity:  origin.split(',')[0].trim(),
-    originState: (origin.split(',')[1] || '').trim(),
-    destCity:    dest.split(',')[0].trim(),
-    destState:   (dest.split(',')[1] || '').trim(),
-    rate:        rate,
-    miles:       miles,
-    weight:      weight,
-    broker:      broker,
-    brokerPhone: phone,
-    pickupDate:  pickup,
-    notes:       notes,
-    rpm:         miles > 0 && rate > 0 ? parseFloat((rate / miles).toFixed(2)) : 0,
-    deadheadMiles: 0,
-    equipment:   window._rcEquipmentType || 'F',
-    loadType:    'Full',
-    credit:      '',
-    days2Pay:    '',
-    age:         '0',
-    manual:      true,
-  };
-
-  // Add to live loads cache and re-render
-  if (!_liveLoadsCache) _liveLoadsCache = [];
-  _liveLoadsCache.push(manualLoad);
-  renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
-
-  // Save to booked_loads if rate > 0 so it shows in invoice history
-  if (rate > 0 && window._rcUserId && window._supabaseReady) {
-    try {
-      await window._supabase.from('booked_loads').insert({
-        user_id:    window._rcUserId,
-        origin:     origin,
-        destination: dest,
-        rate:       rate,
-        miles:      miles,
-        broker:     broker,
-        eta_date:   pickup || new Date().toISOString().split('T')[0],
-        active:     false,
-      });
-    } catch(e) { console.error('Save manual load error:', e); }
-  }
-
-  // Clear form and hide
-  ['new-load-origin','new-load-dest','new-load-rate','new-load-miles',
-   'new-load-broker','new-load-phone','new-load-pickup','new-load-weight','new-load-notes'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.value = '';
-  });
-  var form = document.getElementById('add-load-form');
-  if (form) form.style.display = 'none';
-
-  // Show toast
-  var toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:.6rem 1.2rem;border-radius:20px;font-size:.82rem;font-weight:bold;z-index:9999;';
-  toast.textContent = '✅ Load added';
-  document.body.appendChild(toast);
-  setTimeout(function() { toast.remove(); }, 2500);
-}
+function saveLoad() { alert('Load saved!'); document.getElementById('add-load-form').style.display = 'none'; }
 function showAddRun() {
   const f = document.getElementById('add-run-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
@@ -342,14 +240,6 @@ function calculateProfit() {
   const rpm = rate / miles;
   const npm = net / totalMiles;
   const fmt = n => '$' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
-  // Get maintenance CPM from tracker
-  var maintCPM = 0;
-  var maintEl2 = document.getElementById('maint-cpm');
-  if (maintEl2) maintCPM = parseFloat(maintEl2.textContent.replace(/[^0-9.]/g,'')) || 0;
-  var maintCost = Math.round(miles * maintCPM);
-  var trueNet   = net - maintCost;
-  var trueNpm   = trueNet / totalMiles;
-
   document.getElementById('r-gross').textContent = fmt(rate);
   document.getElementById('r-broker').textContent = brokerFee > 0 ? '-' + fmt(brokerFee) : '$0.00';
   document.getElementById('r-fuel').textContent = '-' + fmt(fuelCost);
@@ -357,18 +247,11 @@ function calculateProfit() {
   document.getElementById('r-net').textContent = (net < 0 ? '-' : '') + fmt(net);
   document.getElementById('r-rpm').textContent = fmt(rpm) + '/mi';
   document.getElementById('r-npm').textContent = (npm < 0 ? '-' : '') + fmt(npm) + '/mi';
-  // Maintenance line
-  var rMaint = document.getElementById('r-maint');
-  if (rMaint) rMaint.textContent = maintCost > 0 ? '-' + fmt(maintCost) + ' ($' + maintCPM.toFixed(3) + '/mi)' : '$0.00 (set in Maint. Tracker)';
-  var rTrueNet = document.getElementById('r-true-net');
-  if (rTrueNet) { rTrueNet.textContent = (trueNet < 0 ? '-' : '') + fmt(trueNet); rTrueNet.style.color = trueNet >= 0 ? 'var(--green)' : 'var(--red)'; }
   let verdict, color;
   var minR = defaults.minRpm || 2.00;
-  var minG = defaults.minGross || 0;
-  if (trueNet >= minG && rpm >= minR && rpm >= 2.3)  { verdict = '✅ Strong'; color = 'var(--green)'; }
-  else if (trueNet >= minG && rpm >= minR)            { verdict = '⚠️ Acceptable'; color = 'var(--amber)'; }
-  else if (rpm < minR)                               { verdict = '❌ Below Min RPM'; color = 'var(--red)'; }
-  else                                               { verdict = '❌ Below Min Gross after maintenance'; color = 'var(--red)'; }
+  if (rpm >= minR && rpm >= 2.3)  { verdict = '✅ Strong'; color = 'var(--green)'; }
+  else if (rpm >= minR)           { verdict = '⚠️ Acceptable'; color = 'var(--amber)'; }
+  else                            { verdict = '❌ Skip — Below Your Minimum'; color = 'var(--red)'; }
   document.getElementById('r-verdict').textContent = verdict;
   document.getElementById('r-verdict').style.color = color;
   document.getElementById('r-total-row').className = net >= 0 ? 'calc-row total' : 'calc-row total loss';
@@ -380,11 +263,6 @@ function calculateProfit() {
 }
 
 function saveParams() {
-  // Update settings page minRpm display
-  setTimeout(function() {
-    var settingsEl = document.getElementById('settings-minrpm-display');
-    if (settingsEl) settingsEl.textContent = '$' + (defaults.minRpm || 2.00).toFixed(2) + '/mi — change in Parameters';
-  }, 100);
   var minRpm    = parseFloat(document.getElementById('p-rpm')       && document.getElementById('p-rpm').value)       || 2.00;
   var minGross  = parseFloat(document.getElementById('p-gross')     && document.getElementById('p-gross').value)     || 0;
   var minMiles  = parseFloat(document.getElementById('p-minmi')     && document.getElementById('p-minmi').value)     || 0;
@@ -441,6 +319,92 @@ function saveParams() {
 function filterLoads(type) {
   document.querySelectorAll('[id^=filter-]').forEach(b => b.className = 'btn btn-outline btn-sm');
   document.getElementById('filter-' + type).className = 'btn btn-green btn-sm';
+}
+
+// ── Deadhead City Filter ──────────────────────────────────────────────────
+var _dhFilterActive = false;
+var _dhFilterCity   = null;
+var _dhFilterLat    = null;
+var _dhFilterLon    = null;
+var _dhFilterMaxMi  = 150;
+
+async function applyDeadheadFilter() {
+  var cityInput = document.getElementById('dh-filter-city');
+  var miInput   = document.getElementById('dh-filter-miles');
+  var statusEl  = document.getElementById('dh-filter-status');
+  var clearBtn  = document.getElementById('dh-clear-btn');
+  var city      = cityInput ? cityInput.value.trim() : '';
+  var maxMi     = miInput && miInput.value ? parseInt(miInput.value) : (defaults.maxDeadhead || 150);
+
+  if (!city) { alert('Enter a city to filter by.'); return; }
+
+  // Try to get coords for the city
+  var cityKey = city.toLowerCase().replace(/,.*$/, '').trim();
+  var coords  = null;
+
+  // Check CITY_COORDS first
+  if (window.CITY_COORDS && window.CITY_COORDS[cityKey]) {
+    coords = window.CITY_COORDS[cityKey];
+  } else {
+    // Try Nominatim geocode
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Locating ' + city + '...'; }
+    try {
+      var geoRes = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(city) + '&limit=1');
+      var geoData = await geoRes.json();
+      if (geoData && geoData[0]) {
+        coords = [parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)];
+        if (window.CITY_COORDS) window.CITY_COORDS[cityKey] = coords;
+      }
+    } catch(e) {}
+  }
+
+  if (!coords) {
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Could not find coordinates for: ' + city + '. Try City, State format.'; }
+    return;
+  }
+
+  _dhFilterActive = true;
+  _dhFilterCity   = city;
+  _dhFilterLat    = coords[0];
+  _dhFilterLon    = coords[1];
+  _dhFilterMaxMi  = maxMi;
+
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Showing loads within ' + maxMi + ' mi deadhead of ' + city; }
+  if (clearBtn)  clearBtn.style.display = 'inline-block';
+
+  // Re-render with filter applied
+  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
+    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+  }
+}
+
+function clearDeadheadFilter() {
+  _dhFilterActive = false;
+  _dhFilterCity   = null;
+  _dhFilterLat    = null;
+  _dhFilterLon    = null;
+  var statusEl = document.getElementById('dh-filter-status');
+  var clearBtn = document.getElementById('dh-clear-btn');
+  var cityInput = document.getElementById('dh-filter-city');
+  var miInput   = document.getElementById('dh-filter-miles');
+  if (statusEl)  { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+  if (clearBtn)  clearBtn.style.display = 'none';
+  if (cityInput) cityInput.value = '';
+  if (miInput)   miInput.value   = '';
+  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
+    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+  }
+}
+
+function getDistanceMiles(lat1, lon1, lat2, lon2) {
+  var R  = 3958.8;
+  var d1 = lat1 * Math.PI / 180;
+  var d2 = lat2 * Math.PI / 180;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(d1) * Math.cos(d2) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0, minRpm: 2.00, minGross: 1500, minMiles: 500, maxMiles: 2000, maxDeadhead: 150 };
@@ -690,12 +654,12 @@ function saveFuelDefaults() {
   const mpg      = parseFloat(document.getElementById('set-mpg').value) || 6.5;
   const emptyMpg = parseFloat(document.getElementById('set-empty-mpg') ? document.getElementById('set-empty-mpg').value : 8.0) || 8.0;
   const fuel     = parseFloat(document.getElementById('set-fuel').value) || 4.25;
+  const minrpm   = parseFloat(document.getElementById('set-minrpm').value) || 2.00;
   const speed    = parseFloat(document.getElementById('set-speed').value) || 55;
-  // minRpm is owned by Parameters screen (p-rpm) — not duplicated here
-  const minrpm   = defaults.minRpm || 2.00;
   defaults.mpg       = mpg;
   defaults.emptyMpg  = emptyMpg;
   defaults.fuelPrice = fuel;
+  defaults.minRpm    = minrpm;
   const cf = document.getElementById('calc-fuel');
   const cm = document.getElementById('calc-mpg');
   if (cf) cf.value = fuel.toFixed(2);
@@ -822,19 +786,6 @@ async function loadPreferencesFromSupabase() {
     });
     if (data.equipment_type) { var el = document.getElementById('p-equipment'); if (el) el.value = data.equipment_type; }
     if (data.pickup_date_filter !== undefined) { var el = document.getElementById('p-pickup-date'); if (el) el.value = data.pickup_date_filter; }
-
-    // Also load MC number from profiles table
-    try {
-      var profRes = await _supabase.from('profiles').select('mc_number').eq('user_id', window._rcUserId).single();
-      if (!profRes.error && profRes.data && profRes.data.mc_number) {
-        var mc = profRes.data.mc_number.toString().replace(/^MC-?/i, '').trim();
-        window._rcMCNumber = mc;
-        localStorage.setItem('rc-mc-number', mc);
-        var mcInput = document.getElementById('set-mc-number');
-        if (mcInput) mcInput.value = 'MC-' + mc;
-        setTimeout(function() { loadFMCSAProfile(); }, 2000);
-      }
-    } catch(e) {}
     Object.keys(fields).forEach(function(id) {
       var el = document.getElementById(id);
       if (el && fields[id]) el.value = fields[id];
@@ -867,42 +818,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ══════════════════════════════════════════════════════════════
 // BROKER DATABASE
 // ══════════════════════════════════════════════════════════════
-// Live broker credit cache — populated from Truckstop SOAP load data as loads come in
-var _brokerCreditCache = {};
-
-// Session broker block list — brokers hidden for this session only
-var _blockedBrokers = new Set();
-
-function blockBroker(brokerName) {
-  if (!brokerName) return;
-  _blockedBrokers.add(brokerName.toLowerCase().trim());
-  // Re-render loads without the blocked broker
-  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
-    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
-  }
-  var toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#ffd04d;padding:.6rem 1.2rem;border-radius:20px;font-size:.82rem;font-weight:bold;z-index:9999;border:1px solid rgba(255,208,77,.3);white-space:nowrap;';
-  toast.textContent = '🚫 ' + brokerName + ' hidden for this session';
-  document.body.appendChild(toast);
-  setTimeout(function() { toast.remove(); }, 3000);
-}
-
-function unblockAllBrokers() {
-  _blockedBrokers.clear();
-  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
-    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
-  }
-}
-
-function cacheBrokerCredit(brokerName, credit, days2Pay) {
-  if (!brokerName || (!credit && !days2Pay)) return;
-  var key = brokerName.toLowerCase().trim();
-  if (!_brokerCreditCache[key]) _brokerCreditCache[key] = {};
-  if (credit   && credit   !== '----' && credit   !== '') _brokerCreditCache[key].credit  = credit;
-  if (days2Pay && days2Pay !== '----' && days2Pay !== '') _brokerCreditCache[key].days2Pay = days2Pay;
-  _brokerCreditCache[key].name = brokerName;
-}
-
 var BROKER_DB = {
   "ch robinson":   { score:"A+", days:22, flags:[{t:"good",i:"✅",m:"Pays consistently on time"},{t:"good",i:"✅",m:"Top credit rating"},{t:"warn",i:"⚠️",m:"Large volume broker — negotiate hard"}], rec:"Solid broker. Book with confidence. Push for $0.15 to $0.25 above first offer." },
   "echo global":   { score:"A",  days:27, flags:[{t:"good",i:"✅",m:"Good payment history"},{t:"warn",i:"⚠️",m:"Low first offers on competitive lanes"}], rec:"Reliable. Counter at 10 percent above their initial offer." },
@@ -915,138 +830,17 @@ var BROKER_DB = {
   "landstar":      { score:"A+", days:21, flags:[{t:"good",i:"✅",m:"Top tier credit"},{t:"good",i:"✅",m:"Agent based — negotiate with agent directly"}], rec:"Push the agent for an extra 5 to 10 percent. They have flexibility." },
 };
 
-async function lookupBroker() {
+function lookupBroker() {
   var q = document.getElementById("broker-search").value.trim().toLowerCase();
   var result = document.getElementById("broker-result");
   if (!q) return;
-
-  // First check your own broker vault in Supabase
   var match = null;
-  if (window._supabaseReady && window._rcUserId) {
-    try {
-      var vaultRes = await window._supabase
-        .from('brokers')
-        .select('*')
-        .eq('user_id', window._rcUserId);
-      if (!vaultRes.error && vaultRes.data) {
-        var vaultMatch = vaultRes.data.find(function(b) {
-          var name = (b.name || '').toLowerCase();
-          var mc   = (b.mc_number || '').toLowerCase();
-          return name.indexOf(q) >= 0 || q.indexOf(name) >= 0 || mc === q || mc === 'mc-' + q;
-        });
-        if (vaultMatch) {
-          // Build match from your real broker data
-          var invData = invoices ? invoices.filter(function(i) { return (i.broker_name || '').toLowerCase().indexOf((vaultMatch.name || '').toLowerCase()) >= 0; }) : [];
-          var avgDays = invData.length > 0 ? Math.round(invData.reduce(function(sum, i) {
-            if (i.invoice_date && i.paid_date) {
-              return sum + Math.round((new Date(i.paid_date) - new Date(i.invoice_date)) / 86400000);
-            }
-            return sum + parseInt(vaultMatch.payment_terms || 30);
-          }, 0) / invData.length) : parseInt(vaultMatch.payment_terms || 30);
-          match = {
-            score: '★ Vault',
-            days:  avgDays,
-            flags: [
-              { t:'good', i:'📋', m:'In your broker vault — ' + invData.length + ' invoice' + (invData.length !== 1 ? 's' : '') + ' on record' },
-              { t:'good', i:'📞', m:'Phone: ' + (vaultMatch.phone || 'not saved') },
-              vaultMatch.notes ? { t:'warn', i:'📝', m:vaultMatch.notes } : null
-            ].filter(Boolean),
-            rec: 'From your vault. Payment terms: Net ' + (vaultMatch.payment_terms || 30) + '. ' + (vaultMatch.notes || '')
-          };
-        }
-      }
-    } catch(e) {}
+  var keys = Object.keys(BROKER_DB);
+  for (var k = 0; k < keys.length; k++) {
+    if (q.indexOf(keys[k]) >= 0 || keys[k].indexOf(q) >= 0) { match = BROKER_DB[keys[k]]; break; }
   }
-
-  // Check live broker credit cache from Truckstop load data
   if (!match) {
-    var cacheKeys = Object.keys(_brokerCreditCache);
-    for (var k = 0; k < cacheKeys.length; k++) {
-      if (q.indexOf(cacheKeys[k]) >= 0 || cacheKeys[k].indexOf(q) >= 0) {
-        var cached = _brokerCreditCache[cacheKeys[k]];
-        var creditVal = cached.credit || 'N/A';
-        var daysVal   = cached.days2Pay && cached.days2Pay !== '----' ? parseInt(cached.days2Pay) : '?';
-        var daysNum   = typeof daysVal === 'number' ? daysVal : 999;
-        match = {
-          score: creditVal,
-          days:  daysVal,
-          flags: [
-            { t: 'good', i: '📡', m: 'Live data from Truckstop load board' },
-            { t: daysNum <= 28 ? 'good' : daysNum <= 42 ? 'warn' : 'bad', i: '💰', m: 'Days to pay: ' + daysVal + (typeof daysVal === 'number' ? (daysNum <= 28 ? ' — fast payer' : daysNum <= 42 ? ' — average' : ' — slow payer') : '') },
-          ],
-          rec: 'Live Truckstop credit data. Credit score: ' + creditVal + '. Days to pay: ' + daysVal + '. Always get rate confirmation in writing.'
-        };
-        break;
-      }
-    }
-  }
-
-  // Fall back to BROKER_DB if not in vault or cache
-  if (!match) {
-    var keys = Object.keys(BROKER_DB);
-    for (var k = 0; k < keys.length; k++) {
-      if (q.indexOf(keys[k]) >= 0 || keys[k].indexOf(q) >= 0) { match = BROKER_DB[keys[k]]; break; }
-    }
-  }
-
-  // If still no match, try FMCSA lookup by MC number
-  if (!match) {
-    var mcQuery = q.replace(/^mc-?/i, '').trim();
-    if (/^\d{4,8}$/.test(mcQuery)) {
-      // Looks like an MC number — do live FMCSA lookup
-      var resultEl2 = document.getElementById('broker-result');
-      if (resultEl2) {
-        resultEl2.style.display = 'block';
-        document.getElementById('b-score').textContent = '...';
-        document.getElementById('b-days').textContent = '...';
-        document.getElementById('broker-flags').innerHTML = '<div style="color:#b8c8b8;font-size:.8rem;padding:.5rem 0;">Looking up MC-' + mcQuery + ' in FMCSA database...</div>';
-        document.getElementById('broker-rec').textContent = '';
-      }
-      try {
-        var fmcsaData = await fetchFMCSAProfile(mcQuery);
-        // Handle multiple FMCSA response structures
-        var carrier = null;
-        if (fmcsaData) {
-          if (fmcsaData.content && Array.isArray(fmcsaData.content) && fmcsaData.content[0]) {
-            carrier = fmcsaData.content[0].carrier || fmcsaData.content[0];
-          } else if (fmcsaData.carrier) {
-            carrier = fmcsaData.carrier;
-          } else if (fmcsaData.content && fmcsaData.content.carrier) {
-            carrier = fmcsaData.content.carrier;
-          }
-        }
-        if (carrier) {
-          var isAuth  = carrier.allowedToOperate === 'Y';
-          var hasInsurance = carrier.bipdInsuranceOnFile > 0;
-          var safetyRating = carrier.safetyRating || 'Not Rated';
-          var score = isAuth && hasInsurance ? 'Active' : 'Check';
-          var scoreColor = isAuth && hasInsurance ? 'var(--green)' : 'var(--amber)';
-          document.getElementById('b-score').textContent = score;
-          document.getElementById('b-score').style.color = scoreColor;
-          document.getElementById('b-days').textContent = '?';
-          document.getElementById('b-days').style.color = 'var(--amber)';
-          var flags = [
-            { t: isAuth ? 'good' : 'bad', i: isAuth ? '✅' : '❌', m: 'Operating Authority: ' + (isAuth ? 'Active' : 'NOT AUTHORIZED') },
-            { t: hasInsurance ? 'good' : 'bad', i: hasInsurance ? '✅' : '❌', m: 'Insurance on file: ' + (hasInsurance ? 'Yes ($' + (carrier.bipdInsuranceOnFile||0).toLocaleString() + ')' : 'NOT ON FILE') },
-            { t: 'warn', i: '📋', m: 'Legal Name: ' + (carrier.legalName || carrier.name || 'Unknown') },
-            { t: 'warn', i: '📍', m: 'Location: ' + (carrier.phyCity || '') + ', ' + (carrier.phyState || '') },
-            { t: 'warn', i: '🚛', m: 'Power Units: ' + (carrier.totalPowerUnits || '?') + ' · Drivers: ' + (carrier.totalDrivers || '?') },
-          ];
-          document.getElementById('broker-flags').innerHTML = flags.map(function(f) {
-            return '<div class="broker-flag"><span class="flag-icon">' + f.i + '</span><span class="flag-' + f.t + '">' + f.m + '</span></div>';
-          }).join('');
-          var rec = isAuth && hasInsurance
-            ? 'FMCSA verified carrier. Check payment terms before loading. Get rate confirmation in writing.'
-            : 'WARNING: Authority or insurance issues found. Verify carefully before loading.';
-          document.getElementById('broker-rec').textContent = '💡 ' + rec;
-          return; // Skip the normal render below
-        }
-      } catch(e) {}
-      // FMCSA lookup failed
-      match = { score:'N/A', days:'?', flags:[{t:'warn',i:'⚠️',m:'MC-' + mcQuery + ' not found in FMCSA database'},{t:'warn',i:'⚠️',m:'Verify on Truckstop before loading'},{t:'warn',i:'⚠️',m:'Get signed rate confirmation before accepting'}], rec:'Unknown carrier. Verify authority and insurance before loading.' };
-    } else {
-      match = { score:'N/A', days:'?', flags:[{t:'warn',i:'⚠️',m:'Not in your vault or database'},{t:'warn',i:'⚠️',m:'Search by MC number for FMCSA lookup'},{t:'warn',i:'⚠️',m:'Get signed rate confirmation before accepting'}], rec:'Try entering the MC number for a live FMCSA authority check.' };
-    }
+    match = { score:"N/A", days:"?", flags:[{t:"warn",i:"⚠️",m:"Broker not in database — verify on Truckstop"},{t:"warn",i:"⚠️",m:"Check credit score before loading"},{t:"warn",i:"⚠️",m:"Get signed rate confirmation before accepting"}], rec:"Unknown broker. Check their Truckstop credit rating. Always get payment terms in writing." };
   }
   var scoreColor = match.score.indexOf("A") === 0 ? "var(--green)" : match.score.indexOf("B") === 0 ? "var(--amber)" : "var(--red)";
   var daysColor  = match.days <= 28 ? "var(--green)" : match.days <= 35 ? "var(--amber)" : "var(--red)";
@@ -1387,36 +1181,6 @@ function bookLoad(btn, origin, dest, rate, miles, broker, phone) {
     card.querySelectorAll(".load-tag").forEach(function(t) { t.className = "load-tag tag-booked"; t.textContent = "Booked"; });
   }
 
-  // Grab pickup date from load card panel for ETA calculation
-  var panel = btn.closest('.load-expand-panel') || btn.closest('[data-pickup]');
-  var pickupDate = null;
-  if (panel) {
-    // Look for pickup date in the panel
-    var pickupEl = panel.querySelector('[data-pickupdate]') || panel.querySelector('.pickup-date-val');
-    if (pickupEl) pickupDate = pickupEl.textContent.trim();
-    // Also check load card for pickup date text
-    if (!pickupDate) {
-      var cardEl = btn.closest('.load-card');
-      if (cardEl) {
-        var pickupText = cardEl.innerHTML.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
-        if (pickupText) pickupDate = pickupText[1];
-      }
-    }
-  }
-  // Store for use in saveBookedLoadForLoadback
-  if (pickupDate) {
-    try {
-      // Convert M/D/YY to YYYY-MM-DD
-      var parts = pickupDate.split('/');
-      if (parts.length === 3) {
-        var yr = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-        window._lastBookedPickup = yr + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
-      }
-    } catch(e) { window._lastBookedPickup = null; }
-  } else {
-    window._lastBookedPickup = null;
-  }
-
   // Show actual pay confirmation modal
   showBookConfirmModal(origin, dest, rate, miles, broker, phone);
 }
@@ -1581,16 +1345,11 @@ async function saveBookedLoadForLoadback(origin, dest, rate, miles, broker) {
     var destCity  = destParts[0].trim();
     var destState = destParts.length > 1 ? destParts[1].trim() : '';
 
-    // Calculate ETA based on pickup date + drive time (not today)
-    var avgSpeed     = defaults.speed || 55;
+    // Calculate ETA based on miles and avg speed
+    var avgSpeed  = 55;
     var drivingHours = miles / avgSpeed;
-    // HOS: 11 hrs driving per day max, so calculate calendar days
-    var drivingDays  = Math.ceil(drivingHours / 11);
-    // Start from pickup date if available, otherwise today
-    var pickupStr = window._lastBookedPickup || null;
-    var etaDate   = pickupStr ? new Date(pickupStr + 'T12:00:00') : new Date();
-    // Add driving days to pickup date
-    etaDate.setDate(etaDate.getDate() + drivingDays);
+    var etaDate   = new Date();
+    etaDate.setHours(etaDate.getHours() + Math.ceil(drivingHours));
 
     await _supabase.from('booked_loads').upsert({
       user_id:        window._rcUserId,
@@ -1604,7 +1363,7 @@ async function saveBookedLoadForLoadback(origin, dest, rate, miles, broker) {
       eta_date:       etaDate.toISOString().split('T')[0],
       equipment_type: window._rcEquipmentType || 'V',
       min_rpm:        defaults.minRpm || 2.00,
-      active:         false, // set to true when driver taps 'On This Load' in Logbook
+      active:         true,
     }, { onConflict: 'user_id,destination,eta_date' });
 
     console.log('Booked load saved for Loadback notifications — destination:', dest);
@@ -1692,30 +1451,9 @@ function addReturnLoad(route, miles, rate) {
   showScreen("loads", loadsBtn);
 }
 
-async function reopenLoadback() {
-  // Use in-memory last loadback if available
-  if (window._lastLoadback) {
-    var l = window._lastLoadback;
-    showLoadback(l.origin, l.dest, l.rate, l.miles, l.broker, l.phone);
-    return;
-  }
-  // Fall back to active booked load from Supabase
-  if (!window._rcUserId || !window._supabaseReady) { alert('No recent load found. Book a load first.'); return; }
-  try {
-    var res = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).eq('active', true).order('eta_date', { ascending: false }).limit(1);
-    var load = res.data && res.data[0];
-    if (!load) {
-      // Try most recent regardless of active status
-      var res2 = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).order('eta_date', { ascending: false }).limit(1);
-      load = res2.data && res2.data[0];
-    }
-    if (load) {
-      window._lastLoadback = { origin: load.origin, dest: load.destination, rate: load.rate, miles: load.miles, broker: load.broker, phone: '' };
-      showLoadback(load.origin, load.destination, load.rate, load.miles, load.broker, '');
-    } else {
-      alert('No booked loads found. Book a load first.');
-    }
-  } catch(e) { alert('Could not open return load finder.'); }
+function reopenLoadback() {
+  if (window._lastLoadback) { var l = window._lastLoadback; showLoadback(l.origin, l.dest, l.rate, l.miles, l.broker, l.phone); }
+  else alert("No recent load booked yet.");
 }
 
 function goToInvoice() {
@@ -1794,33 +1532,12 @@ function checkDeadhead(panelId, rate, miles) {
 // ══════════════════════════════════════════════════════════════
 // MAINTENANCE TRACKER
 // ══════════════════════════════════════════════════════════════
-// Default maintenance items — owner-operator realistic high-end costs
-// These are defaults shown before user enters their actual odometer readings
-// Cost = high-end realistic price for an owner-operator (no fleet discounts)
 var maintItems = [
-  // Core PM items
-  { name:'Oil Change',              lastOdo:0, interval:25000,  cost:450,  currentOdo:0 },
-  { name:'Air Filter',              lastOdo:0, interval:25000,  cost:150,  currentOdo:0 },
-  { name:'Fuel Filter',             lastOdo:0, interval:25000,  cost:200,  currentOdo:0 },
-  { name:'Fifth Wheel Lubrication', lastOdo:0, interval:25000,  cost:150,  currentOdo:0 },
-  { name:'Trailer Brakes & Lights', lastOdo:0, interval:25000,  cost:200,  currentOdo:0 },
-  // 50k items
-  { name:'Air Dryer Cartridge',     lastOdo:0, interval:50000,  cost:180,  currentOdo:0 },
-  { name:'Brake Inspection',        lastOdo:0, interval:50000,  cost:350,  currentOdo:0 },
-  // 100k items
-  { name:'Tire Replacement (Full)', lastOdo:0, interval:100000, cost:6000, currentOdo:0 },
-  { name:'Annual DOT Inspection',   lastOdo:0, interval:100000, cost:2000, currentOdo:0 },
-  { name:'EGR Valve Service',       lastOdo:0, interval:100000, cost:800,  currentOdo:0 },
-  { name:'Wheel Bearing Service',   lastOdo:0, interval:100000, cost:600,  currentOdo:0 },
-  { name:'Belts & Hoses',           lastOdo:0, interval:100000, cost:500,  currentOdo:0 },
-  { name:'Battery Replacement',     lastOdo:0, interval:100000, cost:400,  currentOdo:0 },
-  { name:'Transmission Service',    lastOdo:0, interval:100000, cost:400,  currentOdo:0 },
-  { name:'DEF System Service',      lastOdo:0, interval:100000, cost:500,  currentOdo:0 },
-  // 150k items
-  { name:'DPF Cleaning',            lastOdo:0, interval:150000, cost:1000, currentOdo:0 },
-  { name:'Coolant Flush',           lastOdo:0, interval:150000, cost:400,  currentOdo:0 },
-  // Unplanned reserve — most important line item
-  { name:'Unplanned Repairs Reserve', lastOdo:0, interval:100000, cost:5000, currentOdo:0 },
+  { name:"Oil Change",        lastOdo:487000, interval:15000,  cost:650,  currentOdo:495000 },
+  { name:"Tire Rotation",     lastOdo:485000, interval:25000,  cost:200,  currentOdo:495000 },
+  { name:"Annual DOT Inspect",lastOdo:470000, interval:100000, cost:450,  currentOdo:495000 },
+  { name:"DPF Cleaning",      lastOdo:450000, interval:100000, cost:1200, currentOdo:495000 },
+  { name:"Brake Inspection",  lastOdo:480000, interval:30000,  cost:350,  currentOdo:495000 },
 ];
 
 async function loadMaintItems() {
@@ -1853,8 +1570,7 @@ function renderMaint() {
     if (milesLeft < 0)                         { tier = "overdue"; barColor = "red";   status = "OVERDUE " + Math.abs(milesLeft).toLocaleString() + " mi"; }
     else if (milesLeft < item.interval * 0.15) { tier = "soon";    barColor = "amber"; status = "DUE IN " + milesLeft.toLocaleString() + " mi"; }
     else                                        { tier = "good";    barColor = "green"; status = "GOOD — " + milesLeft.toLocaleString() + " mi left"; }
-    return '<div class="maint-item"><div class="maint-top"><div class="maint-name">' + item.name + '</div><span class="maint-status ' + tier + '">' + status + '</span>' +
-      '<button onclick="deleteMaintItem(this.dataset.name)" data-name="' + item.name.replace(/"/g,'&quot;') + '" style="background:none;border:none;color:#ff7e7e;font-size:.75rem;cursor:pointer;padding:0 .3rem;margin-left:.3rem;" title="Remove this item">✕</button></div>' +
+    return '<div class="maint-item"><div class="maint-top"><div class="maint-name">' + item.name + '</div><span class="maint-status ' + tier + '">' + status + '</span></div>' +
       '<div class="maint-bar-wrap"><div class="maint-bar ' + barColor + '" style="width:' + pct + '%"></div></div>' +
       '<div class="maint-stats"><span class="maint-stat">Last: <strong>' + item.lastOdo.toLocaleString() + ' mi</strong></span><span class="maint-stat">Interval: <strong>' + item.interval.toLocaleString() + ' mi</strong></span><span class="maint-stat">Cost/mi: <strong>$' + cpm + '</strong></span><span class="maint-stat">Est. Cost: <strong>$' + item.cost.toLocaleString() + '</strong></span></div></div>';
   }).join("");
@@ -1924,14 +1640,14 @@ async function loadSharedCityCoords() {
 async function saveSharedCityCoord(key, cityName, stateCode, lat, lon, source) {
   if (!window._supabaseReady || !window._supabase) return;
   try {
-    await _supabase.from('city_coords').upsert({
+    await _supabase.from('city_coords').insert({
       city_key:   key,
       city_name:  cityName,
       state_code: stateCode || '',
       lat:        lat,
       lon:        lon,
       source:     source || 'geocode',
-    }, { onConflict: 'city_key' });
+    });
   } catch(err) {
     // Ignore unique constraint violations (city already exists)
   }
@@ -1975,7 +1691,7 @@ async function geocodeCityAsync(key, fullCityStr, stateCode) {
 // Seed shared table with built-in coords on first load (runs once)
 async function seedSharedCityCoords() {
   if (!window._supabaseReady || !window._supabase) return;
-  if (localStorage.getItem('rc-coords-seeded-v2')) return;
+  if (localStorage.getItem('rc-coords-seeded')) return;
   try {
     var rows = Object.keys(CITY_COORDS).map(function(key) {
       return {
@@ -1989,9 +1705,9 @@ async function seedSharedCityCoords() {
     });
     // Insert in batches of 50
     for (var i = 0; i < rows.length; i += 50) {
-      await _supabase.from('city_coords').upsert(rows.slice(i, i + 50), { onConflict: 'city_key' });
+      await _supabase.from('city_coords').insert(rows.slice(i, i + 50));
     }
-    localStorage.setItem('rc-coords-seeded-v2', '1');
+    localStorage.setItem('rc-coords-seeded', '1');
     console.log('Seeded', rows.length, 'cities to shared database');
   } catch(e) { console.error('Seed error:', e); }
 }
@@ -2075,7 +1791,7 @@ var CITY_COORDS = {
   "reno":[39.5296,-119.8138],"fresno":[36.7378,-119.7871],"bakersfield":[35.3733,-119.0187],
   "san diego":[32.7157,-117.1611],"san jose":[37.3382,-121.8863],"san francisco":[37.7749,-122.4194],
   "albuquerque":[35.0844,-106.6504],"el paso":[31.7619,-106.4850],"dallas":[32.7767,-96.7970],
-  "fort worth":[32.7555,-97.3308],"houston":[29.7604,-95.3698],"san antonio":[29.4241,-98.4936],"burnet":[30.7585,-98.2361],"austin":[30.2672,-97.7431],"waco":[31.5493,-97.1467],"abilene":[32.4487,-99.7331],"lubbock":[33.5779,-101.8552],"amarillo":[35.2220,-101.8313],"corpus christi":[27.8006,-97.3964],"laredo":[27.5306,-99.4803],"midland":[31.9974,-102.0779],"odessa":[31.8457,-102.3676],"tyler":[32.3513,-95.3011],"beaumont":[30.0802,-94.1266],"killeen":[31.1171,-97.7278],"temple":[31.0982,-97.3428],"wichita falls":[33.9137,-98.4934],"longview":[32.5007,-94.7405],"texarkana":[33.4251,-94.0477],
+  "fort worth":[32.7555,-97.3308],"houston":[29.7604,-95.3698],"san antonio":[29.4241,-98.4936],
   "oklahoma city":[35.4676,-97.5164],"kansas city":[39.0997,-94.5786],"omaha":[41.2565,-95.9345],
   "minneapolis":[44.9778,-93.2650],"chicago":[41.8781,-87.6298],"st louis":[38.6270,-90.1994],
   "memphis":[35.1495,-90.0490],"nashville":[36.1627,-86.7816],"atlanta":[33.7490,-84.3880],
@@ -2276,31 +1992,7 @@ function startGPS() {
   );
 }
 
-// EIA price cache — only fetch once per session per region to avoid 429 rate limits
-var _eiaPriceCache = {};
-var _eiaPriceCacheTime = {};
-var EIA_CACHE_TTL = 3600000; // 1 hour
-
 async function fetchFuelPrice(region) {
-  // Return cached price if fresh
-  var now = Date.now();
-  if (_eiaPriceCache[region] && (now - (_eiaPriceCacheTime[region] || 0)) < EIA_CACHE_TTL) {
-    var cached = _eiaPriceCache[region];
-    var fuelVal = document.getElementById('fuel-value');
-    var fuelSub = document.getElementById('fuel-sub');
-    var fuelDot = document.getElementById('fuel-dot');
-    var fuelBox = document.getElementById('fuel-box');
-    if (fuelVal) fuelVal.textContent = '$' + cached.price.toFixed(3) + '/gal';
-    if (fuelSub) fuelSub.textContent = region + ' Region · EIA Live';
-    if (fuelDot) fuelDot.className = 'live-dot green';
-    if (fuelBox) fuelBox.className = 'live-box connected';
-    defaults.fuelPrice = cached.price;
-    return;
-  }
-  return _fetchFuelPriceLive(region);
-}
-
-async function _fetchFuelPriceLive(region) {
   if (window._gpsLat && window._gpsLon) {
     var crowdResult = await fetchCrowdFuelPrice(window._gpsLat, window._gpsLon);
     if (crowdResult && crowdResult.count >= 3) { updateFuelDisplay(crowdResult.price, crowdResult.count); return; }
@@ -2318,9 +2010,6 @@ async function _fetchFuelPriceLive(region) {
     if (d && d.price) { price = parseFloat(d.price); period = d.period || ''; }
     else { const rows = d?.response?.data; if (!rows || !rows.length) throw new Error('No data'); price = parseFloat(rows[0].value); period = rows[0].period || ''; }
     if (price) {
-      // Cache the result to avoid repeated EIA calls
-      _eiaPriceCache[region]     = { price: price, period: period };
-      _eiaPriceCacheTime[region] = Date.now();
       defaults.fuelPrice = price; fuelVal.textContent = '$' + price.toFixed(3) + '/gal'; fuelSub.textContent = region + ' Region · EIA Live';
       fuelDot.className = 'live-dot green'; fuelBox.className = 'live-box connected';
       if (fuelUpd) fuelUpd.textContent = 'Week of ' + period;
@@ -2360,21 +2049,7 @@ renderStates(stateData); injectProfitBars(); loadSavedPreferences(); renderMaint
     if (!pulling) return; pulling = false;
     var dist = e.changedTouches[0].clientY - startY;
     indicator.style.transform = 'translateY(-100%)'; indicator.textContent = 'Pull to refresh';
-    if (dist > 60) {
-      indicator.textContent = 'Refreshing...';
-      indicator.style.transform = 'translateY(0)';
-      // Check which screen is active and refresh accordingly
-      var statesScreen = document.getElementById('screen-states');
-      if (statesScreen && statesScreen.classList.contains('active')) {
-        // On states tab — force refresh national data from Supabase
-        _nationalStatsLastFetch = 0; // clear cache so it re-fetches
-        fetchNationalStateData();
-      } else {
-        startGPS();
-        refreshWeather();
-      }
-      setTimeout(function() { indicator.style.transform = 'translateY(-100%)'; }, 1500);
-    }
+    if (dist > 60) { indicator.textContent = 'Refreshing...'; indicator.style.transform = 'translateY(0)'; startGPS(); refreshWeather(); setTimeout(function() { indicator.style.transform = 'translateY(-100%)'; }, 1500); }
     startY = 0;
   }, { passive: true });
 })();
@@ -3205,7 +2880,7 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
   var totalFuel  = loadedFuel + deadFuel;
   var net        = rate - totalFuel;
   var rpm        = parseFloat((rate / miles).toFixed(2));
-  var netPerMile = parseFloat((net / miles).toFixed(2)); // loaded miles only — deadhead cost already in numerator
+  var netPerMile = parseFloat((net / (miles + deadMiles)).toFixed(2));
   var minRpm     = defaults.minRpm || 2.00;
   var minGross   = defaults.minGross || 1500;
 
@@ -3224,90 +2899,16 @@ async function getLoadDecision(panelId, rate, miles, broker, pickup) {
     }
   }
 
-  // Calculate maintenance CPM from saved items
-  var maintCpm = 0;
-  try {
-    var maintEl = document.getElementById('maint-cpm');
-    if (maintEl) maintCpm = parseFloat(maintEl.textContent.replace(/[^0-9.]/g,'')) || 0;
-  } catch(e) {}
-  // Non-fuel cost per mile only — fuel is already subtracted from net profit
-  // so we only pass maintenance/overhead to avoid double-counting in AI prompt
-  var nonFuelCostPerMile = parseFloat(maintCpm.toFixed(2));
-  var totalCostPerMile   = parseFloat((totalFuel / miles + maintCpm).toFixed(2)); // for reference only
-
-  // Get lane market data from stateData (live from Supabase state_stats)
-  var originState = broker ? '' : '';
-  // Extract origin state from load card context if available
-  var laneMarketRpm = null;
-  var laneMarketSource = '';
-  try {
-    // Try LANE_RATES static table for this specific lane
-    var laneKey = null;
-    var panelEl = document.getElementById('panel-' + panelId);
-    if (panelEl) {
-      var routeEl = panelEl.querySelector('.load-route, .load-header');
-      if (routeEl) {
-        var routeText = routeEl.textContent || '';
-        var stateMatch = routeText.match(/,\s*([A-Z]{2})\s*[→>]/);
-        var destMatch  = routeText.match(/[→>]\s*[\w\s]+,\s*([A-Z]{2})/);
-        if (stateMatch && destMatch) {
-          laneKey = stateMatch[1] + '-' + destMatch[1];
-          var LANE_RATES_REF = {
-            'WA-CA':2.45,'WA-OR':1.95,'WA-ID':2.05,'WA-UT':2.25,'WA-NV':2.35,'WA-TX':2.55,'WA-CO':2.35,'WA-AZ':2.40,'WA-MT':2.10,
-            'OR-CA':2.30,'OR-ID':2.00,'OR-WA':1.95,'OR-UT':2.20,'OR-TX':2.50,'OR-CO':2.30,
-            'ID-WA':2.05,'ID-OR':2.00,'ID-UT':2.10,'ID-CA':2.40,'ID-TX':2.48,'ID-MT':2.00,'ID-CO':2.20,
-            'UT-WA':2.25,'UT-CA':2.38,'UT-TX':2.30,'UT-NV':2.12,'UT-ID':2.10,'UT-CO':2.05,'UT-AZ':2.15,
-            'CA-WA':2.20,'CA-OR':2.15,'CA-NV':1.90,'CA-AZ':1.95,'CA-UT':2.05,'CA-TX':2.35,
-            'TX-WA':2.60,'TX-CA':2.40,'TX-UT':2.25,'TX-OK':1.85,'TX-NM':1.90,'TX-CO':2.20,'TX-KS':1.95,
-            'NV-CA':1.85,'NV-WA':2.30,'NV-UT':2.05,'NV-AZ':1.95,
-            'MT-WA':2.15,'MT-ID':2.00,'MT-UT':2.20,'MT-CO':2.25,'MT-WY':2.10,
-            'CO-WA':2.35,'CO-CA':2.42,'CO-TX':2.20,'CO-UT':2.05,'CO-KS':2.00,'CO-NM':2.05,
-          };
-          if (LANE_RATES_REF[laneKey]) {
-            laneMarketRpm = LANE_RATES_REF[laneKey];
-            laneMarketSource = 'historical lane average';
-          }
-          // Override with live stateData if available
-          var originSt = stateMatch[1];
-          var liveState = stateData.find(function(s) { return s.code === originSt; });
-          if (liveState && liveState.rpm > 0) {
-            laneMarketRpm = liveState.rpm;
-            laneMarketSource = 'live Truckstop market data (last 30 min)';
-          }
-        }
-      }
-    }
-  } catch(e) {}
-
-  var laneContext = laneMarketRpm
-    ? '- Current market avg for this origin: $' + laneMarketRpm.toFixed(2) + '/mi (' + laneMarketSource + ')\n'
-    : '';
-
-  // Pre-compute everything so AI cannot invent its own numbers
-  var trueNetProfit  = Math.round(net - (maintCpm * miles));
-  var trueNetPerMile = parseFloat((trueNetProfit / miles).toFixed(2));
-  var maintCost      = Math.round(maintCpm * miles);
-  var meetsRpm       = parseFloat(rpm) >= parseFloat(minRpm);
-  var meetsGross     = minGross > 0 ? trueNetProfit >= minGross : true;
-  var recommendVerdict = meetsRpm && meetsGross ? 'TAKE IT' : 'PASS';
-
   var prompt =
-    "You are a freight dispatcher for an owner-operator flatbed trucker. Your job is to explain the load decision in ONE sentence using only these pre-calculated numbers. DO NOT invent any numbers, miles, or thresholds not listed below.\n\n" +
-    "PRE-CALCULATED RESULTS (use ONLY these):\n" +
-    "- Gross rate: $" + rate + "\n" +
-    "- Loaded miles: " + miles + " (deadhead: " + deadMiles + ")\n" +
-    "- Rate/mile: $" + rpm + "/mi (driver minimum: $" + minRpm + "/mi)\n" +
-    "- Fuel cost: $" + (loadedFuel + deadFuel) + " total ($" + loadedFuel + " loaded + $" + deadFuel + " deadhead)\n" +
-    "- Net after fuel: $" + net + "\n" +
-    "- Maintenance cost: $" + maintCost + " ($" + maintCpm.toFixed(2) + "/mi x " + miles + " loaded miles)\n" +
-    "- TRUE NET after fuel and maintenance: $" + trueNetProfit + " ($" + trueNetPerMile + "/mi)\n" +
-    "- Driver minimum gross: $" + minGross + "\n" +
-    "- Meets RPM minimum: " + (meetsRpm ? 'YES' : 'NO') + "\n" +
-    "- Meets gross minimum: " + (meetsGross ? 'YES' : 'NO') + "\n" +
-    (laneContext ? "- " + laneContext : "") +
-    "- Broker: " + (broker || "unknown") + (brokerInfo ? " (" + brokerInfo + ")" : "") + "\n\n" +
-    "VERDICT: " + recommendVerdict + "\n\n" +
-    "Write exactly: '" + recommendVerdict + " — [one sentence explaining why using the specific dollar amounts above]'";
+    "You are a freight dispatcher advising an owner-operator trucker. Give a quick TAKE IT or PASS recommendation with ONE sentence of reasoning. Be blunt and specific with numbers.\n\n" +
+    "LOAD DETAILS:\n" +
+    "- Gross rate: $" + rate + " — " + grossStatus + "\n" +
+    "- Miles: " + miles + " loaded + " + deadMiles + " deadhead\n" +
+    "- Rate per mile: $" + rpm + " — " + rpmStatus + "\n" +
+    "- Loaded fuel: $" + loadedFuel + " · Deadhead fuel: $" + deadFuel + "\n" +
+    "- Net after all fuel: $" + net + " ($" + netPerMile + "/mi all-in)\n" +
+    "- Broker: " + (broker || "unknown") + (brokerInfo ? " — " + brokerInfo : "") + "\n\n" +
+    "Reply format: TAKE IT or PASS — [one sentence with the key number that drives your decision]";
 
   try {
     var text = await callAI(prompt, 80);
@@ -3742,114 +3343,23 @@ function loadSavedMCNumber() {
 // ══════════════════════════════════════════════════════════════
 // LIVE DASHBOARD STATS
 // ══════════════════════════════════════════════════════════════
-async function updateDashboardStats() {
-  var now     = new Date();
+function updateDashboardStats() {
+  if (!invoices || !invoices.length) return;
+  var now = new Date();
   var weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  // ── Revenue from invoices ─────────────────────────────────
-  var weekRevenue  = 0;
-  var outstanding  = 0;
-  if (invoices && invoices.length) {
-    weekRevenue = invoices
-      .filter(function(i) { return new Date(i.invoice_date || i.date) >= weekAgo; })
-      .reduce(function(sum, i) { return sum + (parseFloat(i.amount) || 0); }, 0);
-    outstanding = invoices
-      .filter(function(i) { return i.status !== 'paid'; })
-      .reduce(function(sum, i) { return sum + (parseFloat(i.amount) || 0); }, 0);
-  }
-
-  // ── Miles + fuel from booked_loads this week ──────────────
-  var weekMiles    = 0;
-  var weekFuelCost = 0;
-  var weekRpm      = 0;
-  try {
-    if (window._supabaseReady && window._rcUserId) {
-      var bookedRes = await window._supabase
-        .from('booked_loads')
-        .select('rate,miles,eta_date')
-        .eq('user_id', window._rcUserId)
-        .gte('eta_date', weekAgo.toISOString().split('T')[0]);
-      if (!bookedRes.error && bookedRes.data && bookedRes.data.length > 0) {
-        bookedRes.data.forEach(function(l) {
-          weekMiles += parseFloat(l.miles) || 0;
-        });
-      }
-    }
-  } catch(e) { /* non-critical */ }
-
-  // Fuel cost from miles
-  var mpg       = defaults.mpg       || 6.5;
-  var fuelPrice = defaults.fuelPrice || 4.25;
-  weekFuelCost  = Math.round((weekMiles / mpg) * fuelPrice);
-
-  // RPM = revenue / miles
-  weekRpm = weekMiles > 0 && weekRevenue > 0 ? weekRevenue / weekMiles : 0;
-
-  // ── Update logbook YTD stats ─────────────────────────────
-  var ytdStart  = new Date(now.getFullYear(), 0, 1);
-  var ytdRev    = 0;
-  var ytdLoads  = 0;
-  if (invoices && invoices.length) {
-    invoices.forEach(function(i) {
-      if (new Date(i.invoice_date || i.date) >= ytdStart) {
-        ytdRev += parseFloat(i.amount) || 0;
-        ytdLoads++;
-      }
-    });
-  }
-  var ytdRevEl = document.getElementById('log-ytd-rev');
-  if (ytdRevEl) ytdRevEl.textContent = '$' + ytdRev.toLocaleString();
-  var ytdLoadsEl = document.querySelectorAll('#screen-log .metric-val');
-  // Update logbook metrics if on that screen
-  var logMetrics = document.querySelectorAll('#screen-log .metric');
-  logMetrics.forEach(function(card) {
-    var label = card.querySelector('.metric-label');
-    var val   = card.querySelector('.metric-val');
-    if (!label || !val) return;
-    var labelText = label.textContent.toLowerCase();
-    if (labelText.includes('ytd revenue'))      val.textContent = '$' + ytdRev.toLocaleString();
-    if (labelText.includes('loads completed'))   val.textContent = ytdLoads;
-  });
-
-  // ── Update metric cards ───────────────────────────────────
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var weekRevenue = invoices.filter(function(i) { return i.status === 'paid' && new Date(i.date) >= weekAgo; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var outstanding = invoices.filter(function(i) { return i.status !== 'paid'; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
+  var monthRevenue = invoices.filter(function(i) { return i.status === 'paid' && new Date(i.date) >= monthStart; }).reduce(function(sum, i) { return sum + i.amount; }, 0);
   var metricCards = document.querySelectorAll('#screen-dash .metric');
   metricCards.forEach(function(card) {
     var label = card.querySelector('.metric-label');
     var val   = card.querySelector('.metric-val');
     if (!label || !val) return;
     var labelText = label.textContent.toLowerCase();
-
-    if (labelText.includes('week revenue')) {
-      val.textContent = '$' + weekRevenue.toLocaleString();
-      val.className   = 'metric-val' + (weekRevenue > 0 ? '' : ' red');
-    }
-    if (labelText.includes('rpm this week')) {
-      val.textContent = weekRpm > 0 ? '$' + weekRpm.toFixed(2) : '—';
-      val.className   = 'metric-val' + (weekRpm >= (defaults.minRpm || 2.0) ? '' : ' amber');
-    }
-    if (labelText.includes('miles this week')) {
-      val.textContent = weekMiles > 0 ? weekMiles.toLocaleString() : '—';
-      val.className   = 'metric-val';
-    }
-    if (labelText.includes('est. fuel') || labelText.includes('fuel cost')) {
-      val.textContent = weekFuelCost > 0 ? '$' + weekFuelCost.toLocaleString() : '—';
-      val.className   = 'metric-val red';
-    }
-    if (labelText.includes('outstanding')) {
-      val.textContent = '$' + outstanding.toLocaleString();
-      val.className   = 'metric-val' + (outstanding > 0 ? ' amber' : '');
-    }
-  // Also update by ID for the new named elements
-  var byId = {
-    'dash-week-rev':   { val: '$' + weekRevenue.toLocaleString(), cls: 'metric-val' + (weekRevenue > 0 ? '' : ' red') },
-    'dash-week-rpm':   { val: weekRpm > 0 ? '$' + weekRpm.toFixed(2) : '—', cls: 'metric-val' + (weekRpm >= (defaults.minRpm||2.0) ? '' : ' amber') },
-    'dash-week-miles': { val: weekMiles > 0 ? weekMiles.toLocaleString() : '—', cls: 'metric-val' },
-    'dash-week-fuel':  { val: weekFuelCost > 0 ? '$' + weekFuelCost.toLocaleString() : '—', cls: 'metric-val red' },
-  };
-  Object.keys(byId).forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) { el.textContent = byId[id].val; el.className = byId[id].cls; }
-  });
+    if (labelText.includes('week revenue')) { val.textContent = '$' + weekRevenue.toLocaleString(); val.className = 'metric-val' + (weekRevenue > 0 ? '' : ' red'); }
+    if (labelText.includes('outstanding'))  { val.textContent = '$' + outstanding.toLocaleString(); val.className = 'metric-val' + (outstanding > 0 ? ' amber' : ''); }
+    if (labelText.includes('month revenue') || labelText.includes('this month')) { val.textContent = '$' + monthRevenue.toLocaleString(); }
   });
 }
 
@@ -3923,206 +3433,6 @@ function toggleCommandDetail() {
   if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
 }
 
-
-// ══════════════════════════════════════════════════════════════
-// SUBSCRIPTION & BILLING
-// ══════════════════════════════════════════════════════════════
-var _billingWorker = 'https://stripe-billing-worker.wild-sunset-1d5f.workers.dev';
-var _subStatus     = null;
-
-async function checkSubscriptionStatus(userId, email) {
-  if (!userId) return;
-  try {
-    // Always read from Supabase — source of truth
-    var result = await window._supabase
-      .from('profiles')
-      .select('subscription_status,subscription_expires')
-      .eq('user_id', userId)
-      .single();
-
-    if (result.error || !result.data) return;
-
-    var status  = result.data.subscription_status || 'trial';
-    var expires = result.data.subscription_expires;
-    _subStatus  = status;
-
-    // Beta users always have full access
-    if (status === 'beta') return;
-
-    // Check if trial or subscription has expired
-    var now      = new Date();
-    var expDate  = expires ? new Date(expires) : null;
-    var isExpired = expDate && expDate < now;
-
-    if (status === 'active' && !isExpired) return; // paid and current
-    if (status === 'trial'  && !isExpired) {
-      // Show trial banner with days remaining
-      var daysLeft = expDate ? Math.ceil((expDate - now) / 86400000) : 14;
-      showTrialBanner(daysLeft);
-      return;
-    }
-
-    // Expired — show paywall
-    showPaywall(status === 'trial' ? 'trial_expired' : 'subscription_expired');
-
-  } catch(e) {
-    console.error('Subscription check error:', e);
-  }
-}
-
-function showTrialBanner(daysLeft) {
-  // Only show if not already there
-  if (document.getElementById('trial-banner')) return;
-  var banner = document.createElement('div');
-  banner.id  = 'trial-banner';
-  banner.style.cssText = 'background:linear-gradient(90deg,#1a2e1a,#0d1f0d);border-bottom:1px solid var(--green-border);padding:.5rem 1rem;display:flex;align-items:center;justify-content:space-between;font-size:.75rem;position:sticky;top:0;z-index:500;';
-  banner.innerHTML = '<span style="color:#ffd04d;">⏳ ' + daysLeft + ' day' + (daysLeft !== 1 ? 's' : '') + ' left in your free trial</span>' +
-    '<button onclick="showBillingScreen()" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.25rem .6rem;font-size:.72rem;font-weight:bold;cursor:pointer;">Subscribe $197/mo</button>';
-  var main = document.querySelector('.main');
-  if (main) main.insertBefore(banner, main.firstChild);
-}
-
-function showPaywall(reason) {
-  // Blur the main content and show paywall overlay
-  var overlay = document.getElementById('paywall-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'paywall-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
-    document.body.appendChild(overlay);
-  }
-  var isTrialExpired = reason === 'trial_expired';
-  overlay.innerHTML =
-    '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:12px;max-width:420px;width:100%;padding:2rem;text-align:center;">' +
-      '<div style="font-size:2rem;margin-bottom:.8rem;">🚛</div>' +
-      '<div style="font-size:1.2rem;font-weight:bold;color:var(--green);margin-bottom:.5rem;">RoadCommand</div>' +
-      '<div style="font-size:.9rem;color:#ffd04d;margin-bottom:.5rem;">' +
-        (isTrialExpired ? 'Your 14-day trial has ended' : 'Your subscription has expired') +
-      '</div>' +
-      '<div style="font-size:.82rem;color:#b8c8b8;margin-bottom:1.5rem;line-height:1.6;">' +
-        'Subscribe to keep access to live loads, AI dispatch, push notifications, and everything else built for owner-operators.' +
-      '</div>' +
-      '<div style="display:flex;flex-direction:column;gap:.7rem;margin-bottom:1rem;">' +
-        '<button onclick="startCheckout(&quot;monthly&quot;)" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:.9rem;font-size:.95rem;font-weight:bold;cursor:pointer;">$197 / month<br><span style=\"font-size:.72rem;font-weight:normal;opacity:.8;\">14-day free trial included</span></button>' +
-        '<button onclick="startCheckout(&quot;annual&quot;)" style="background:transparent;color:var(--green);border:1px solid var(--green-border);border-radius:8px;padding:.9rem;font-size:.95rem;cursor:pointer;">$1,970 / year<br><span style=\"font-size:.72rem;opacity:.7;\">Save $394 — 2 months free</span></button>' +
-      '</div>' +
-      '<div style="font-size:.7rem;color:#b8c8b8;">Cancel anytime · No contracts · Built for owner-operators</div>' +
-    '</div>';
-}
-
-function showBillingScreen() {
-  // Remove trial banner if present
-  var banner = document.getElementById('trial-banner');
-  if (banner) banner.remove();
-
-  var overlay = document.getElementById('billing-screen-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'billing-screen-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:8000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
-    document.body.appendChild(overlay);
-  }
-
-  var status = _subStatus || 'trial';
-  var isBeta = status === 'beta';
-  var isActive = status === 'active';
-
-  overlay.innerHTML =
-    '<div style="background:var(--surface);border:1px solid var(--green-border);border-radius:12px;max-width:440px;width:100%;padding:2rem;">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">' +
-        '<div style="font-size:1rem;font-weight:bold;color:var(--green);">🧾 Subscription</div>' +
-        '<button onclick="document.getElementById(&quot;billing-screen-overlay&quot;).remove()" style="background:none;border:none;color:#b8c8b8;font-size:1.2rem;cursor:pointer;">✕</button>' +
-      '</div>' +
-
-      // Current status
-      '<div style="background:#0d1f0d;border:1px solid var(--green-border);border-radius:8px;padding:1rem;margin-bottom:1.2rem;">' +
-        '<div style="font-size:.75rem;color:#b8c8b8;margin-bottom:.3rem;">Current Plan</div>' +
-        '<div style="font-size:1rem;font-weight:bold;color:' + (isBeta ? '#ffd04d' : isActive ? 'var(--green)' : '#ff7e7e') + ';">' +
-          (isBeta ? '⭐ Beta Access — Lifetime Free' : isActive ? '✅ Active Subscription' : '⏳ Free Trial') +
-        '</div>' +
-      '</div>' +
-
-      (isBeta || isActive ? '' :
-        // Plans
-        '<div style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:1.2rem;">' +
-          '<button onclick="startCheckout(&quot;monthly&quot;)" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:.9rem;font-size:.9rem;font-weight:bold;cursor:pointer;text-align:left;">' +
-            '<div>Monthly — $197/mo</div>' +
-            '<div style=\"font-size:.72rem;font-weight:normal;opacity:.8;\">14-day free trial · Cancel anytime</div>' +
-          '</button>' +
-          '<button onclick="startCheckout(&quot;annual&quot;)" style="background:transparent;color:var(--green);border:1px solid var(--green-border);border-radius:8px;padding:.9rem;font-size:.9rem;cursor:pointer;text-align:left;">' +
-            '<div>Annual — $1,970/yr <span style=\"background:#ffd04d;color:#000;font-size:.65rem;padding:.1rem .3rem;border-radius:3px;margin-left:.3rem;\">SAVE $394</span></div>' +
-            '<div style=\"font-size:.72rem;opacity:.7;\">2 months free · Best value</div>' +
-          '</button>' +
-        '</div>'
-      ) +
-
-      (isActive ?
-        '<button onclick="openBillingPortal()" style="width:100%;background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.7rem;font-size:.82rem;cursor:pointer;">Manage Subscription / Cancel</button>'
-        : ''
-      ) +
-
-      '<div style="margin-top:1rem;font-size:.7rem;color:#b8c8b8;text-align:center;">Secured by Stripe · Cancel anytime · No contracts</div>' +
-    '</div>';
-}
-
-async function startCheckout(plan) {
-  if (!window._rcUserId || !window._rcUserEmail) return;
-  var btn = event && event.target;
-  if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
-
-  try {
-    var res  = await fetch(_billingWorker + '/create-checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: window._rcUserId,
-        email:  window._rcUserEmail,
-        plan:   plan
-      })
-    });
-    var data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert('Could not start checkout. Please try again.');
-      if (btn) { btn.textContent = plan === 'monthly' ? '$197 / month' : '$1,970 / year'; btn.disabled = false; }
-    }
-  } catch(e) {
-    alert('Checkout error. Please try again.');
-    if (btn) { btn.disabled = false; }
-  }
-}
-
-async function openBillingPortal() {
-  if (!window._rcUserId) return;
-  try {
-    var res  = await fetch(_billingWorker + '/portal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: window._rcUserId })
-    });
-    var data = await res.json();
-    if (data.url) window.location.href = data.url;
-  } catch(e) {
-    alert('Could not open billing portal. Please try again.');
-  }
-}
-
-// Handle return from Stripe checkout
-(function checkBillingReturn() {
-  var params = new URLSearchParams(window.location.search);
-  if (params.get('billing') === 'success') {
-    history.replaceState({}, '', window.location.pathname);
-    setTimeout(function() {
-      var overlay = document.getElementById('paywall-overlay');
-      if (overlay) overlay.remove();
-      var banner = document.getElementById('trial-banner');
-      if (banner) banner.remove();
-      alert('Welcome to RoadCommand! Your subscription is active. Go make some money. 🚛');
-    }, 1000);
-  }
-})();
-
 // Hook into onAuthReady and loadInvoices
 var _origOnAuthReady = onAuthReady;
 onAuthReady = function(firstName, userId, email) {
@@ -4134,124 +3444,8 @@ onAuthReady = function(firstName, userId, email) {
 var _origLoadInvoices = loadInvoices;
 loadInvoices = async function() {
   await _origLoadInvoices();
-  setTimeout(function() { updateDashboardStats(); renderCommandScore(); renderLogbook(); }, 500);
+  setTimeout(function() { updateDashboardStats(); renderCommandScore(); }, 500);
 };
-
-async function deleteMaintItem(name) {
-  if (!confirm('Remove ' + name + ' from maintenance tracker?')) return;
-  maintItems = maintItems.filter(function(i) { return i.name !== name; });
-  renderMaint();
-  if (window._rcUserId && window._supabaseReady) {
-    try { await window._supabase.from('maintenance').delete().eq('user_id', window._rcUserId).eq('name', name); } catch(e) {}
-  }
-}
-
-async function renderLogbook() {
-  var logList = document.getElementById('run-list');
-  if (!logList) return;
-
-  // Load active booked loads from Supabase to show "on this load" status
-  var bookedLoads = [];
-  try {
-    if (window._rcUserId && window._supabaseReady) {
-      var bRes = await window._supabase.from('booked_loads').select('*').eq('user_id', window._rcUserId).order('eta_date', { ascending: false });
-      if (!bRes.error && bRes.data) bookedLoads = bRes.data;
-    }
-  } catch(e) {}
-
-  var html = '';
-
-  // Show active/booked loads first
-  if (bookedLoads.length > 0) {
-    html += '<div style="font-size:.72rem;color:#b8c8b8;padding:.4rem .8rem;text-transform:uppercase;letter-spacing:.05em;">Active Loads</div>';
-    html += bookedLoads.map(function(load) {
-      var isActive = load.active;
-      var statusColor = isActive ? 'var(--green)' : '#b8c8b8';
-      var statusText  = isActive ? '🚛 En Route' : '📋 Booked';
-      return '<div class="log-item" style="padding:.8rem 1rem;border-left:3px solid ' + statusColor + ';">' +
-        '<div class="log-top">' +
-          '<div class="log-route" style="font-weight:bold;">' + (load.origin || '?') + ' → ' + (load.destination || '?') + '</div>' +
-          '<div class="log-date">' + statusText + '</div>' +
-        '</div>' +
-        '<div class="log-stats">' +
-          '<div class="log-stat">Rate: <strong>$' + (parseFloat(load.rate)||0).toLocaleString() + '</strong></div>' +
-          '<div class="log-stat">Miles: <strong>' + (load.miles||'?') + '</strong></div>' +
-          '<div class="log-stat">ETA: <strong>' + (load.eta_date || '?') + '</strong></div>' +
-        '</div>' +
-        '<div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">' +
-          (!isActive ? '<button class="lb-active-btn" data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.3rem .7rem;font-size:.75rem;cursor:pointer;font-weight:bold;">&#x1F69B; On This Load</button>' : '') +
-          (isActive  ? '<button class="lb-inactive-btn" data-id="' + load.id + '" onclick="setLoadInactive(this.dataset.id)" style="background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:.3rem .7rem;font-size:.75rem;cursor:pointer;">&#x2713; Mark Delivered</button>' : '') +
-          '<button class="lb-del-btn" data-id="' + load.id + '" onclick="deleteBookedLoad(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.3rem .6rem;font-size:.72rem;cursor:pointer;">&#x2715; Remove</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  }
-
-  // Show invoice history
-  if (invoices && invoices.length > 0) {
-    html += '<div style="font-size:.72rem;color:#b8c8b8;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.05em;margin-top:.5rem;">Invoice History</div>';
-    var sorted = invoices.slice().sort(function(a, b) {
-      return new Date(b.invoice_date || b.date || 0) - new Date(a.invoice_date || a.date || 0);
-    });
-    html += sorted.slice(0, 10).map(function(inv) {
-      var date   = inv.invoice_date || inv.date || '';
-      var status = inv.status === 'paid'
-        ? '<span style="color:var(--green);font-size:.7rem;">✅ Paid</span>'
-        : inv.status === 'overdue'
-          ? '<span style="color:var(--red);font-size:.7rem;">⚠️ Overdue</span>'
-          : '<span style="color:var(--amber);font-size:.7rem;">⏳ Pending</span>';
-      return '<div class="log-item" style="padding:.8rem 1rem;">' +
-        '<div class="log-top">' +
-          '<div class="log-route">' + (inv.broker_name || inv.broker || 'Unknown Broker') + '</div>' +
-          '<div class="log-date">' + (date ? new Date(date).toLocaleDateString('en-US', {month:'short',day:'numeric'}) : '—') + '</div>' +
-        '</div>' +
-        '<div class="log-stats">' +
-          '<div class="log-stat">Rate: <strong>$' + (parseFloat(inv.amount)||0).toLocaleString() + '</strong></div>' +
-          '<div class="log-stat">Ref: <strong>' + (inv.ref || '—') + '</strong></div>' +
-          '<div class="log-stat">' + status + '</div>' +
-        '</div>' +
-        '<div style="margin-top:.4rem;">' +
-          '<button data-id="' + inv.id + '" onclick="deleteInvoice(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.2rem .5rem;font-size:.7rem;cursor:pointer;">&#x2715; Delete Invoice</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  }
-
-  if (!html) {
-    html = '<div class="alert alert-amber"><div class="alert-icon">📋</div><div>No runs yet. Book loads and log invoices to build your history.</div></div>';
-  }
-
-  logList.innerHTML = html;
-}
-
-async function setLoadActive(loadId) {
-  try {
-    await window._supabase.from('booked_loads').update({ active: true }).eq('id', loadId).eq('user_id', window._rcUserId);
-    renderLogbook();
-    // Save loadback prefs so push worker knows where you're headed
-    saveLoadAlertPrefs();
-    var toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:.6rem 1.2rem;border-radius:20px;font-size:.82rem;font-weight:bold;z-index:9999;';
-    toast.textContent = '🚛 En Route — Loadback notifications active';
-    document.body.appendChild(toast);
-    setTimeout(function() { toast.remove(); }, 3000);
-  } catch(e) { console.error(e); }
-}
-
-async function setLoadInactive(loadId) {
-  try {
-    await window._supabase.from('booked_loads').update({ active: false }).eq('id', loadId).eq('user_id', window._rcUserId);
-    renderLogbook();
-  } catch(e) {}
-}
-
-async function deleteBookedLoad(loadId) {
-  if (!confirm('Remove this booked load? This cannot be undone.')) return;
-  try {
-    await window._supabase.from('booked_loads').delete().eq('id', loadId).eq('user_id', window._rcUserId);
-    renderLogbook();
-  } catch(e) {}
-}
 
 // ══════════════════════════════════════════════════════════════════════════
 // TRUCKSTOP LIVE LOAD INTEGRATION
@@ -4267,10 +3461,7 @@ async function fetchTruckstopLoads(forceRefresh) {
   // Never block — always reset flag after 10 seconds max
   if (_liveLoadsFetching) {
     var timeSinceFetch = Date.now() - (_liveLoadsLastFetch || 0);
-    if (timeSinceFetch < 10000) {
-      if (_liveLoadsCache.length > 0) renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
-      return;
-    }
+    if (timeSinceFetch < 10000) return; // only block if recent
     _liveLoadsFetching = false; // reset stuck flag
   }
 
@@ -4280,8 +3471,8 @@ async function fetchTruckstopLoads(forceRefresh) {
     return;
   }
 
-  // Committed to a real fetch — now safe to wipe screen
   _liveLoadsFetching = true;
+  // Safety reset after 15 seconds no matter what
   setTimeout(function() { _liveLoadsFetching = false; }, 15000);
 
   var state    = currentState || 'WA';
@@ -4302,7 +3493,7 @@ async function fetchTruckstopLoads(forceRefresh) {
     '&originCity='    + encodeURIComponent(city) +
     '&equipmentType=' + encodeURIComponent(equipType) +
     '&hoursOld=24' +
-    '&pageSize=200' +
+    '&pageSize=50' +
     '&originRange='   + maxDead +
     '&loadType='      + encodeURIComponent(loadType);
 
@@ -4315,10 +3506,7 @@ async function fetchTruckstopLoads(forceRefresh) {
       _liveLoadsCache     = loads;
       _liveLoadsLastFetch = now;
       renderLiveLoadCards(loads, minRpm);
-      updateStatesFromLoads(loads);
       track('live_loads_fetched', { count: loads.length, state: state });
-    } else if (_liveLoadsCache.length > 0) {
-      renderLiveLoadCards(_liveLoadsCache, minRpm);
     } else {
       showNoLoadsState(state);
     }
@@ -4330,122 +3518,6 @@ async function fetchTruckstopLoads(forceRefresh) {
   _liveLoadsFetching = false;
 }
 // ── Render live load cards into both dash and loads screens ───────────────
-// ── National freight market data — reads from Supabase state_stats table ──
-// Data is collected by rc-push-worker cron every 30 min — no direct API calls
-async function fetchNationalStateData() {
-  if (!window._supabaseReady || !window._supabase) return;
-
-  var STATE_NAMES = {
-    WA:'Washington',OR:'Oregon',ID:'Idaho',MT:'Montana',WY:'Wyoming',
-    CA:'California',NV:'Nevada',UT:'Utah',CO:'Colorado',AZ:'Arizona',
-    NM:'New Mexico',TX:'Texas',OK:'Oklahoma',KS:'Kansas',NE:'Nebraska',
-    SD:'South Dakota',ND:'North Dakota',MN:'Minnesota',IA:'Iowa',
-    MO:'Missouri',AR:'Arkansas',LA:'Louisiana',MS:'Mississippi',
-    AL:'Alabama',TN:'Tennessee',KY:'Kentucky',IN:'Indiana',IL:'Illinois',
-    WI:'Wisconsin',MI:'Michigan',OH:'Ohio',WV:'West Virginia',VA:'Virginia',
-    NC:'North Carolina',SC:'South Carolina',GA:'Georgia',FL:'Florida',
-    PA:'Pennsylvania',NY:'New York',NJ:'New Jersey',CT:'Connecticut',
-    MA:'Massachusetts',ME:'Maine',NH:'New Hampshire',VT:'Vermont',
-    DE:'Delaware',MD:'Maryland'
-  };
-
-  var list = document.getElementById('state-list');
-  if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">Loading freight market data...</div>';
-
-  try {
-    var result = await window._supabase
-      .from('state_stats')
-      .select('*')
-      .order('volume', { ascending: false });
-
-    if (result.error) throw result.error;
-    var rows = result.data || [];
-
-    if (rows.length === 0) {
-      // Table exists but no data yet — push worker hasn't run yet
-      if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#b8c8b8;font-size:.85rem;">Market data is being collected — check back in a few minutes.</div>';
-      return;
-    }
-
-    var maxVol = Math.max.apply(null, rows.map(function(r) { return r.volume || 0; }));
-    var updated = rows.map(function(r) {
-      return {
-        code:   r.state_code,
-        name:   STATE_NAMES[r.state_code] || r.state_code,
-        volume: r.volume || 0,
-        rpm:    parseFloat((r.avg_rpm || 0).toFixed(2)),
-        trend:  'flat',
-        maxVol: maxVol
-      };
-    });
-
-    stateData = updated;
-    renderStates(stateData);
-
-    // Show last updated time
-    if (list && rows[0] && rows[0].updated_at) {
-      var updatedAt = new Date(rows[0].updated_at);
-      var minutesAgo = Math.round((Date.now() - updatedAt.getTime()) / 60000);
-      var notice = document.createElement('div');
-      notice.style.cssText = 'padding:.3rem 1rem;text-align:right;color:#b8c8b8;font-size:.7rem;';
-      notice.textContent = 'Updated ' + minutesAgo + ' min ago · refreshes every 30 min';
-      list.appendChild(notice);
-    }
-
-  } catch(e) {
-    console.error('State stats load error:', e);
-    if (list) list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#b8c8b8;font-size:.85rem;">Could not load market data.</div>';
-  }
-}
-
-
-// ── Update only the current origin state in stateData from live loads ───
-// Does NOT replace national data — only refreshes the state you are in
-function updateStatesFromLoads(loads) {
-  if (!loads || loads.length === 0) return;
-  // Only tally the origin state of the current search (should all be same state)
-  var statMap = {};
-  loads.forEach(function(l) {
-    if (!l.originState || l.rate <= 0 || l.miles <= 0) return;
-    var s = l.originState.toUpperCase().trim();
-    if (!statMap[s]) statMap[s] = { volume: 0, rpmSum: 0, rpmCount: 0 };
-    statMap[s].volume++;
-    statMap[s].rpmSum   += l.rate / l.miles;
-    statMap[s].rpmCount += 1;
-  });
-  var STATE_NAMES = {
-    WA:'Washington',OR:'Oregon',ID:'Idaho',CA:'California',NV:'Nevada',
-    MT:'Montana',WY:'Wyoming',UT:'Utah',CO:'Colorado',AZ:'Arizona',
-    NM:'New Mexico',TX:'Texas',OK:'Oklahoma',KS:'Kansas',NE:'Nebraska',
-    SD:'South Dakota',ND:'North Dakota',MN:'Minnesota',IA:'Iowa',
-    MO:'Missouri',AR:'Arkansas',LA:'Louisiana',MS:'Mississippi',
-    AL:'Alabama',TN:'Tennessee',KY:'Kentucky',IN:'Indiana',IL:'Illinois',
-    WI:'Wisconsin',MI:'Michigan',OH:'Ohio',WV:'West Virginia',VA:'Virginia',
-    NC:'North Carolina',SC:'South Carolina',GA:'Georgia',FL:'Florida',
-    PA:'Pennsylvania',NY:'New York',NJ:'New Jersey',CT:'Connecticut',
-    MA:'Massachusetts',RI:'Rhode Island',NH:'New Hampshire',VT:'Vermont',
-    ME:'Maine',DE:'Delaware',MD:'Maryland',DC:'DC'
-  };
-  var updated = Object.keys(statMap).map(function(code) {
-    var s = statMap[code];
-    var avgRpm = s.rpmCount > 0 ? s.rpmSum / s.rpmCount : 0;
-    var existing = stateData.find(function(x) { return x.code === code; });
-    var trend = existing ? existing.trend : 'flat';
-    return { code: code, name: STATE_NAMES[code] || code, volume: s.volume, rpm: parseFloat(avgRpm.toFixed(2)), trend: trend, maxVol: 0 };
-  });
-  if (updated.length === 0) return;
-  // Merge into existing stateData — only update states present in local loads
-  updated.forEach(function(u) {
-    var idx = stateData.findIndex(function(s) { return s.code === u.code; });
-    if (idx >= 0) {
-      stateData[idx].rpm = u.rpm; // update RPM from live data
-      // Only update volume if we dont have national data (volume would be small)
-      if (stateData[idx].volume <= 10) stateData[idx].volume = u.volume;
-    }
-  });
-  renderStates(stateData);
-}
-
 function renderLiveLoadCards(loads, minRpm) {
   minRpm = minRpm || defaults.minRpm || 2.00;
   var minGross  = defaults.minGross    || 0;
@@ -4457,6 +3529,17 @@ function renderLiveLoadCards(loads, minRpm) {
   var fuelPrice = defaults.fuelPrice   || 4.25;
   var mpg       = defaults.mpg         || 6.5;
   var emptyMpg  = defaults.emptyMpg    || 8.0;
+
+  // Apply deadhead city filter if active
+  if (_dhFilterActive && _dhFilterLat && _dhFilterLon) {
+    loads = loads.filter(function(l) {
+      var originKey = (l.originCity || '').toLowerCase().trim();
+      var coords    = window.CITY_COORDS && window.CITY_COORDS[originKey];
+      if (!coords) return true; // unknown city — show it
+      var dist = getDistanceMiles(_dhFilterLat, _dhFilterLon, coords[0], coords[1]);
+      return dist <= _dhFilterMaxMi;
+    });
+  }
 
   // Calculate deadhead for each load using current GPS
   if (window._gpsLat && window._gpsLon) {
@@ -4490,42 +3573,12 @@ function renderLiveLoadCards(loads, minRpm) {
   }
 
   // Calculate net RPM for each load (rate minus fuel / total miles)
-  // Filter out session-blocked brokers
-  if (_blockedBrokers.size > 0) {
-    loads = loads.filter(function(l) {
-      return !l.broker || !_blockedBrokers.has(l.broker.toLowerCase().trim());
-    });
-    // Show unblock banner on dash
-    var existing = document.getElementById('broker-block-banner');
-    if (!existing) {
-      var banner = document.createElement('div');
-      banner.id = 'broker-block-banner';
-      banner.style.cssText = 'background:#1a1200;border:1px solid rgba(255,208,77,.3);border-radius:6px;padding:.4rem .8rem;margin:.4rem 0;display:flex;align-items:center;justify-content:space-between;font-size:.75rem;';
-      banner.innerHTML = '<span style="color:#ffd04d;">🚫 <span id="broker-block-count">' + _blockedBrokers.size + '</span> broker(s) hidden this session</span>' +
-        '<button onclick="unblockAllBrokers()" style="background:none;border:1px solid rgba(255,208,77,.3);color:#ffd04d;border-radius:4px;padding:.15rem .4rem;font-size:.7rem;cursor:pointer;">Show All</button>';
-      var dashLoads = document.getElementById('dash-live-loads');
-      if (dashLoads) dashLoads.parentNode.insertBefore(banner, dashLoads);
-    } else {
-      var countEl = document.getElementById('broker-block-count');
-      if (countEl) countEl.textContent = _blockedBrokers.size;
-    }
-  } else {
-    var banner = document.getElementById('broker-block-banner');
-    if (banner) banner.remove();
-  }
-
-  // Cache broker credit data from live loads
-  loads.forEach(function(l) {
-    if (l.broker && (l.credit || l.days2Pay)) {
-      cacheBrokerCredit(l.broker, l.credit, l.days2Pay);
-    }
-  });
-
   loads.forEach(function(l) {
     if (l.rate > 0 && l.miles > 0) {
       var loadedFuel = Math.round((l.miles / mpg) * fuelPrice);
       var deadFuel   = l.deadheadMiles > 0 ? Math.round((l.deadheadMiles / emptyMpg) * fuelPrice) : 0;
-      l.netRpm = parseFloat(((l.rate - loadedFuel - deadFuel) / l.miles).toFixed(2)); // divide by loaded miles only
+      var totalMiles = l.miles + (l.deadheadMiles || 0);
+      l.netRpm = parseFloat(((l.rate - loadedFuel - deadFuel) / totalMiles).toFixed(2));
     } else {
       l.netRpm = 0;
     }
@@ -4563,8 +3616,8 @@ function renderLiveLoadCards(loads, minRpm) {
 
   var hotCount = hotLoads.length;
 
-  // Dash shows hot loads first (meet all params), then fills with watch loads up to 15
-  var dashLoads  = hotLoads.slice(0, 15).concat(watchLoads).slice(0, 15);
+  // Dash gets top 15 by net RPM regardless of hot/watch
+  var dashLoads  = loads.slice(0, 15);
   // Loads screen gets all
   var allLoads   = loads;
   clearLoadCards();
@@ -4637,7 +3690,6 @@ function renderLiveLoadCards(loads, minRpm) {
           '<button class="load-action-btn call-btn" onclick="callBroker(\'' + bestPhone + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
           '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + bestPhone + '\')"><span class="btn-icon">✓</span>Book</button>' +
           '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
-          (load.broker ? '<button class="load-action-btn" onclick="blockBroker(this.dataset.broker)" data-broker="' + (load.broker||'').replace(/"/g,'&quot;') + '" style="font-size:.7rem;color:#ff7e7e;border-color:rgba(255,126,126,.3);padding:.3rem .5rem;">🚫 Hide</button>' : '') +
         '</div>' +
       '</div>';
     }).join('');
@@ -4651,18 +3703,16 @@ function renderLiveLoadCards(loads, minRpm) {
   if (hotBadge) hotBadge.textContent = hotCount + ' HOT';
 
   // Inject into dash screen — top 15 only
-  var TS_BADGE = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:.4rem;padding:.5rem .6rem;opacity:.5;"><span style="font-size:.62rem;color:#b8c8b8;letter-spacing:.03em;">Powered by</span><img src="/icons/Truckstop_Logo_-_Single_Color_White.png" alt="Truckstop" style="height:14px;width:auto;vertical-align:middle;"></div>';
-
   var dashCardBody = document.getElementById('dash-live-loads');
   if (dashCardBody) {
     dashCardBody.innerHTML = allLoads.length > 0
-      ? dashCards + TS_BADGE
+      ? dashCards
       : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads near you right now. Checking every 5 minutes.</div></div>';
   }
 
   // Inject into loads screen — all loads
   var loadsLive = document.getElementById('loads-screen-live');
-  if (loadsLive) loadsLive.innerHTML = allCards + TS_BADGE;
+  if (loadsLive) loadsLive.innerHTML = allCards;
 
   // Re-inject profit bars
   injectProfitBars();
@@ -4761,15 +3811,12 @@ async function savePushSubscription(subscription) {
   if (!window._rcUserId || !window._supabaseReady) return;
   var sub = subscription.toJSON();
   try {
-    // Delete all old subscriptions for this user first — keeps table clean
-    await _supabase.from('push_subscriptions').delete().eq('user_id', window._rcUserId);
-    // Insert the current fresh subscription
-    await _supabase.from('push_subscriptions').insert({
+    await _supabase.from('push_subscriptions').upsert({
       user_id:  window._rcUserId,
       endpoint: sub.endpoint,
       p256dh:   sub.keys.p256dh,
       auth:     sub.keys.auth,
-    });
+    }, { onConflict: 'user_id,endpoint' });
   } catch(err) {
     console.error('Error saving push subscription:', err);
   }
@@ -4806,208 +3853,75 @@ function urlBase64ToUint8Array(base64String) {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', function(event) {
     if (event.data && event.data.type === 'LOAD_ALERT_CLICKED') {
+      var data     = event.data.data || {};
+      var notifyType = data.notifyType || 'load';
+
+      // For loadback — open loadback screen
+      if (notifyType === 'loadback') {
+        openLoadbackScreen();
+        return;
+      }
+
+      // For load alerts — go to loads screen and highlight the matching card
       var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
       showScreen('loads', loadsBtn);
+
+      // Try to find and highlight the matching load card
+      setTimeout(function() {
+        var rate   = data.rate;
+        var route  = data.route || '';
+        var loadId = data.loadId || '';
+
+        // Find card by load ID first, then by route/rate
+        var card = null;
+        if (loadId) {
+          card = document.querySelector('[data-load-id="' + loadId + '"]');
+        }
+        if (!card && route) {
+          var parts    = route.split(' to ');
+          var originStr = parts[0] || '';
+          var cards    = document.querySelectorAll('.load-card');
+          cards.forEach(function(el) {
+            if (!card && el.textContent.indexOf(originStr) >= 0 && el.textContent.indexOf('$' + rate) >= 0) {
+              card = el;
+            }
+          });
+        }
+
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.style.transition = 'box-shadow .3s';
+          card.style.boxShadow  = '0 0 0 2px var(--green), 0 0 20px rgba(74,222,128,.4)';
+          setTimeout(function() { card.style.boxShadow = ''; }, 3000);
+          // Auto-expand the card
+          var expandBtn = card.querySelector('.load-expand-btn, .load-rate-col');
+          if (expandBtn) expandBtn.click();
+        }
+      }, 800);
     }
   });
 }
+
+// Handle URL params on load — for when app opens fresh from notification tap
+(function handleNotificationUrl() {
+  var params = new URLSearchParams(window.location.search);
+  var notify = params.get('notify');
+  if (!notify) return;
+  history.replaceState({}, '', window.location.pathname);
+  setTimeout(function() {
+    if (notify === 'loadback') {
+      openLoadbackScreen();
+    } else if (notify === 'load') {
+      var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
+      if (loadsBtn) showScreen('loads', loadsBtn);
+      // The load card highlight will fire from the message handler
+    }
+  }, 1500);
+})();
 
 // ══════════════════════════════════════════════════════════════════════════
 // LIVE LOADBACK — Real return loads based on arrival ETA
 // ══════════════════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════════════
-// LOADBACK SCREEN — Full dedicated page for return loads
-// ══════════════════════════════════════════════════════════════════════════
-var _loadbackScreenLoads = [];
-var _loadbackCurrentSort = 'roundtrip';
-var _loadbackCurrentLoad = null;
-
-async function openLoadbackScreen() {
-  // Get current active load
-  var activeLoad = null;
-  if (window._lastLoadback) {
-    activeLoad = window._lastLoadback;
-  } else if (window._rcUserId && window._supabaseReady) {
-    try {
-      var res = await window._supabase.from('booked_loads').select('*')
-        .eq('user_id', window._rcUserId).eq('active', true)
-        .order('eta_date', { ascending: false }).limit(1);
-      if (res.data && res.data[0]) {
-        var l = res.data[0];
-        activeLoad = { origin: l.origin, dest: l.destination, rate: l.rate, miles: l.miles, broker: l.broker, phone: '' };
-      } else {
-        // Fall back to most recent
-        var res2 = await window._supabase.from('booked_loads').select('*')
-          .eq('user_id', window._rcUserId).order('eta_date', { ascending: false }).limit(1);
-        if (res2.data && res2.data[0]) {
-          var l = res2.data[0];
-          activeLoad = { origin: l.origin, dest: l.destination, rate: l.rate, miles: l.miles, broker: l.broker, phone: '' };
-        }
-      }
-    } catch(e) {}
-  }
-
-  if (!activeLoad) {
-    alert('No booked load found. Book a load first.');
-    return;
-  }
-
-  _loadbackCurrentLoad = activeLoad;
-
-  // Navigate to loadback screen
-  showScreen('loadback', null);
-
-  // Show header with current load info
-  var destParts = (activeLoad.dest || '').split(',');
-  var destCity  = destParts[0].trim();
-  var destState = destParts.length > 1 ? destParts[1].trim() : '';
-
-  var header = document.getElementById('loadback-screen-header');
-  if (header) {
-    header.innerHTML =
-      '<div style="background:#0d1f0d;border:1px solid var(--green-border);border-radius:8px;padding:.8rem 1rem;">' +
-        '<div style="font-size:.72rem;color:#b8c8b8;margin-bottom:.2rem;">CURRENT LOAD</div>' +
-        '<div style="font-weight:bold;color:var(--green);">' + (activeLoad.origin || '?') + ' &#x2192; ' + (activeLoad.dest || '?') + '</div>' +
-        '<div style="font-size:.78rem;color:#b8c8b8;margin-top:.2rem;">$' + (activeLoad.rate||0).toLocaleString() + ' &middot; ' + (activeLoad.miles||0) + ' mi &middot; searching for return loads at <strong style="color:#ffd04d;">' + destCity + ', ' + destState + '</strong></div>' +
-      '</div>';
-  }
-
-  // Show loading state
-  var loadsEl = document.getElementById('loadback-screen-loads');
-  if (loadsEl) loadsEl.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--green);font-size:.85rem;">&#x1F504; Searching Truckstop for loads at ' + destCity + ', ' + destState + '...</div>';
-
-  // Fetch loads
-  if (!destState) { if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x26A0;&#xFE0F;</div><div>Could not determine destination state from: ' + activeLoad.dest + '</div></div>'; return; }
-
-  try {
-    var equipType = window._rcEquipmentType || 'F';
-    // Search state-wide with large radius and your equipment type
-    // Use 'F' for flatbed but also check if there are other types configured
-    var url = _tsWorkerUrl + '/search' +
-      '?originState=' + encodeURIComponent(destState) +
-      '&equipmentType=' + encodeURIComponent(equipType) +
-      '&hoursOld=72&pageSize=100&originRange=250&loadType=All';
-    // Add city as center point for radius — not a hard filter
-    if (destCity) url += '&originCity=' + encodeURIComponent(destCity);
-    console.log('[Loadback] Searching:', url);
-
-    var res  = await fetch(url);
-    var data = await res.json();
-
-    if (!data.success || !data.loads || !data.loads.length) {
-      if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads found at ' + destCity + ', ' + destState + ' right now. Check back closer to your arrival date.</div></div>';
-      return;
-    }
-
-    var fuelPrice = defaults.fuelPrice || 4.25;
-    var mpg       = defaults.mpg       || 6.5;
-    var emptyMpg  = defaults.emptyMpg  || 8.0;
-    var outNet    = (activeLoad.rate||0) - Math.round(((activeLoad.miles||0) / mpg) * fuelPrice);
-    var minRpm    = defaults.minRpm    || 2.00;
-
-    var maxDead = defaults.maxDeadhead || 200;
-
-    _loadbackScreenLoads = data.loads
-      .filter(function(l) { return l.rate > 0 && l.miles > 0; })
-      .map(function(l) {
-        var dhFromDest = getDeadheadMilesFromCity(destCity, destState, l.originCity, l.originState) || 0;
-        var dhFuel     = dhFromDest > 0 ? Math.round((dhFromDest / emptyMpg) * fuelPrice) : 0;
-        var returnFuel = Math.round((l.miles / mpg) * fuelPrice);
-        var returnNet  = l.rate - returnFuel - dhFuel;
-        var roundTripNet = outNet + returnNet;
-        return Object.assign({}, l, {
-          returnNet:    returnNet,
-          roundTripNet: roundTripNet,
-          dhFromDest:   dhFromDest,
-          returnFuel:   returnFuel,
-        });
-      })
-      .filter(function(l) {
-        // Only apply deadhead filter when we actually calculated the distance
-        // If dhFromDest is 0 (city not in coords), show the load anyway
-        if (l.dhFromDest > 0 && maxDead > 0 && l.dhFromDest > maxDead) return false;
-        return true;
-      });
-
-    renderLoadbackScreen(_loadbackCurrentSort);
-
-  } catch(err) {
-    console.error('Loadback screen error:', err);
-    if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x26A0;&#xFE0F;</div><div>Error fetching loads: ' + (err.message||'unknown') + '</div></div>';
-  }
-}
-
-function sortLoadback(sortKey) {
-  _loadbackCurrentSort = sortKey;
-  // Update button states
-  ['roundtrip','rpm','rate','miles'].forEach(function(k) {
-    var btn = document.getElementById('lb-sort-' + k);
-    if (btn) btn.className = k === sortKey ? 'btn btn-green btn-sm' : 'btn btn-outline btn-sm';
-  });
-  renderLoadbackScreen(sortKey);
-}
-
-function renderLoadbackScreen(sortKey) {
-  var loadsEl = document.getElementById('loadback-screen-loads');
-  if (!loadsEl || !_loadbackScreenLoads.length) return;
-
-  var minRpm  = defaults.minRpm || 2.00;
-  var sorted  = _loadbackScreenLoads.slice().sort(function(a, b) {
-    if (sortKey === 'rpm')      return b.rpm - a.rpm;
-    if (sortKey === 'rate')     return b.rate - a.rate;
-    if (sortKey === 'miles')    return b.miles - a.miles;
-    return b.roundTripNet - a.roundTripNet; // default: roundtrip
-  });
-
-  var meetsMin = sorted.filter(function(l) { return l.rpm >= minRpm; });
-  var belowMin = sorted.filter(function(l) { return l.rpm < minRpm; });
-
-  function buildCard(l, i) {
-    var meetsRpm = l.rpm >= minRpm;
-    var bestPhone = l.contactPhone || l.brokerPhone || '';
-    var pickupStr = l.pickupDate ? '&#x1F4C5; Pickup: ' + l.pickupDate : '&#x1F4C5; Pickup: flexible';
-    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi from dropoff' : 'within 250mi of dropoff';
-    return '<div class="loadback-card" style="margin-bottom:.7rem;border-left:3px solid ' + (meetsRpm ? 'var(--green)' : 'rgba(255,255,255,.1)') + ';">' +
-      '<div class="loadback-card-top">' +
-        '<div class="loadback-route" style="font-size:.9rem;font-weight:bold;">' + (l.originCity||'?') + ', ' + (l.originState||'?') + ' &#x2192; ' + (l.destCity||'?') + ', ' + (l.destState||'?') + '</div>' +
-        '<div class="loadback-rate" style="color:' + (meetsRpm ? 'var(--green)' : 'var(--amber)') + ';">$' + (l.rate||0).toLocaleString() + '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin:.4rem 0;font-size:.78rem;">' +
-        '<div><div style="color:#b8c8b8;font-size:.65rem;">RPM</div><strong style="color:' + (meetsRpm ? 'var(--green)' : 'var(--amber)') + ';">$' + (l.rpm||0).toFixed(2) + '/mi</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.65rem;">MILES</div><strong>' + (l.miles||0) + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.65rem;">NET RETURN</div><strong style="color:var(--green);">$' + (l.returnNet||0).toLocaleString() + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.65rem;">FUEL</div><strong>-$' + (l.returnFuel||0).toLocaleString() + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.65rem;">FROM DROPOFF</div><strong>' + dhStr + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.65rem;">ROUND TRIP</div><strong style="color:var(--green);">$' + (l.roundTripNet||0).toLocaleString() + '</strong></div>' +
-      '</div>' +
-      '<div style="font-size:.72rem;color:#b8c8b8;margin-bottom:.5rem;">' + pickupStr + ' &middot; ' + (l.broker||'Unknown Broker') + ' &middot; ' + (l.equipment||'F') + ' &middot; ' + (l.weight ? (l.weight).toLocaleString() + ' lb' : 'weight TBD') + '</div>' +
-      (l.notes ? '<div style="font-size:.72rem;color:#ffd04d;margin-bottom:.5rem;font-style:italic;">' + (l.notes||'').substring(0,120) + '</div>' : '') +
-      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">' +
-        (bestPhone ? '<button class="lb-call-btn" data-phone="' + bestPhone + '" data-broker="' + (l.broker||'Broker').replace(/"/g,'&quot;') + '" onclick="callBroker(this.dataset.phone,this.dataset.broker)" style="font-size:.75rem;">&#x1F4DE; Call</button>' : '') +
-        '<button class="lb-book-btn" onclick="addReturnLoad(\'' + (l.originCity||'') + ', ' + (l.originState||'') + '\'' + ',' + (l.miles||0) + ',' + (l.rate||0) + ')" style="font-size:.75rem;">&#x2713; Add to Loads</button>' +
-        '<button class="lb-call-btn lb-ai-btn" onclick="analyzeReturnLoad(this,\'' + (l.originCity||'') + '&#x2192;' + (l.destCity||'') + '\',' + (l.rate||0) + ',' + (l.miles||0) + ',' + (l.rpm||0).toFixed(2) + ',' + (l.returnNet||0) + ',' + (l.roundTripNet||0) + ',\'' + (l.broker||'') + '\')" style="color:#7ab8ff;border-color:rgba(122,184,255,.35);font-size:.75rem;">&#x1F916; Analyze</button>' +
-      '</div>' +
-      '<div class="lb-ai-result" style="display:none;margin-top:.5rem;padding:.5rem .7rem;border-radius:3px;font-size:.82rem;"></div>' +
-    '</div>';
-  }
-
-  var html = '';
-
-  if (meetsMin.length > 0) {
-    html += '<div style="font-size:.72rem;color:var(--green);padding:.3rem 0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">&#x2705; ' + meetsMin.length + ' loads above your $' + minRpm.toFixed(2) + '/mi minimum</div>';
-    html += meetsMin.map(function(l, i) { return buildCard(l, i); }).join('');
-  }
-
-  if (belowMin.length > 0) {
-    html += '<div style="font-size:.72rem;color:#b8c8b8;padding:.5rem 0 .3rem;text-transform:uppercase;letter-spacing:.05em;border-top:1px solid rgba(255,255,255,.08);margin-top:.5rem;">Below your minimum (' + belowMin.length + ' loads)</div>';
-    html += belowMin.map(function(l, i) { return buildCard(l, i); }).join('');
-  }
-
-  if (!html) html = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads found matching your parameters at this destination.</div></div>';
-
-  loadsEl.innerHTML = html + '<div style="margin-top:.5rem;font-size:.68rem;color:#b8c8b8;text-align:center;">Showing ' + sorted.length + ' loads &middot; Powered by Truckstop.com</div>';
-}
 
 var _origShowLoadback = showLoadback;
 showLoadback = async function(origin, dest, rate, miles, broker, phone) {
@@ -5093,7 +4007,7 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
           '<span class="loadback-stat">Net: <strong>$' + l.returnNet.toLocaleString() + '</strong></span>' +
           '<span class="loadback-stat">Round Trip: <strong style="color:var(--green)">$' + l.roundTripNet.toLocaleString() + '</strong></span>' +
         '</div>' +
-        '<div class="loadback-date">📅 Pickup: ' + (l.pickupDate || 'Flexible') + ' · Available around your arrival · ' + (l.equipment || 'V') + '</div>' +
+        '<div class="loadback-date">📅 Available around arrival · ' + (l.equipment || 'V') + '</div>' +
         '<div class="lb-actions">' +
           (l.contactPhone ? '<button class="lb-call-btn" onclick="callBroker(\'' + l.contactPhone + '\',\'' + (l.broker || 'Broker') + '\')">📞 Call ' + (l.broker || 'Broker') + '</button>' : '') +
           '<button class="lb-book-btn" onclick="addReturnLoad(\'' + l.route + '\',' + l.miles + ',' + l.rate + ')">✓ Add to Loads</button>' +
@@ -5204,23 +4118,22 @@ onAuthReady = function(firstName, userId, email) {
       clearInterval(waitForSupabase);
       // Load shared city coords first, then preferences, then loads
       loadSharedCityCoords().then(function() {
-        seedSharedCityCoords(); // runs in background, does not block load fetch
+        seedSharedCityCoords(); // seed built-in coords if not done yet
         return loadPreferencesFromSupabase();
       }).then(function() {
         registerPushSubscription();
         saveLoadAlertPrefs();
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
-        setTimeout(function() { fetchNationalStateData(); }, 2000);
       }).catch(function() {
         setTimeout(function() { fetchTruckstopLoads(true); }, 500);
       });
     }
   }, 500);
-  // Fallback fetch — 20s so it only fires if chain truly stalls
+  // Fallback fetch after 8 seconds
   setTimeout(function() {
     if (_liveLoadsCache.length === 0) {
       console.log('Fallback load fetch firing');
       fetchTruckstopLoads(true);
     }
-  }, 20000);
+  }, 8000);
 };
