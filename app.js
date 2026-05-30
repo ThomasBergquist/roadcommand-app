@@ -289,13 +289,20 @@ async function renderLogbook() {
 }
 
 function buildBookedLoadCard(load, type) {
-  var isActive  = type === 'active';
-  var isQueued  = type === 'queued';
-  var borderColor = isActive ? 'var(--green)' : isQueued ? '#ffd04d' : 'rgba(255,255,255,.1)';
+  var isActive    = type === 'active';
+  var isQueued    = type === 'queued';
+  var borderColor = isActive ? 'var(--green)' : isQueued ? '#ffd04d' : 'rgba(255,255,255,.08)';
+  var tagHtml     = isActive
+    ? '<span style="background:var(--green);color:#000;font-size:.65rem;font-weight:bold;padding:.1rem .4rem;border-radius:3px;margin-left:.4rem;">EN ROUTE</span>'
+    : isQueued
+      ? '<span style="background:rgba(255,208,77,.2);color:#ffd04d;font-size:.65rem;font-weight:bold;padding:.1rem .4rem;border-radius:3px;margin-left:.4rem;">QUEUED</span>'
+      : '';
   var rpm = load.miles > 0 && load.rate > 0 ? '$' + (load.rate / load.miles).toFixed(2) + '/mi' : '—';
-  return '<div class="log-item" style="padding:.8rem 1rem;border-left:3px solid ' + borderColor + ';margin-bottom:.3rem;">' +
+  var broker = load.broker || '—';
+
+  return '<div class="log-item" style="border-left:3px solid ' + borderColor + ';">' +
     '<div class="log-top">' +
-      '<div class="log-route" style="font-weight:bold;">' + (load.origin || '?') + ' &#x2192; ' + (load.destination || '?') + '</div>' +
+      '<div class="log-route">' + (load.origin || '?') + ' → ' + (load.destination || '?') + tagHtml + '</div>' +
       '<div class="log-date">' + (load.eta_date || '—') + '</div>' +
     '</div>' +
     '<div class="log-stats">' +
@@ -303,24 +310,23 @@ function buildBookedLoadCard(load, type) {
       '<div class="log-stat">Miles: <strong>' + (load.miles || '?') + '</strong></div>' +
       '<div class="log-stat">RPM: <strong>' + rpm + '</strong></div>' +
     '</div>' +
-    '<div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap;">' +
-      // Active load actions
-      (isActive ?
-        '<button data-id="' + load.id + '" onclick="setLoadInactive(this.dataset.id)" style="background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:.3rem .6rem;font-size:.73rem;cursor:pointer;touch-action:manipulation;">&#x2713; Mark Delivered</button>' +
-        '<button onclick="openLoadbackScreen()" style="background:transparent;color:var(--green);border:1px solid var(--green-border);border-radius:4px;padding:.3rem .6rem;font-size:.73rem;cursor:pointer;touch-action:manipulation;">&#x1F504; Find Loadback</button>'
-      : '') +
-      // Pending load actions
-      (!isActive && !isQueued ?
-        '<button data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.3rem .7rem;font-size:.73rem;cursor:pointer;font-weight:bold;touch-action:manipulation;">&#x1F69B; On This Load</button>' +
-        '<button data-id="' + load.id + '" onclick="setLoadQueued(this.dataset.id)" style="background:transparent;color:#ffd04d;border:1px solid rgba(255,208,77,.3);border-radius:4px;padding:.3rem .6rem;font-size:.73rem;cursor:pointer;touch-action:manipulation;">&#x1F4CB; Add to Queue</button>'
-      : '') +
-      // Queued load actions
-      (isQueued ?
-        '<button data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.3rem .7rem;font-size:.73rem;cursor:pointer;font-weight:bold;touch-action:manipulation;">&#x1F69B; Start This Load</button>' +
-        '<button data-id="' + load.id + '" onclick="setLoadUnqueued(this.dataset.id)" style="background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:.3rem .5rem;font-size:.7rem;cursor:pointer;touch-action:manipulation;">Remove from Queue</button>'
-      : '') +
-      // Delete always available
-      '<button data-id="' + load.id + '" onclick="deleteBookedLoad(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.3rem .5rem;font-size:.7rem;cursor:pointer;touch-action:manipulation;">&#x2715;</button>' +
+    '<div class="log-stats" style="margin-top:.2rem;">' +
+      '<div class="log-stat">Broker: <strong>' + broker + '</strong></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap;">' +
+      (isActive
+        ? '<button data-id="' + load.id + '" onclick="setLoadInactive(this.dataset.id)" class="btn btn-outline btn-sm" style="touch-action:manipulation;">&#x2713; Delivered</button>' +
+          '<button onclick="openLoadbackScreen()" class="btn btn-outline btn-sm" style="color:var(--green);border-color:var(--green-border);touch-action:manipulation;">&#x1F504; Loadback</button>'
+        : '') +
+      (!isActive && !isQueued
+        ? '<button data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" class="btn btn-green btn-sm" style="touch-action:manipulation;">&#x1F69B; On This Load</button>' +
+          '<button data-id="' + load.id + '" onclick="setLoadQueued(this.dataset.id)" class="btn btn-outline btn-sm" style="color:#ffd04d;border-color:rgba(255,208,77,.3);touch-action:manipulation;">&#x1F4CB; Queue</button>'
+        : '') +
+      (isQueued
+        ? '<button data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" class="btn btn-green btn-sm" style="touch-action:manipulation;">&#x1F69B; Start Load</button>' +
+          '<button data-id="' + load.id + '" onclick="setLoadUnqueued(this.dataset.id)" class="btn btn-outline btn-sm" style="touch-action:manipulation;">Remove</button>'
+        : '') +
+      '<button data-id="' + load.id + '" onclick="deleteBookedLoad(this.dataset.id)" class="btn btn-outline btn-sm" style="color:#ff7e7e;border-color:rgba(255,126,126,.3);touch-action:manipulation;">&#x2715;</button>' +
     '</div>' +
   '</div>';
 }
@@ -3217,8 +3223,14 @@ function promptLogRun(origin, dest, rate, miles) {
     var logList = document.getElementById('run-list');
     if (logList) {
       var item = document.createElement('div');
-      item.className = 'run-row';
-      item.innerHTML = '<div><div class="run-route">' + origin + ' → ' + dest + '</div><div class="run-meta">' + today + ' · ' + miles + ' mi</div></div><div><div class="run-profit">$' + rate.toLocaleString() + '</div><div class="run-rpm">$' + rpm + '/mi</div></div>';
+      item.className = 'log-item';
+      item.innerHTML =
+        '<div class="log-top"><div class="log-route">' + origin + ' → ' + dest + '</div><div class="log-date">' + today + '</div></div>' +
+        '<div class="log-stats">' +
+          '<div class="log-stat">Rate: <strong>$' + rate.toLocaleString() + '</strong></div>' +
+          '<div class="log-stat">Miles: <strong>' + miles + '</strong></div>' +
+          '<div class="log-stat">RPM: <strong>$' + rpm + '/mi</strong></div>' +
+        '</div>';
       logList.insertBefore(item, logList.firstChild);
     }
     var ytdRev = document.getElementById('log-ytd-rev'); if (ytdRev) { var current = parseFloat(ytdRev.textContent.replace(/[^0-9.]/g,''))||0; ytdRev.textContent = '$' + (current+rate).toLocaleString(); }
