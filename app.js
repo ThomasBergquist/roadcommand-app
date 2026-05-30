@@ -333,48 +333,55 @@ async function applyDeadheadFilter() {
   var miInput   = document.getElementById('dh-filter-miles');
   var statusEl  = document.getElementById('dh-filter-status');
   var clearBtn  = document.getElementById('dh-clear-btn');
+  var loadsEl   = document.getElementById('loads-screen-live');
   var city      = cityInput ? cityInput.value.trim() : '';
   var maxMi     = miInput && miInput.value ? parseInt(miInput.value) : (defaults.maxDeadhead || 150);
 
-  if (!city) { alert('Enter a city to filter by.'); return; }
+  if (!city) { alert('Enter a city to filter by deadhead distance.'); return; }
 
-  // Try to get coords for the city
-  var cityKey = city.toLowerCase().replace(/,.*$/, '').trim();
-  var coords  = null;
+  // Parse city and state
+  var parts     = city.split(',');
+  var cityName  = parts[0].trim();
+  var stateCode = parts.length > 1 ? parts[1].trim().toUpperCase().substring(0,2) : '';
 
-  // Check CITY_COORDS first
-  if (window.CITY_COORDS && window.CITY_COORDS[cityKey]) {
-    coords = window.CITY_COORDS[cityKey];
-  } else {
-    // Try Nominatim geocode
-    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Locating ' + city + '...'; }
-    try {
-      var geoRes = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(city) + '&limit=1');
-      var geoData = await geoRes.json();
-      if (geoData && geoData[0]) {
-        coords = [parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)];
-        if (window.CITY_COORDS) window.CITY_COORDS[cityKey] = coords;
-      }
-    } catch(e) {}
-  }
-
-  if (!coords) {
-    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Could not find coordinates for: ' + city + '. Try City, State format.'; }
+  if (!stateCode) {
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Please include state — e.g. "Bozeman, MT"'; }
     return;
   }
 
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Searching Truckstop for loads near ' + city + '...'; }
+  if (clearBtn)  clearBtn.style.display = 'inline-block';
+  if (loadsEl)   loadsEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--green);font-size:.85rem;">Searching loads near ' + city + '...</div>';
+
   _dhFilterActive = true;
   _dhFilterCity   = city;
-  _dhFilterLat    = coords[0];
-  _dhFilterLon    = coords[1];
   _dhFilterMaxMi  = maxMi;
 
-  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Showing loads within ' + maxMi + ' mi deadhead of ' + city; }
-  if (clearBtn)  clearBtn.style.display = 'inline-block';
+  try {
+    var equipType = window._rcEquipmentType || defaults.equipmentType || 'F';
+    var url = _tsWorkerUrl + '/search' +
+      '?originState=' + encodeURIComponent(stateCode) +
+      '&originCity='  + encodeURIComponent(cityName) +
+      '&equipmentType=' + encodeURIComponent(equipType) +
+      '&hoursOld=48&pageSize=100&originRange=' + maxMi + '&loadType=All';
 
-  // Re-render with filter applied
-  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
-    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+    var res  = await fetch(url);
+    var data = await res.json();
+
+    if (!data.success || !data.loads) {
+      if (statusEl) statusEl.textContent = 'No loads found near ' + city + '. Try expanding your mile radius.';
+      if (loadsEl)  loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">📋</div><div>No loads found within ' + maxMi + ' miles of ' + city + '. Try a larger radius or different city.</div></div>';
+      return;
+    }
+
+    // Cache these as the current loads and render them
+    _liveLoadsCache = data.loads;
+    renderLiveLoadCards(data.loads, defaults.minRpm || 2.00);
+    if (statusEl) statusEl.textContent = data.loads.length + ' loads found within ' + maxMi + ' mi of ' + city + ' · Tap × to clear';
+
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Search failed: ' + e.message;
+    if (loadsEl)  loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">⚠️</div><div>Search error. Please try again.</div></div>';
   }
 }
 
@@ -383,17 +390,16 @@ function clearDeadheadFilter() {
   _dhFilterCity   = null;
   _dhFilterLat    = null;
   _dhFilterLon    = null;
-  var statusEl = document.getElementById('dh-filter-status');
-  var clearBtn = document.getElementById('dh-clear-btn');
+  var statusEl  = document.getElementById('dh-filter-status');
+  var clearBtn  = document.getElementById('dh-clear-btn');
   var cityInput = document.getElementById('dh-filter-city');
   var miInput   = document.getElementById('dh-filter-miles');
   if (statusEl)  { statusEl.style.display = 'none'; statusEl.textContent = ''; }
   if (clearBtn)  clearBtn.style.display = 'none';
   if (cityInput) cityInput.value = '';
   if (miInput)   miInput.value   = '';
-  if (_liveLoadsCache && _liveLoadsCache.length > 0) {
-    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
-  }
+  // Re-fetch loads for current GPS location
+  fetchTruckstopLoads();
 }
 
 function getDistanceMiles(lat1, lon1, lat2, lon2) {
@@ -3530,16 +3536,7 @@ function renderLiveLoadCards(loads, minRpm) {
   var mpg       = defaults.mpg         || 6.5;
   var emptyMpg  = defaults.emptyMpg    || 8.0;
 
-  // Apply deadhead city filter if active
-  if (_dhFilterActive && _dhFilterLat && _dhFilterLon) {
-    loads = loads.filter(function(l) {
-      var originKey = (l.originCity || '').toLowerCase().trim();
-      var coords    = window.CITY_COORDS && window.CITY_COORDS[originKey];
-      if (!coords) return true; // unknown city — show it
-      var dist = getDistanceMiles(_dhFilterLat, _dhFilterLon, coords[0], coords[1]);
-      return dist <= _dhFilterMaxMi;
-    });
-  }
+  // Deadhead city filter is handled by applyDeadheadFilter() via live Truckstop search
 
   // Calculate deadhead for each load using current GPS
   if (window._gpsLat && window._gpsLon) {
