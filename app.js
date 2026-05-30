@@ -211,6 +211,181 @@ function showAddLoad() {
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
 function saveLoad() { alert('Load saved!'); document.getElementById('add-load-form').style.display = 'none'; }
+// ══════════════════════════════════════════════════════════════════════════
+// LOGBOOK — Active loads, queue, invoice history
+// ══════════════════════════════════════════════════════════════════════════
+
+async function renderLogbook() {
+  var logList = document.getElementById('run-list');
+  if (!logList) return;
+  logList.innerHTML = '<div style="padding:1rem;text-align:center;color:#b8c8b8;font-size:.82rem;">Loading...</div>';
+
+  var bookedLoads = [];
+  try {
+    if (window._rcUserId && window._supabaseReady) {
+      var bRes = await window._supabase.from('booked_loads')
+        .select('*').eq('user_id', window._rcUserId)
+        .order('eta_date', { ascending: true });
+      if (!bRes.error && bRes.data) bookedLoads = bRes.data;
+    }
+  } catch(e) {}
+
+  var html = '';
+
+  // ── Active load (en route) ──────────────────────────────────────────
+  var activeLoad = bookedLoads.find(function(l) { return l.active === true; });
+  if (activeLoad) {
+    html += '<div style="font-size:.7rem;color:var(--green);padding:.4rem .8rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F69B; Currently On This Load</div>';
+    html += buildBookedLoadCard(activeLoad, 'active');
+  }
+
+  // ── Queued loads ────────────────────────────────────────────────────
+  var queued = bookedLoads.filter(function(l) { return !l.active && l.queued; });
+  if (queued.length > 0) {
+    html += '<div style="font-size:.7rem;color:#ffd04d;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F4CB; Load Queue (' + queued.length + ')</div>';
+    queued.forEach(function(load) { html += buildBookedLoadCard(load, 'queued'); });
+  }
+
+  // ── Pending (booked but not active or queued) ───────────────────────
+  var pending = bookedLoads.filter(function(l) { return !l.active && !l.queued; });
+  if (pending.length > 0) {
+    html += '<div style="font-size:.7rem;color:#b8c8b8;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F4CB; Booked Loads</div>';
+    pending.forEach(function(load) { html += buildBookedLoadCard(load, 'pending'); });
+  }
+
+  // ── Invoice history ─────────────────────────────────────────────────
+  if (invoices && invoices.length > 0) {
+    html += '<div style="font-size:.7rem;color:#b8c8b8;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.06em;border-top:1px solid rgba(255,255,255,.06);margin-top:.5rem;">Invoice History</div>';
+    var sorted = invoices.slice().sort(function(a, b) {
+      return new Date(b.invoice_date || b.date || 0) - new Date(a.invoice_date || a.date || 0);
+    });
+    sorted.slice(0, 15).forEach(function(inv) {
+      var date   = inv.invoice_date || inv.date || '';
+      var status = inv.status === 'paid'
+        ? '<span style="color:var(--green);font-size:.7rem;">&#x2705; Paid</span>'
+        : inv.status === 'overdue'
+          ? '<span style="color:var(--red);font-size:.7rem;">&#x26A0;&#xFE0F; Overdue</span>'
+          : '<span style="color:#ffd04d;font-size:.7rem;">&#x23F3; Pending</span>';
+      html +=
+        '<div class="log-item" style="padding:.7rem 1rem;">' +
+          '<div class="log-top">' +
+            '<div class="log-route">' + (inv.broker_name || inv.broker || 'Unknown') + '</div>' +
+            '<div class="log-date">' + (date ? new Date(date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—') + '</div>' +
+          '</div>' +
+          '<div class="log-stats">' +
+            '<div class="log-stat">Rate: <strong>$' + (parseFloat(inv.amount)||0).toLocaleString() + '</strong></div>' +
+            '<div class="log-stat">Ref: <strong>' + (inv.ref || '—') + '</strong></div>' +
+            '<div class="log-stat">' + status + '</div>' +
+          '</div>' +
+          '<div style="margin-top:.4rem;">' +
+            '<button data-id="' + inv.id + '" onclick="deleteInvoice(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.2rem .5rem;font-size:.7rem;cursor:pointer;">&#x2715; Delete</button>' +
+          '</div>' +
+        '</div>';
+    });
+  }
+
+  if (!html) html = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads booked yet.</div></div>';
+  logList.innerHTML = html;
+}
+
+function buildBookedLoadCard(load, type) {
+  var isActive  = type === 'active';
+  var isQueued  = type === 'queued';
+  var borderColor = isActive ? 'var(--green)' : isQueued ? '#ffd04d' : 'rgba(255,255,255,.1)';
+  var rpm = load.miles > 0 && load.rate > 0 ? '$' + (load.rate / load.miles).toFixed(2) + '/mi' : '—';
+  return '<div class="log-item" style="padding:.8rem 1rem;border-left:3px solid ' + borderColor + ';margin-bottom:.3rem;">' +
+    '<div class="log-top">' +
+      '<div class="log-route" style="font-weight:bold;">' + (load.origin || '?') + ' &#x2192; ' + (load.destination || '?') + '</div>' +
+      '<div class="log-date">' + (load.eta_date || '—') + '</div>' +
+    '</div>' +
+    '<div class="log-stats">' +
+      '<div class="log-stat">Rate: <strong>$' + (parseFloat(load.rate)||0).toLocaleString() + '</strong></div>' +
+      '<div class="log-stat">Miles: <strong>' + (load.miles || '?') + '</strong></div>' +
+      '<div class="log-stat">RPM: <strong>' + rpm + '</strong></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap;">' +
+      // Active load actions
+      (isActive ?
+        '<button data-id="' + load.id + '" onclick="setLoadInactive(this.dataset.id)" style="background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:.3rem .6rem;font-size:.73rem;cursor:pointer;touch-action:manipulation;">&#x2713; Mark Delivered</button>' +
+        '<button onclick="openLoadbackScreen()" style="background:transparent;color:var(--green);border:1px solid var(--green-border);border-radius:4px;padding:.3rem .6rem;font-size:.73rem;cursor:pointer;touch-action:manipulation;">&#x1F504; Find Loadback</button>'
+      : '') +
+      // Pending load actions
+      (!isActive && !isQueued ?
+        '<button data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.3rem .7rem;font-size:.73rem;cursor:pointer;font-weight:bold;touch-action:manipulation;">&#x1F69B; On This Load</button>' +
+        '<button data-id="' + load.id + '" onclick="setLoadQueued(this.dataset.id)" style="background:transparent;color:#ffd04d;border:1px solid rgba(255,208,77,.3);border-radius:4px;padding:.3rem .6rem;font-size:.73rem;cursor:pointer;touch-action:manipulation;">&#x1F4CB; Add to Queue</button>'
+      : '') +
+      // Queued load actions
+      (isQueued ?
+        '<button data-id="' + load.id + '" onclick="setLoadActive(this.dataset.id)" style="background:var(--green);color:#000;border:none;border-radius:4px;padding:.3rem .7rem;font-size:.73rem;cursor:pointer;font-weight:bold;touch-action:manipulation;">&#x1F69B; Start This Load</button>' +
+        '<button data-id="' + load.id + '" onclick="setLoadUnqueued(this.dataset.id)" style="background:transparent;color:#b8c8b8;border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:.3rem .5rem;font-size:.7rem;cursor:pointer;touch-action:manipulation;">Remove from Queue</button>'
+      : '') +
+      // Delete always available
+      '<button data-id="' + load.id + '" onclick="deleteBookedLoad(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.3rem .5rem;font-size:.7rem;cursor:pointer;touch-action:manipulation;">&#x2715;</button>' +
+    '</div>' +
+  '</div>';
+}
+
+async function setLoadActive(loadId) {
+  if (!window._rcUserId) return;
+  try {
+    // Only one load active at a time — deactivate others first
+    await window._supabase.from('booked_loads').update({ active: false }).eq('user_id', window._rcUserId);
+    await window._supabase.from('booked_loads').update({ active: true, queued: false }).eq('id', loadId).eq('user_id', window._rcUserId);
+    saveLoadAlertPrefs();
+    renderLogbook();
+    showToast('&#x1F69B; En Route — Loadback notifications active');
+  } catch(e) { console.error(e); }
+}
+
+async function setLoadInactive(loadId) {
+  try {
+    await window._supabase.from('booked_loads').update({ active: false }).eq('id', loadId).eq('user_id', window._rcUserId);
+    renderLogbook();
+    showToast('&#x2705; Load marked delivered');
+  } catch(e) {}
+}
+
+async function setLoadQueued(loadId) {
+  try {
+    await window._supabase.from('booked_loads').update({ queued: true }).eq('id', loadId).eq('user_id', window._rcUserId);
+    renderLogbook();
+    showToast('&#x1F4CB; Added to queue — loadback options will include this lane');
+  } catch(e) {}
+}
+
+async function setLoadUnqueued(loadId) {
+  try {
+    await window._supabase.from('booked_loads').update({ queued: false }).eq('id', loadId).eq('user_id', window._rcUserId);
+    renderLogbook();
+  } catch(e) {}
+}
+
+async function deleteBookedLoad(loadId) {
+  if (!confirm('Remove this booked load?')) return;
+  try {
+    await window._supabase.from('booked_loads').delete().eq('id', loadId).eq('user_id', window._rcUserId);
+    renderLogbook();
+  } catch(e) {}
+}
+
+async function deleteInvoice(id) {
+  if (!confirm('Delete this invoice?')) return;
+  try {
+    await window._supabase.from('invoices').delete().eq('id', id).eq('user_id', window._rcUserId);
+    invoices = invoices.filter(function(i) { return i.id != id; });
+    renderLogbook();
+    renderInvoices();
+  } catch(e) {}
+}
+
+function showToast(msg) {
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:.6rem 1.2rem;border-radius:20px;font-size:.82rem;font-weight:bold;z-index:9999;white-space:nowrap;max-width:90vw;';
+  toast.innerHTML = msg;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 3000);
+}
+
 function showAddRun() {
   const f = document.getElementById('add-run-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
@@ -3454,7 +3629,7 @@ onAuthReady = function(firstName, userId, email) {
 var _origLoadInvoices = loadInvoices;
 loadInvoices = async function() {
   await _origLoadInvoices();
-  setTimeout(function() { updateDashboardStats(); renderCommandScore(); }, 500);
+  setTimeout(function() { updateDashboardStats(); renderCommandScore(); renderLogbook(); }, 500);
 };
 
 // ══════════════════════════════════════════════════════════════════════════
