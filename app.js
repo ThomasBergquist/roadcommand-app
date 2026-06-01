@@ -4195,15 +4195,25 @@ function closeNotifAndFindCard() {
   var notify = params.get('notify');
   if (!notify) return;
   history.replaceState({}, '', window.location.pathname);
-  setTimeout(function() {
-    if (notify === 'loadback') {
-      openLoadbackScreen();
-    } else if (notify === 'load') {
-      var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
-      if (loadsBtn) showScreen('loads', loadsBtn);
-      // The load card highlight will fire from the message handler
+
+  // Wait for app to be fully ready before acting on notification
+  var attempts = 0;
+  var maxAttempts = 30; // 30 * 500ms = 15 seconds max wait
+  function waitAndOpen() {
+    attempts++;
+    // Check if app is ready — Supabase initialized and user logged in
+    if (window._supabaseReady && window._rcUserId) {
+      if (notify === 'loadback') {
+        openLoadbackScreen();
+      } else if (notify === 'load') {
+        var loadsBtn = document.querySelector('.nav-btn[data-screen="loads"]');
+        if (loadsBtn) showScreen('loads', loadsBtn);
+      }
+    } else if (attempts < maxAttempts) {
+      setTimeout(waitAndOpen, 500);
     }
-  }, 1500);
+  }
+  setTimeout(waitAndOpen, 800); // Initial delay for DOM
 })();
 
 // ══════════════════════════════════════════════════════════════════════════
