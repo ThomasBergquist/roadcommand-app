@@ -4210,6 +4210,173 @@ function closeNotifAndFindCard() {
 // LIVE LOADBACK — Real return loads based on arrival ETA
 // ══════════════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════════
+// LOADBACK SCREEN
+// ══════════════════════════════════════════════════════════════════════════
+var _loadbackScreenLoads  = [];
+var _loadbackCurrentSort  = 'roundtrip';
+var _loadbackCurrentLoad  = null;
+
+async function openLoadbackScreen() {
+  // Get active load from Supabase
+  var activeLoad = null;
+  if (window._rcUserId && window._supabaseReady) {
+    try {
+      var res = await window._supabase.from('booked_loads').select('*')
+        .eq('user_id', window._rcUserId).eq('active', true)
+        .order('eta_date', { ascending: false }).limit(1);
+      if (res.data && res.data[0]) {
+        var l = res.data[0];
+        activeLoad = { origin: l.origin, dest: l.destination, rate: l.rate, miles: l.miles, broker: l.broker };
+      } else {
+        // Fall back to most recent
+        var res2 = await window._supabase.from('booked_loads').select('*')
+          .eq('user_id', window._rcUserId).order('eta_date', { ascending: false }).limit(1);
+        if (res2.data && res2.data[0]) {
+          var l2 = res2.data[0];
+          activeLoad = { origin: l2.origin, dest: l2.destination, rate: l2.rate, miles: l2.miles, broker: l2.broker };
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (!activeLoad) { alert('No booked load found. Book a load first.'); return; }
+  _loadbackCurrentLoad = activeLoad;
+
+  // Navigate to loadback screen
+  showScreen('loadback', null);
+
+  // Parse destination
+  var destParts = (activeLoad.dest || '').split(',');
+  var destCity  = destParts[0].trim();
+  var destState = destParts.length > 1 ? destParts[1].trim().toUpperCase().substring(0,2) : '';
+
+  // Show header
+  var header = document.getElementById('loadback-screen-header');
+  if (header) {
+    header.innerHTML =
+      '<div style="background:#0d1f0d;border:1px solid var(--green-border);border-radius:8px;padding:.8rem 1rem;margin-bottom:.5rem;">' +
+        '<div style="font-size:.7rem;color:#b8c8b8;margin-bottom:.2rem;">CURRENT LOAD</div>' +
+        '<div style="font-weight:bold;color:var(--green);">' + (activeLoad.origin||'?') + ' &#x2192; ' + (activeLoad.dest||'?') + '</div>' +
+        '<div style="font-size:.78rem;color:#b8c8b8;margin-top:.2rem;">Searching return loads at <strong style="color:#ffd04d;">' + destCity + (destState ? ', '+destState : '') + '</strong></div>' +
+      '</div>';
+  }
+
+  var loadsEl = document.getElementById('loadback-screen-loads');
+  if (loadsEl) loadsEl.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--green);font-size:.85rem;">&#x1F504; Searching Truckstop for loads at ' + destCity + '...</div>';
+
+  if (!destState) {
+    if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x26A0;&#xFE0F;</div><div>Could not determine destination state from: ' + activeLoad.dest + '</div></div>';
+    return;
+  }
+
+  try {
+    var equipType = window._rcEquipmentType || 'F';
+    var maxDead   = defaults.maxDeadhead || 200;
+    var url = _tsWorkerUrl + '/search' +
+      '?originState=' + encodeURIComponent(destState) +
+      '&originCity='  + encodeURIComponent(destCity) +
+      '&equipmentType=' + encodeURIComponent(equipType) +
+      '&hoursOld=72&pageSize=100&originRange=250&loadType=All';
+    console.log('[Loadback] Searching:', url);
+
+    var res  = await fetch(url);
+    var data = await res.json();
+
+    if (!data.success || !data.loads || !data.loads.length) {
+      if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads found at ' + destCity + ', ' + destState + ' right now. Check back closer to your arrival.</div></div>';
+      return;
+    }
+
+    var fuelPrice  = defaults.fuelPrice || 4.25;
+    var mpg        = defaults.mpg       || 6.5;
+    var emptyMpg   = defaults.emptyMpg  || 8.0;
+    var outNet     = (activeLoad.rate||0) - Math.round(((activeLoad.miles||0)/mpg)*fuelPrice);
+
+    _loadbackScreenLoads = data.loads
+      .filter(function(l) { return l.rate > 0 && l.miles > 0; })
+      .map(function(l) {
+        var originKey = (l.originCity||'').toLowerCase().trim();
+        var coords    = window.CITY_COORDS && window.CITY_COORDS[originKey];
+        var destKey   = destCity.toLowerCase().trim();
+        var destCoords = window.CITY_COORDS && window.CITY_COORDS[destKey];
+        var dhFromDest = (coords && destCoords) ? Math.round(getDistanceMiles(destCoords[0], destCoords[1], coords[0], coords[1])) : 0;
+        var dhFuel     = dhFromDest > 0 ? Math.round((dhFromDest/emptyMpg)*fuelPrice) : 0;
+        var returnFuel = Math.round((l.miles/mpg)*fuelPrice);
+        var returnNet  = l.rate - returnFuel - dhFuel;
+        return Object.assign({}, l, { returnNet: returnNet, roundTripNet: outNet+returnNet, dhFromDest: dhFromDest, returnFuel: returnFuel });
+      });
+
+    renderLoadbackScreen(_loadbackCurrentSort);
+
+  } catch(err) {
+    console.error('Loadback error:', err);
+    if (loadsEl) loadsEl.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">&#x26A0;&#xFE0F;</div><div>Error: ' + (err.message||'unknown') + '</div></div>';
+  }
+}
+
+function sortLoadback(sortKey) {
+  _loadbackCurrentSort = sortKey;
+  ['roundtrip','rpm','rate','miles'].forEach(function(k) {
+    var btn = document.getElementById('lb-sort-' + k);
+    if (btn) btn.className = k === sortKey ? 'btn btn-green btn-sm' : 'btn btn-outline btn-sm';
+  });
+  renderLoadbackScreen(sortKey);
+}
+
+function renderLoadbackScreen(sortKey) {
+  var loadsEl = document.getElementById('loadback-screen-loads');
+  if (!loadsEl || !_loadbackScreenLoads.length) return;
+  var minRpm = defaults.minRpm || 2.00;
+  var sorted = _loadbackScreenLoads.slice().sort(function(a,b) {
+    if (sortKey==='rpm')   return b.rpm-a.rpm;
+    if (sortKey==='rate')  return b.rate-a.rate;
+    if (sortKey==='miles') return b.miles-a.miles;
+    return b.roundTripNet-a.roundTripNet;
+  });
+
+  var meetsMin = sorted.filter(function(l) { return l.rpm >= minRpm; });
+  var belowMin = sorted.filter(function(l) { return l.rpm < minRpm; });
+
+  function buildCard(l) {
+    var meetsRpm  = l.rpm >= minRpm;
+    var bestPhone = l.contactPhone || l.brokerPhone || '';
+    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi from dropoff' : 'within 250mi of dropoff';
+    var pickupStr = l.pickupDate ? l.pickupDate : 'Flexible';
+    return '<div class="load-card" style="margin-bottom:.7rem;border-left:3px solid ' + (meetsRpm?'var(--green)':'rgba(255,255,255,.1)') + ';">' +
+      '<div class="load-header" style="display:flex;justify-content:space-between;padding:.7rem .8rem .3rem;">' +
+        '<div style="font-weight:bold;font-size:.88rem;">' + (l.originCity||'?') + ', ' + (l.originState||'?') + ' &#x2192; ' + (l.destCity||'?') + ', ' + (l.destState||'?') + '</div>' +
+        '<div style="color:' + (meetsRpm?'var(--green)':'var(--amber)') + ';font-weight:bold;">$' + (l.rate||0).toLocaleString() + '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;padding:.3rem .8rem;font-size:.78rem;">' +
+        '<div><div style="color:#b8c8b8;font-size:.62rem;">RPM</div><strong style="color:' + (meetsRpm?'var(--green)':'var(--amber)') + ';">$' + (l.rpm||0).toFixed(2) + '/mi</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.62rem;">MILES</div><strong>' + (l.miles||0) + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.62rem;">NET RETURN</div><strong style="color:var(--green);">$' + (l.returnNet||0).toLocaleString() + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.62rem;">FUEL</div><strong>-$' + (l.returnFuel||0).toLocaleString() + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.62rem;">FROM DROPOFF</div><strong>' + dhStr + '</strong></div>' +
+        '<div><div style="color:#b8c8b8;font-size:.62rem;">ROUND TRIP</div><strong style="color:var(--green);">$' + (l.roundTripNet||0).toLocaleString() + '</strong></div>' +
+      '</div>' +
+      '<div style="font-size:.72rem;color:#b8c8b8;padding:.2rem .8rem .5rem;">&#x1F4C5; ' + pickupStr + ' &middot; ' + (l.broker||'Unknown') + ' &middot; ' + (l.equipment||'F') + '</div>' +
+      (l.notes ? '<div style="font-size:.72rem;color:#ffd04d;padding:0 .8rem .4rem;font-style:italic;">' + (l.notes||'').substring(0,100) + '</div>' : '') +
+      '<div style="display:flex;gap:.4rem;padding:.3rem .8rem .7rem;flex-wrap:wrap;">' +
+        (bestPhone ? '<button data-phone="' + bestPhone + '" data-broker="' + (l.broker||'').replace(/"/g,'&quot;') + '" onclick="callBroker(this.dataset.phone,this.dataset.broker)" class="btn btn-outline btn-sm" style="touch-action:manipulation;">&#x1F4DE; Call</button>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  var html = '';
+  if (meetsMin.length > 0) {
+    html += '<div style="font-size:.72rem;color:var(--green);padding:.3rem 0 .4rem;letter-spacing:.04em;">&#x2705; ' + meetsMin.length + ' loads above $' + minRpm.toFixed(2) + '/mi</div>';
+    html += meetsMin.map(buildCard).join('');
+  }
+  if (belowMin.length > 0) {
+    html += '<div style="font-size:.72rem;color:#b8c8b8;padding:.5rem 0 .3rem;border-top:1px solid rgba(255,255,255,.07);margin-top:.5rem;">Below minimum — ' + belowMin.length + ' loads</div>';
+    html += belowMin.map(buildCard).join('');
+  }
+  if (!html) html = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads found.</div></div>';
+  loadsEl.innerHTML = html + '<div style="margin-top:.5rem;font-size:.68rem;color:#b8c8b8;text-align:center;">Powered by Truckstop.com</div>';
+}
+
 var _origShowLoadback = showLoadback;
 showLoadback = async function(origin, dest, rate, miles, broker, phone) {
   // Call original for immediate display with cached data
