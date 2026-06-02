@@ -396,7 +396,58 @@ function showAddRun() {
   const f = document.getElementById('add-run-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
-function saveRun() { alert('Run logged!'); document.getElementById('add-run-form').style.display = 'none'; }
+async function saveRun() {
+  var form    = document.getElementById('add-run-form');
+  var inputs  = form.querySelectorAll('input');
+  var origin  = inputs[0].value.trim();
+  var dest    = inputs[1].value.trim();
+  var rate    = parseFloat(inputs[2].value) || 0;
+  var miles   = parseInt(inputs[3].value) || 0;
+  var fuel    = parseFloat(inputs[4].value) || 0;
+  var date    = inputs[5].value;
+  var notes   = form.querySelector('textarea') ? form.querySelector('textarea').value.trim() : '';
+
+  if (!origin || !dest) { alert('Origin and destination are required.'); return; }
+  if (!rate)            { alert('Rate is required.'); return; }
+
+  // Save as invoice to Supabase so it shows in logbook and money tracker
+  if (window._rcUserId && window._supabaseReady) {
+    try {
+      var { data, error } = await window._supabase.from('invoices').insert({
+        user_id:      window._rcUserId,
+        broker_name:  notes || (origin + ' to ' + dest),
+        amount:       rate,
+        ref:          origin + ' → ' + dest,
+        invoice_date: date || new Date().toISOString().split('T')[0],
+        due_date:     date || new Date().toISOString().split('T')[0],
+        terms:        30,
+        status:       'paid',
+        notes:        'Miles: ' + miles + (fuel ? ' · Fuel: $' + fuel : '') + (notes ? ' · ' + notes : ''),
+        miles:        miles,
+      }).select().single();
+
+      if (error) throw error;
+
+      // Add to local invoices array and re-render
+      if (!invoices) invoices = [];
+      invoices.unshift(data);
+      renderLogbook();
+      renderInvoices();
+      updateDashboardStats();
+
+      // Clear form and hide
+      inputs.forEach(function(el) { el.value = ''; });
+      if (form.querySelector('textarea')) form.querySelector('textarea').value = '';
+      form.style.display = 'none';
+
+      showToast('&#x2705; Run logged and saved');
+    } catch(e) {
+      alert('Error saving run: ' + (e.message || 'Please try again.'));
+    }
+  } else {
+    alert('Not connected. Please check your internet connection.');
+  }
+}
 
 function calcLoad(rate, miles) {
   showScreen('calc', null);
