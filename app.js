@@ -1883,10 +1883,28 @@ try {
 async function loadSharedCityCoords() {
   if (!window._supabaseReady || !window._supabase) return;
   try {
-    var { data, error } = await _supabase
-      .from('city_coords')
-      .select('city_key, state_code, lat, lon')
-      .limit(25000);
+    // Load all city coords in batches — Supabase caps at 1000 per request
+    var allCoords = [];
+    var batchSize = 1000;
+    var page = 0;
+    var keepGoing = true;
+    while (keepGoing) {
+      var from = page * batchSize;
+      var to   = from + batchSize - 1;
+      var batchRes = await _supabase
+        .from('city_coords')
+        .select('city_key, state_code, lat, lon')
+        .range(from, to);
+      if (batchRes.error || !batchRes.data || batchRes.data.length === 0) {
+        keepGoing = false;
+      } else {
+        allCoords = allCoords.concat(batchRes.data);
+        if (batchRes.data.length < batchSize) keepGoing = false;
+        page++;
+      }
+    }
+    var data  = allCoords;
+    var error = null;
     if (error || !data) return;
     data.forEach(function(row) {
       var key = row.city_key;
