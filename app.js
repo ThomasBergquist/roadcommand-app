@@ -3992,9 +3992,17 @@ function renderLiveLoadCards(loads, minRpm) {
       : '<div class="alert alert-amber" style="margin:.5rem 0;"><div class="alert-icon">📋</div><div>No loads near you right now. Checking every 5 minutes.</div></div>';
   }
 
-  // Inject into loads screen — all loads
+  // Inject into loads screen — preserve any open panels
   var loadsLive = document.getElementById('loads-screen-live');
-  if (loadsLive) loadsLive.innerHTML = allCards;
+  if (loadsLive) {
+    var openPanels = [];
+    loadsLive.querySelectorAll('.load-expand-panel.open').forEach(function(p) { openPanels.push(p.id); });
+    loadsLive.innerHTML = allCards;
+    openPanels.forEach(function(id) {
+      var p = document.getElementById(id);
+      if (p) { p.classList.add('open'); var a = document.getElementById('arrow_' + id); if (a) a.classList.add('open'); }
+    });
+  }
 
   // Re-inject profit bars
   injectProfitBars();
