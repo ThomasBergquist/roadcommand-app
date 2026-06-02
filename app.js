@@ -4349,12 +4349,13 @@ async function openLoadbackScreen() {
   try {
     var equipType = window._rcEquipmentType || 'F';
     var maxDead   = defaults.maxDeadhead || 200;
+    // Use max deadhead param as the search radius — don't show loads further than you'd deadhead
     var url = _tsWorkerUrl + '/search' +
       '?originState=' + encodeURIComponent(destState) +
       '&originCity='  + encodeURIComponent(destCity) +
       '&equipmentType=' + encodeURIComponent(equipType) +
-      '&hoursOld=72&pageSize=100&originRange=250&loadType=All';
-    console.log('[Loadback] Searching:', url);
+      '&hoursOld=72&pageSize=100&originRange=' + maxDead + '&loadType=All';
+    console.log('[Loadback] Searching within ' + maxDead + ' mi of ' + destCity + ', ' + destState);
 
     var res  = await fetch(url);
     var data = await res.json();
