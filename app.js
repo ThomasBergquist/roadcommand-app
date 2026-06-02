@@ -410,29 +410,30 @@ async function saveRun() {
   if (!origin || !dest) { alert('Origin and destination are required.'); return; }
   if (!rate)            { alert('Rate is required.'); return; }
 
-  // Save as invoice to Supabase so it shows in logbook and money tracker
+  // Save as booked load so it shows in logbook with On This Load button
   if (window._rcUserId && window._supabaseReady) {
     try {
-      var { data, error } = await window._supabase.from('invoices').insert({
-        user_id:      window._rcUserId,
-        broker_name:  notes || (origin + ' to ' + dest),
-        amount:       rate,
-        ref:          origin + ' → ' + dest,
-        invoice_date: date || new Date().toISOString().split('T')[0],
-        due_date:     date || new Date().toISOString().split('T')[0],
-        terms:        30,
-        status:       'paid',
-        notes:        'Miles: ' + miles + (fuel ? ' · Fuel: $' + fuel : '') + (notes ? ' · ' + notes : ''),
-        miles:        miles,
+      var destParts = dest.split(',');
+      var destCity  = destParts[0].trim();
+      var destState = destParts.length > 1 ? destParts[1].trim().toUpperCase().substring(0,2) : '';
+
+      var { data, error } = await window._supabase.from('booked_loads').insert({
+        user_id:     window._rcUserId,
+        origin:      origin,
+        destination: dest,
+        dest_city:   destCity,
+        dest_state:  destState,
+        rate:        rate,
+        miles:       miles,
+        broker:      notes || '',
+        eta_date:    date || new Date().toISOString().split('T')[0],
+        active:      false,
+        queued:      false,
       }).select().single();
 
       if (error) throw error;
 
-      // Add to local invoices array and re-render
-      if (!invoices) invoices = [];
-      invoices.unshift(data);
       renderLogbook();
-      renderInvoices();
       updateDashboardStats();
 
       // Clear form and hide
