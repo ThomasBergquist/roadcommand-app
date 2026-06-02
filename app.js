@@ -184,9 +184,15 @@ function showScreen(id, btn) {
     var moreBtn = document.getElementById('more-nav-btn');
     if (moreBtn) moreBtn.classList.add('active');
   }
-  // Re-render from cache when switching to dash or loads — no new fetch
+  // Re-render from cache when switching to dash or loads — only if screen was not already active
   if ((id === 'dash' || id === 'loads') && _liveLoadsCache && _liveLoadsCache.length > 0) {
-    setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 50);
+    var loadsLiveEl = document.getElementById('loads-screen-live');
+    var dashLiveEl  = document.getElementById('dash-live-loads');
+    var alreadyHasCards = (id === 'loads' && loadsLiveEl && loadsLiveEl.querySelector('.load-card')) ||
+                          (id === 'dash'  && dashLiveEl  && dashLiveEl.querySelector('.load-card'));
+    if (!alreadyHasCards) {
+      setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 50);
+    }
   }
   track('tab_opened', { tab: id });
 }
