@@ -3925,8 +3925,8 @@ function renderLiveLoadCards(loads, minRpm) {
       var fuelSubDisplay = deadFuelEst > 0 ? '$' + loadedFuelEst + ' loaded + $' + deadFuelEst + ' DH (' + Math.round(deadMilesEst) + ' mi)' : '';
       var netEst         = load.rate && totalFuelEst ? '$' + Math.max(0, load.rate - totalFuelEst).toLocaleString() : '—';
 
-      return '<div class="load-card ' + cardClass + '" data-rate="' + (load.rate || 0) + '" data-miles="' + (load.miles || 0) + '">' +
-        '<div class="load-top load-card-clickable" onclick="toggleExpand(\'' + panelId + '\')">' +
+      return '<div class="load-card ' + cardClass + '" data-rate="' + (load.rate || 0) + '" data-miles="' + (load.miles || 0) + '" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
+        '<div class="load-top load-card-clickable">' +
           '<div>' +
             '<div class="load-route"><span class="expand-arrow" id="arrow_' + panelId + '">▼</span>' +
               load.originCity + ', ' + load.originState + ' <span>→</span> ' + load.destCity + ', ' + load.destState +
@@ -3935,11 +3935,11 @@ function renderLiveLoadCards(loads, minRpm) {
           '</div>' +
           '<div style="text-align:right;"><div class="load-rate">' + rateDisplay + '</div><div class="load-rate-sub" style="color:var(--green);">' + netRpmDisplay + '</div></div>' +
         '</div>' +
-        '<div class="broker-info" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
+        '<div class="broker-info" style="cursor:pointer;">' +
           '<span class="broker-name">' + (load.broker || 'Broker') + ':</span>' +
           '<span class="broker-phone">📞 ' + (bestPhone || '—') + '</span>' +
         '</div>' +
-        '<div class="load-meta" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;">' +
+        '<div class="load-meta" style="cursor:pointer;">' +
           '<div><div class="lm-label">Miles</div><div class="lm-val">' + (load.miles || '—') + '</div></div>' +
           '<div><div class="lm-label">Weight</div><div class="lm-val">' + (load.weight ? load.weight.toLocaleString() + ' lb' : '—') + '</div></div>' +
           '<div><div class="lm-label">Pickup</div><div class="lm-val">' + (load.pickupDate || '—') + '</div></div>' +
@@ -3968,7 +3968,7 @@ function renderLiveLoadCards(loads, minRpm) {
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="load-actions">' +
+        '<div class="load-actions" onclick="event.stopPropagation()">' +
           '<button class="load-action-btn call-btn" onclick="callBroker(\'' + bestPhone + '\',\'' + (load.broker || 'Broker') + '\')"><span class="btn-icon">📞</span>Call</button>' +
           '<button class="load-action-btn book-btn" onclick="bookLoad(this,\'' + load.originCity + ', ' + load.originState + '\',\'' + load.destCity + ', ' + load.destState + '\',' + (load.rate || 0) + ',' + (load.miles || 0) + ',\'' + (load.broker || '') + '\',\'' + bestPhone + '\')"><span class="btn-icon">✓</span>Book</button>' +
           '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">✕</span>Skip</button>' +
