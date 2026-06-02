@@ -1865,9 +1865,16 @@ var _supabaseCoordsLoaded = false;
 var _lastGPSCity = '';
 
 // Load persisted local cache as fast fallback
+// v2 = simplemaps full dataset loaded — clear old cache
 try {
-  var _savedGeoCache = localStorage.getItem('rc-geocache');
-  if (_savedGeoCache) _cityCoordCache = JSON.parse(_savedGeoCache);
+  var _geoCacheVer = localStorage.getItem('rc-geocache-ver');
+  if (_geoCacheVer === 'v2') {
+    var _savedGeoCache = localStorage.getItem('rc-geocache');
+    if (_savedGeoCache) _cityCoordCache = JSON.parse(_savedGeoCache);
+  } else {
+    localStorage.removeItem('rc-geocache');
+    localStorage.setItem('rc-geocache-ver', 'v2');
+  }
 } catch(e) {}
 
 // Load shared coords from Supabase on startup
@@ -1876,7 +1883,8 @@ async function loadSharedCityCoords() {
   try {
     var { data, error } = await _supabase
       .from('city_coords')
-      .select('city_key, state_code, lat, lon');
+      .select('city_key, state_code, lat, lon')
+      .limit(25000);
     if (error || !data) return;
     data.forEach(function(row) {
       var key = row.city_key;
@@ -2039,7 +2047,7 @@ var CITY_COORDS = {
   "coeur dalene":[47.6777,-116.7805],"lewiston":[46.4165,-117.0177],"caldwell":[43.6629,-116.6874],
   "moscow":[46.7324,-117.0002],"sandpoint":[48.2765,-116.5535],
   // Montana
-  "billings":[45.7833,-108.5007],"missoula":[46.8721,-113.9940],"great falls":[47.5002,-111.3008],
+  "billings":[45.7833,-108.5007],"missoula":[46.8721,-113.9940],"great falls":[47.5002,-111.3008],"columbia falls":[48.3736,-114.1835],"kalispell":[48.1920,-114.3168],"whitefish":[48.4119,-114.3351],"havre":[48.5500,-109.6839],"bozeman":[45.6770,-111.0429],"helena":[46.5958,-112.0270],"butte":[46.0038,-112.5348],"livingston":[45.6627,-110.5599],"miles city":[46.4083,-105.8406],"glendive":[47.1053,-104.7124],"wolf point":[48.0916,-105.6402],"lewistown":[47.0638,-109.4282],"hamilton":[46.2460,-114.1560],"polson":[47.6938,-114.1630],"libby":[48.3880,-115.5566],"cut bank":[48.6330,-112.3244],
   "bozeman":[45.6770,-111.0429],"helena":[46.5958,-112.0270],"butte":[46.0038,-112.5348],
   "kalispell":[48.1957,-114.3124],
   // Major US cities
@@ -4370,18 +4378,24 @@ async function openLoadbackScreen() {
     var emptyMpg   = defaults.emptyMpg  || 8.0;
     var outNet     = (activeLoad.rate||0) - Math.round(((activeLoad.miles||0)/mpg)*fuelPrice);
 
+    var destKey    = destCity.toLowerCase().trim();
+    var destCoords = window.CITY_COORDS && window.CITY_COORDS[destKey];
+
     _loadbackScreenLoads = data.loads
       .filter(function(l) { return l.rate > 0 && l.miles > 0; })
       .map(function(l) {
-        var originKey = (l.originCity||'').toLowerCase().trim();
-        var coords    = window.CITY_COORDS && window.CITY_COORDS[originKey];
-        var destKey   = destCity.toLowerCase().trim();
-        var destCoords = window.CITY_COORDS && window.CITY_COORDS[destKey];
+        var originKey  = (l.originCity||'').toLowerCase().trim();
+        var coords     = window.CITY_COORDS && window.CITY_COORDS[originKey];
         var dhFromDest = (coords && destCoords) ? Math.round(getDistanceMiles(destCoords[0], destCoords[1], coords[0], coords[1])) : 0;
         var dhFuel     = dhFromDest > 0 ? Math.round((dhFromDest/emptyMpg)*fuelPrice) : 0;
         var returnFuel = Math.round((l.miles/mpg)*fuelPrice);
         var returnNet  = l.rate - returnFuel - dhFuel;
         return Object.assign({}, l, { returnNet: returnNet, roundTripNet: outNet+returnNet, dhFromDest: dhFromDest, returnFuel: returnFuel });
+      })
+      .filter(function(l) {
+        // Filter by max deadhead — only apply when we have real distance data
+        if (l.dhFromDest > 0 && l.dhFromDest > maxDead) return false;
+        return true;
       });
 
     renderLoadbackScreen(_loadbackCurrentSort);
@@ -4418,7 +4432,7 @@ function renderLoadbackScreen(sortKey) {
   function buildCard(l) {
     var meetsRpm  = l.rpm >= minRpm;
     var bestPhone = l.contactPhone || l.brokerPhone || '';
-    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi from dropoff' : 'within 250mi of dropoff';
+    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi from dropoff' : 'within ' + (defaults.maxDeadhead || 200) + 'mi of dropoff';
     var pickupStr = l.pickupDate ? l.pickupDate : 'Flexible';
     return '<div class="load-card" style="margin-bottom:.7rem;border-left:3px solid ' + (meetsRpm?'var(--green)':'rgba(255,255,255,.1)') + ';">' +
       '<div class="load-header" style="display:flex;justify-content:space-between;padding:.7rem .8rem .3rem;">' +
