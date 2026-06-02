@@ -1976,7 +1976,7 @@ async function geocodeCityAsync(key, fullCityStr, stateCode) {
 // Seed shared table with built-in coords on first load (runs once)
 async function seedSharedCityCoords() {
   if (!window._supabaseReady || !window._supabase) return;
-  if (localStorage.getItem('rc-coords-seeded')) return;
+  if (localStorage.getItem('rc-coords-seeded-v3')) return;
   try {
     var rows = Object.keys(CITY_COORDS).map(function(key) {
       return {
@@ -1988,11 +1988,11 @@ async function seedSharedCityCoords() {
         source:     'seed',
       };
     });
-    // Insert in batches of 50
+    // Upsert in batches of 50 — won't conflict with existing data
     for (var i = 0; i < rows.length; i += 50) {
-      await _supabase.from('city_coords').insert(rows.slice(i, i + 50));
+      await _supabase.from('city_coords').upsert(rows.slice(i, i + 50), { onConflict: 'city_key', ignoreDuplicates: true });
     }
-    localStorage.setItem('rc-coords-seeded', '1');
+    localStorage.setItem('rc-coords-seeded-v3', '1');
     console.log('Seeded', rows.length, 'cities to shared database');
   } catch(e) { console.error('Seed error:', e); }
 }
