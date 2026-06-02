@@ -647,7 +647,9 @@ function getDistanceMiles(lat1, lon1, lat2, lon2) {
   var dLon = (lon2 - lon1) * Math.PI / 180;
   var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
           Math.cos(d1) * Math.cos(d2) * Math.sin(dLon/2) * Math.sin(dLon/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  var straightLine = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  // Apply 1.3x road factor — trucking routes average 30% longer than straight line
+  return Math.round(straightLine * 1.30);
 }
 
 const defaults = { fuelPrice: 4.25, mpg: 6.5, emptyMpg: 8.0, deadhead: 0, brokerPct: 0, minRpm: 2.00, minGross: 1500, minMiles: 500, maxMiles: 2000, maxDeadhead: 150 };
