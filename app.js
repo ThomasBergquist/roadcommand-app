@@ -1048,6 +1048,20 @@ async function loadPreferencesFromSupabase() {
     } catch(e) {}
 
     console.log('Preferences loaded from Supabase');
+
+    // Also load MC number from profiles table
+    try {
+      var profRes = await _supabase.from('profiles').select('mc_number').eq('user_id', window._rcUserId).single();
+      if (!profRes.error && profRes.data && profRes.data.mc_number) {
+        var mc = profRes.data.mc_number.toString().replace(/^MC-?/i, '').trim();
+        window._rcMCNumber = mc;
+        try { localStorage.setItem('rc-mc-number', mc); } catch(e) {}
+        var mcInput = document.getElementById('set-mc-number');
+        if (mcInput) mcInput.value = 'MC-' + mc;
+        setTimeout(function() { loadFMCSAProfile(); }, 2000);
+      }
+    } catch(e) {}
+
   } catch(err) { console.error('Error loading preferences:', err); }
 }
 
