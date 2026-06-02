@@ -1965,17 +1965,17 @@ async function geocodeCityAsync(key, fullCityStr, stateCode) {
       var cityName = fullCityStr.split(',')[0].trim();
       saveSharedCityCoord(key, cityName, stateCode || '', lat, lon, 'geocode');
       // Re-render loads with updated deadhead
+      // Re-render loads with updated deadhead — skip if panel open
       if (_liveLoadsCache.length > 0) {
         clearTimeout(window._geocodeRerenderTimer);
         window._geocodeRerenderTimer = setTimeout(function() {
-          renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+          if (!document.querySelector('.load-expand-panel.open')) {
+            renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+          }
         }, 1000);
       }
-    } else {
-      delete _cityCoordCache[key];
-    }
-  } catch(e) {
-    delete _cityCoordCache[key];
+      }
+    } catch(e) {
   }
 }
 
@@ -2190,11 +2190,13 @@ async function geocodeCityAsync(key, fullCityStr) {
       _cityCoordCache[key] = coords;
       CITY_COORDS[key] = coords;
       try { localStorage.setItem('rc-geocache', JSON.stringify(_cityCoordCache)); } catch(e) {}
-      // Re-render loads with updated deadhead now that we have coords
+      // Re-render loads with updated deadhead now that we have coords — skip if panel open
       if (_liveLoadsCache.length > 0) {
         clearTimeout(window._geocodeRerenderTimer);
         window._geocodeRerenderTimer = setTimeout(function() {
-          renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+          if (!document.querySelector('.load-expand-panel.open')) {
+            renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+          }
         }, 1000); // debounce — wait 1s for multiple geocodes to batch
       }
     } else {
@@ -3764,7 +3766,10 @@ async function fetchTruckstopLoads(forceRefresh) {
 
   var now = Date.now();
   if (!forceRefresh && _liveLoadsLastFetch && (now - _liveLoadsLastFetch) < 180000 && _liveLoadsCache.length > 0) {
-    renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+    // Only re-render if no panel is currently open — don't wipe expanded cards
+    if (!document.querySelector('.load-expand-panel.open')) {
+      renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00);
+    }
     return;
   }
 
@@ -3802,7 +3807,10 @@ async function fetchTruckstopLoads(forceRefresh) {
       var loads = data.loads;
       _liveLoadsCache     = loads;
       _liveLoadsLastFetch = now;
-      renderLiveLoadCards(loads, minRpm);
+      // Only re-render if no panel is open — don't wipe expanded cards mid-read
+      if (!document.querySelector('.load-expand-panel.open')) {
+        renderLiveLoadCards(loads, minRpm);
+      }
       track('live_loads_fetched', { count: loads.length, state: state });
     } else {
       showNoLoadsState(state);
