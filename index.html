@@ -227,6 +227,10 @@
   <div class="screen" id="screen-states">
     <div class="section-head"><div class="section-label">&#x2014; State Volume Tracker</div><div class="section-title">Where The Loads Are</div></div>
     <div class="alert alert-green"><div class="alert-icon">&#x1F4CA;</div><div>Live freight market data updated every 30 minutes from Truckstop. Pull down to refresh.</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+      <div id="state-updated-time" style="font-size:.72rem;color:#b8c8b8;">Loading market data...</div>
+      <button onclick="loadStateStatsFromSupabase()" class="btn btn-outline btn-sm" style="font-size:.72rem;padding:.3rem .7rem;">&#x21BB; Refresh</button>
+    </div>
     <div class="state-controls">
       <button class="state-filter-btn active" onclick="sortStates('volume',this)">By Volume</button>
       <button class="state-filter-btn" onclick="sortStates('rpm',this)">By Avg RPM</button>

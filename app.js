@@ -85,51 +85,117 @@ function submitFeedback() {
   alert('Thanks! Your feedback is on its way.');
 }
 
-let stateData = [
-  { code:'WA', name:'Washington', volume:47, rpm:2.18, trend:'up', maxVol:47 },
-  { code:'OR', name:'Oregon',     volume:38, rpm:2.11, trend:'up', maxVol:47 },
-  { code:'ID', name:'Idaho',      volume:29, rpm:2.05, trend:'flat', maxVol:47 },
-  { code:'CA', name:'California', volume:24, rpm:2.31, trend:'up', maxVol:47 },
-  { code:'UT', name:'Utah',       volume:21, rpm:2.08, trend:'flat', maxVol:47 },
-  { code:'MT', name:'Montana',    volume:14, rpm:1.98, trend:'down', maxVol:47 },
-  { code:'NV', name:'Nevada',     volume:12, rpm:2.14, trend:'flat', maxVol:47 },
-  { code:'CO', name:'Colorado',   volume:9,  rpm:2.22, trend:'up', maxVol:47 },
-];
+let stateData = [];
+
+const STATE_NAMES = {
+  WA:'Washington',OR:'Oregon',ID:'Idaho',MT:'Montana',WY:'Wyoming',CA:'California',
+  NV:'Nevada',UT:'Utah',CO:'Colorado',AZ:'Arizona',NM:'New Mexico',TX:'Texas',
+  OK:'Oklahoma',KS:'Kansas',NE:'Nebraska',SD:'South Dakota',ND:'North Dakota',
+  MN:'Minnesota',IA:'Iowa',MO:'Missouri',AR:'Arkansas',LA:'Louisiana',MS:'Mississippi',
+  AL:'Alabama',TN:'Tennessee',KY:'Kentucky',IN:'Indiana',IL:'Illinois',WI:'Wisconsin',
+  MI:'Michigan',OH:'Ohio',WV:'West Virginia',VA:'Virginia',NC:'North Carolina',
+  SC:'South Carolina',GA:'Georgia',FL:'Florida',PA:'Pennsylvania',NY:'New York',
+  NJ:'New Jersey',CT:'Connecticut',MA:'Massachusetts',ME:'Maine',NH:'New Hampshire',
+  VT:'Vermont',DE:'Delaware',MD:'Maryland'
+};
+
+// Load state stats from Supabase — updated every 30 min by push worker
+async function loadStateStatsFromSupabase() {
+  var list = document.getElementById('state-list');
+  if (list) list.innerHTML = '<div style="padding:2rem;text-align:center;color:#b8c8b8;font-size:.85rem;">Loading freight market data...</div>';
+
+  try {
+    if (!window._supabaseReady || !window._supabase) {
+      setTimeout(loadStateStatsFromSupabase, 1000);
+      return;
+    }
+
+    var { data, error } = await window._supabase
+      .from('state_stats')
+      .select('state_code, volume, avg_rpm, updated_at')
+      .order('volume', { ascending: false })
+      .limit(50);
+
+    if (error || !data || !data.length) {
+      if (list) list.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">📊</div><div>State data is being collected. Check back in a few minutes.</div></div>';
+      return;
+    }
+
+    // Calculate trends by comparing to previous session cache
+    var prevData = {};
+    try { prevData = JSON.parse(localStorage.getItem('rc-state-stats-prev') || '{}'); } catch(e) {}
+    var newPrev = {};
+
+    stateData = data.map(function(s) {
+      var code    = s.state_code;
+      var volume  = s.volume || 0;
+      var rpm     = parseFloat(s.avg_rpm) || 0;
+      var prev    = prevData[code];
+      var trend   = 'flat';
+      if (prev) {
+        if (volume > prev.volume * 1.05) trend = 'up';
+        else if (volume < prev.volume * 0.95) trend = 'down';
+      }
+      newPrev[code] = { volume: volume, rpm: rpm };
+      return { code: code, name: STATE_NAMES[code] || code, volume: volume, rpm: rpm, trend: trend, updated_at: s.updated_at };
+    });
+
+    // Save for next trend comparison
+    try { localStorage.setItem('rc-state-stats-prev', JSON.stringify(newPrev)); } catch(e) {}
+
+    renderStates(stateData);
+
+    // Show last updated time
+    if (data[0] && data[0].updated_at) {
+      var updated = new Date(data[0].updated_at);
+      var mins    = Math.round((Date.now() - updated.getTime()) / 60000);
+      var timeStr = mins < 2 ? 'Just now' : mins + ' min ago';
+      var timeEl  = document.getElementById('state-updated-time');
+      if (timeEl) timeEl.textContent = 'Updated ' + timeStr;
+    }
+
+  } catch(e) {
+    console.error('State stats error:', e);
+    if (list) list.innerHTML = '<div class="alert alert-amber"><div class="alert-icon">⚠️</div><div>Could not load freight market data.</div></div>';
+  }
+}
 
 function renderStates(data) {
-  const list = document.getElementById('state-list');
+  var list = document.getElementById('state-list');
   if (!list) return;
   if (!data || !data.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🗺️</div><div class="empty-state-msg">No state data yet.<br>Log a load to start tracking volume by state.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🗺️</div><div class="empty-state-msg">No state data yet. Data updates every 30 minutes.</div></div>';
     return;
   }
-  const maxVol = Math.max(...data.map(s => s.volume));
-  list.innerHTML = data.map((s, i) => {
-    const pct = Math.round((s.volume / maxVol) * 100);
-    const barColor = i === 0 ? '' : i === 1 ? '' : pct < 40 ? ' red' : pct < 65 ? ' amber' : '';
-    const rowClass = i === 0 ? 'top-state' : i <= 2 ? 'mid-state' : '';
-    const rankClass = i === 0 ? 'rank-1' : i <= 2 ? 'rank-2' : '';
-    const trendClass = s.trend === 'up' ? 'trend-up' : s.trend === 'down' ? 'trend-down' : 'trend-flat';
-    const trendLabel = s.trend === 'up' ? '↑ Rising' : s.trend === 'down' ? '↓ Falling' : '→ Flat';
-    return `
-      <div class="state-row ${rowClass}">
-        <div class="state-top-line">
-          <div>
-            <span class="state-name">${s.name}</span>
-            <span style="color:#b8c8b8;font-size:.8rem;margin-left:.5rem;">${s.code}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <span class="state-trend ${trendClass}">${trendLabel}</span>
-            <span class="state-rank ${rankClass}">#${i+1}</span>
-          </div>
-        </div>
-        <div class="state-bar-wrap"><div class="state-bar${barColor}" style="width:${pct}%"></div></div>
-        <div class="state-stats">
-          <div class="state-stat">Loads: <strong>${s.volume}</strong></div>
-          <div class="state-stat">Avg RPM: <strong>$${s.rpm.toFixed(2)}</strong></div>
-          <div class="state-stat">Freight: <strong>${pct >= 70 ? '🟢 Hot' : pct >= 40 ? '🟡 Moderate' : '🔴 Slow'}</strong></div>
-        </div>
-      </div>`;
+  var maxVol = Math.max.apply(null, data.map(function(s) { return s.volume; }));
+  list.innerHTML = data.map(function(s, i) {
+    var pct       = maxVol > 0 ? Math.round((s.volume / maxVol) * 100) : 0;
+    var barColor  = pct >= 70 ? '' : pct >= 40 ? ' amber' : ' red';
+    var rowClass  = i === 0 ? 'top-state' : i <= 2 ? 'mid-state' : '';
+    var rankClass = i === 0 ? 'rank-1' : i <= 2 ? 'rank-2' : '';
+    var trendClass = s.trend === 'up' ? 'trend-up' : s.trend === 'down' ? 'trend-down' : 'trend-flat';
+    var trendLabel = s.trend === 'up' ? '&#x2191; Rising' : s.trend === 'down' ? '&#x2193; Falling' : '&#x2192; Flat';
+    var heatLabel  = pct >= 70 ? '&#x1F7E2; Hot' : pct >= 40 ? '&#x1F7E1; Moderate' : '&#x1F534; Slow';
+    var minRpm     = defaults.minRpm || 2.00;
+    var rpmColor   = s.rpm >= minRpm ? 'var(--green)' : s.rpm >= minRpm * 0.85 ? 'var(--amber)' : 'var(--red)';
+    return '<div class="state-row ' + rowClass + '">' +
+      '<div class="state-top-line">' +
+        '<div>' +
+          '<span class="state-name">' + s.name + '</span>' +
+          '<span style="color:#b8c8b8;font-size:.8rem;margin-left:.5rem;">' + s.code + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:.5rem;">' +
+          '<span class="state-trend ' + trendClass + '">' + trendLabel + '</span>' +
+          '<span class="state-rank ' + rankClass + '">#' + (i+1) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="state-bar-wrap"><div class="state-bar' + barColor + '" style="width:' + pct + '%"></div></div>' +
+      '<div class="state-stats">' +
+        '<div class="state-stat">Loads: <strong>' + s.volume + '</strong></div>' +
+        '<div class="state-stat">Avg RPM: <strong style="color:' + rpmColor + ';">$' + (s.rpm||0).toFixed(2) + '/mi</strong></div>' +
+        '<div class="state-stat">Market: <strong>' + heatLabel + '</strong></div>' +
+      '</div>' +
+    '</div>';
   }).join('');
 }
 
@@ -194,6 +260,8 @@ function showScreen(id, btn) {
       setTimeout(function() { renderLiveLoadCards(_liveLoadsCache, defaults.minRpm || 2.00); }, 50);
     }
   }
+  // Refresh state stats when opening the states screen
+  if (id === 'states') loadStateStatsFromSupabase();
   track('tab_opened', { tab: id });
 }
 
@@ -343,9 +411,44 @@ async function setLoadActive(loadId) {
     // Only one load active at a time — deactivate others first
     await window._supabase.from('booked_loads').update({ active: false }).eq('user_id', window._rcUserId);
     await window._supabase.from('booked_loads').update({ active: true, queued: false }).eq('id', loadId).eq('user_id', window._rcUserId);
+
+    // Get the load details to auto-create invoice and broker
+    var loadRes = await window._supabase.from('booked_loads').select('*').eq('id', loadId).single();
+    if (!loadRes.error && loadRes.data) {
+      var load = loadRes.data;
+      // Auto-add broker to vault
+      if (load.broker) await ensureBrokerInVault(load.broker, '', 30);
+      // Auto-create invoice if not already one for this load
+      var invCheck = await window._supabase.from('invoices')
+        .select('id').eq('user_id', window._rcUserId)
+        .ilike('ref', load.origin + '%' + load.destination + '%').limit(1);
+      if (!invCheck.error && (!invCheck.data || invCheck.data.length === 0)) {
+        var today     = new Date().toISOString().split('T')[0];
+        var dueDate   = new Date(); dueDate.setDate(dueDate.getDate() + 30);
+        var inv = {
+          user_id:      window._rcUserId,
+          broker_name:  load.broker || 'Unknown Broker',
+          amount:       parseFloat(load.rate) || 0,
+          ref:          (load.origin || '') + ' to ' + (load.destination || ''),
+          invoice_date: today,
+          due_date:     dueDate.toISOString().split('T')[0],
+          terms:        30,
+          status:       'pending',
+          notes:        'Auto-created when marked En Route · ' + (load.miles || 0) + ' mi',
+        };
+        var saved = await window._supabase.from('invoices').insert(inv).select().single();
+        if (!saved.error && saved.data) {
+          if (!invoices) invoices = [];
+          invoices.unshift(saved.data);
+          renderInvoices();
+          updateMoneyTotals();
+        }
+      }
+    }
+
     saveLoadAlertPrefs();
     renderLogbook();
-    showToast('&#x1F69B; En Route — Loadback notifications active');
+    showToast('&#x1F69B; En Route — Invoice created · Loadback notifications active');
   } catch(e) { console.error(e); }
 }
 
@@ -1438,6 +1541,17 @@ function recalcPanel(panelId, rate, miles) {
   }
 }
 
+// Book a load from the loadback screen — uses full booking modal
+function bookLoadbackCard(btn) {
+  var origin = btn.dataset.origin || '';
+  var dest   = btn.dataset.dest   || '';
+  var rate   = parseFloat(btn.dataset.rate)  || 0;
+  var miles  = parseInt(btn.dataset.miles)   || 0;
+  var broker = btn.dataset.broker || 'Unknown Broker';
+  var phone  = btn.dataset.phone  || '';
+  showBookConfirmModal(origin, dest, rate, miles, broker, phone);
+}
+
 function bookLoad(btn, origin, dest, rate, miles, broker, phone) {
   // Mark card as booked immediately
   var card = btn.closest(".load-card");
@@ -2324,7 +2438,7 @@ function updateLocation() {
   if (val) { document.getElementById('gps-value').textContent = val; document.getElementById('gps-sub').textContent = 'Manual entry'; document.getElementById('location-input').value = ''; }
 }
 
-renderStates(stateData); injectProfitBars(); loadSavedPreferences(); renderMaint(); refreshWeather();
+loadStateStatsFromSupabase(); injectProfitBars(); loadSavedPreferences(); renderMaint(); refreshWeather();
 
 // ══════════════════════════════════════════════════════════════
 // PULL TO REFRESH
@@ -4596,9 +4710,17 @@ showLoadback = async function(origin, dest, rate, miles, broker, phone) {
         '</div>' +
         '<div class="loadback-date">📅 Available around arrival · ' + (l.equipment || 'V') + '</div>' +
         '<div class="lb-actions">' +
-          (l.contactPhone ? '<button class="lb-call-btn" onclick="callBroker(\'' + l.contactPhone + '\',\'' + (l.broker || 'Broker') + '\')">📞 Call ' + (l.broker || 'Broker') + '</button>' : '') +
-          '<button class="lb-book-btn" onclick="addReturnLoad(\'' + l.route + '\',' + l.miles + ',' + l.rate + ')">✓ Add to Loads</button>' +
-          '<button class="lb-call-btn lb-ai-btn" onclick="analyzeReturnLoad(this,\'' + l.route + '\',' + l.rate + ',' + l.miles + ',' + l.rpm.toFixed(2) + ',' + l.returnNet + ',' + l.roundTripNet + ',\'' + (l.broker||'') + '\')" style="color:#7ab8ff;border-color:rgba(122,184,255,.35);">🤖 Analyze</button>' +
+          (l.contactPhone ? '<button class="lb-call-btn" data-phone="' + (l.contactPhone||'') + '" data-broker="broker" onclick="callBroker(this.dataset.phone,this.dataset.broker)" style="touch-action:manipulation;">&#x1F4DE; Call ' + (l.broker || 'Broker') + '</button>' : '') +
+          '<button class="lb-book-btn" ' +
+            'data-origin="' + (l.originCity||'') + ', ' + (l.originState||'') + '" ' +
+            'data-dest="' + (l.destCity||'') + ', ' + (l.destState||'') + '" ' +
+            'data-rate="' + (l.rate||0) + '" ' +
+            'data-miles="' + (l.miles||0) + '" ' +
+            'data-broker="' + (l.broker||'').replace(/"/g,'&quot;') + '" ' +
+            'data-phone="' + (l.contactPhone||l.brokerPhone||'') + '" ' +
+            'onclick="bookLoadbackCard(this)" ' +
+            'style="touch-action:manipulation;">✓ Book It</button>' +
+          '<button class="lb-call-btn lb-ai-btn" onclick="analyzeReturnLoad(this,\'' + l.route + '\',' + l.rate + ',' + l.miles + ',' + l.rpm.toFixed(2) + ',' + l.returnNet + ',' + l.roundTripNet + ',\'' + (l.broker||'') + '\')" style="color:#7ab8ff;border-color:rgba(122,184,255,.35);touch-action:manipulation;">🤖 Analyze</button>' +
         '</div>' +
         '<div class="lb-ai-result" style="display:none;margin-top:.5rem;padding:.5rem .7rem;border-radius:3px;font-size:.82rem;"></div>' +
       '</div>';
