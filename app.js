@@ -4586,27 +4586,88 @@ function renderLoadbackScreen(sortKey) {
   var belowMin = sorted.filter(function(l) { return l.rpm < minRpm; });
 
   function buildCard(l) {
-    var meetsRpm  = l.rpm >= minRpm;
-    var bestPhone = l.contactPhone || l.brokerPhone || '';
-    var dhStr     = l.dhFromDest > 0 ? l.dhFromDest + ' mi from dropoff' : 'within ' + (defaults.maxDeadhead || 200) + 'mi of dropoff';
-    var pickupStr = l.pickupDate ? l.pickupDate : 'Flexible';
-    return '<div class="load-card" style="margin-bottom:.7rem;border-left:3px solid ' + (meetsRpm?'var(--green)':'rgba(255,255,255,.1)') + ';">' +
-      '<div class="load-header" style="display:flex;justify-content:space-between;padding:.7rem .8rem .3rem;">' +
-        '<div style="font-weight:bold;font-size:.88rem;">' + (l.originCity||'?') + ', ' + (l.originState||'?') + ' &#x2192; ' + (l.destCity||'?') + ', ' + (l.destState||'?') + '</div>' +
-        '<div style="color:' + (meetsRpm?'var(--green)':'var(--amber)') + ';font-weight:bold;">$' + (l.rate||0).toLocaleString() + '</div>' +
+    var meetsRpm   = l.rpm >= minRpm;
+    var bestPhone  = l.contactPhone || l.brokerPhone || '';
+    var panelId    = 'lb_' + (l.id || Math.random().toString(36).substr(2,8));
+    var cardClass  = meetsRpm ? 'hot' : 'watch';
+    var tagLabel   = meetsRpm ? '&#x2705; Above Min RPM' : '&#x26A0;&#xFE0F; Below Min RPM';
+    var tagClass   = meetsRpm ? 'tag-hot' : 'tag-watch';
+    var dhStr      = l.dhFromDest > 0 ? l.dhFromDest + ' mi deadhead' : 'DH unknown';
+    var pickupStr  = l.pickupDate || 'Flexible';
+    var rateDisplay = l.rate ? '$' + l.rate.toLocaleString() : 'Call';
+    var rpmDisplay  = '$' + (l.rpm||0).toFixed(2) + '/mi';
+
+    // Full breakdown calcs
+    var fuelPrice   = defaults.fuelPrice || 4.25;
+    var mpg         = defaults.mpg       || 6.5;
+    var emptyMpg    = defaults.emptyMpg  || 8.0;
+    var maintCpm    = window._maintCpmTotal || 0;
+    var returnFuel  = l.returnFuel || Math.round((l.miles/mpg)*fuelPrice);
+    var dhFuel      = l.dhFromDest > 0 ? Math.round((l.dhFromDest/emptyMpg)*fuelPrice) : 0;
+    var totalFuel   = returnFuel + dhFuel;
+    var maintCost   = Math.round(maintCpm * (l.miles||0));
+    var returnNet   = l.returnNet !== undefined ? l.returnNet : (l.rate - totalFuel);
+    var trueNet     = returnNet - maintCost;
+    var roundTrip   = l.roundTripNet || returnNet;
+
+    // Verdict
+    var verdict = trueNet >= (defaults.minGross || 0) && meetsRpm ? 'TAKE IT' : trueNet < 0 ? 'PASS' : 'BORDERLINE';
+    var verdictClass = verdict === 'TAKE IT' ? 'strong' : verdict === 'PASS' ? 'weak' : 'ok';
+
+    return '<div class="load-card ' + cardClass + '" onclick="toggleExpand(\'' + panelId + '\')" style="cursor:pointer;margin-bottom:.6rem;">' +
+      // Top row
+      '<div class="load-top load-card-clickable">' +
+        '<div>' +
+          '<div class="load-route">' +
+            '<span class="expand-arrow" id="arrow_' + panelId + '">&#x25BC;</span> ' +
+            (l.originCity||'?') + ', ' + (l.originState||'?') + ' <span>&#x2192;</span> ' + (l.destCity||'?') + ', ' + (l.destState||'?') +
+          '</div>' +
+          '<div style="margin-top:.3rem;"><span class="load-tag ' + tagClass + '">' + tagLabel + '</span></div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          '<div class="load-rate">' + rateDisplay + '</div>' +
+          '<div class="load-rate-sub" style="color:var(--green);">' + rpmDisplay + '</div>' +
+        '</div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;padding:.3rem .8rem;font-size:.78rem;">' +
-        '<div><div style="color:#b8c8b8;font-size:.62rem;">RPM</div><strong style="color:' + (meetsRpm?'var(--green)':'var(--amber)') + ';">$' + (l.rpm||0).toFixed(2) + '/mi</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.62rem;">MILES</div><strong>' + (l.miles||0) + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.62rem;">NET RETURN</div><strong style="color:var(--green);">$' + (l.returnNet||0).toLocaleString() + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.62rem;">FUEL</div><strong>-$' + (l.returnFuel||0).toLocaleString() + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.62rem;">FROM DROPOFF</div><strong>' + dhStr + '</strong></div>' +
-        '<div><div style="color:#b8c8b8;font-size:.62rem;">ROUND TRIP</div><strong style="color:var(--green);">$' + (l.roundTripNet||0).toLocaleString() + '</strong></div>' +
+      // Broker + meta
+      '<div class="broker-info">' +
+        '<span class="broker-name">' + (l.broker||'Unknown') + ':</span>' +
+        '<span class="broker-phone">&#x1F4DE; ' + (bestPhone||'—') + '</span>' +
       '</div>' +
-      '<div style="font-size:.72rem;color:#b8c8b8;padding:.2rem .8rem .5rem;">&#x1F4C5; ' + pickupStr + ' &middot; ' + (l.broker||'Unknown') + ' &middot; ' + (l.equipment||'F') + '</div>' +
-      (l.notes ? '<div style="font-size:.72rem;color:#ffd04d;padding:0 .8rem .4rem;font-style:italic;">' + (l.notes||'').substring(0,100) + '</div>' : '') +
-      '<div style="display:flex;gap:.4rem;padding:.3rem .8rem .7rem;flex-wrap:wrap;">' +
-        (bestPhone ? '<button data-phone="' + bestPhone + '" data-broker="' + (l.broker||'').replace(/"/g,'&quot;') + '" onclick="callBroker(this.dataset.phone,this.dataset.broker)" class="btn btn-outline btn-sm" style="touch-action:manipulation;">&#x1F4DE; Call</button>' : '') +
+      '<div class="load-meta">' +
+        '<div><div class="lm-label">Miles</div><div class="lm-val">' + (l.miles||'—') + '</div></div>' +
+        '<div><div class="lm-label">Pickup</div><div class="lm-val">' + pickupStr + '</div></div>' +
+        '<div><div class="lm-label">DH from Drop</div><div class="lm-val">' + dhStr + '</div></div>' +
+      '</div>' +
+      // Expand panel — same structure as dashboard
+      '<div class="load-expand-panel" id="' + panelId + '">' +
+        '<div class="expand-profit-grid">' +
+          '<div class="expand-stat"><div class="expand-label">Gross Rate</div><div class="expand-val">' + rateDisplay + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Return Fuel</div><div class="expand-val red">-$' + returnFuel.toLocaleString() + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">DH Fuel</div><div class="expand-val red">-$' + dhFuel.toLocaleString() + (l.dhFromDest > 0 ? '<div style="font-size:.65rem;color:#b8c8b8;margin-top:.1rem;">' + l.dhFromDest + ' mi @ ' + emptyMpg + 'mpg</div>' : '') + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Maint Cost</div><div class="expand-val red">-$' + maintCost.toLocaleString() + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Net Return</div><div class="expand-val green">$' + returnNet.toLocaleString() + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">True Net</div><div class="expand-val green">$' + trueNet.toLocaleString() + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Rate/Mile</div><div class="expand-val">' + rpmDisplay + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-label">Round Trip Net</div><div class="expand-val green" style="font-size:1rem;">$' + roundTrip.toLocaleString() + '</div></div>' +
+        '</div>' +
+        '<div class="expand-verdict ' + verdictClass + '">' + verdict + ' — $' + trueNet.toLocaleString() + ' true net · $' + (l.rpm||0).toFixed(2) + '/mi</div>' +
+        (l.notes ? '<div class="expand-notes"><div class="expand-notes-text has-notes">' + (l.notes||'').substring(0,200) + '</div></div>' : '') +
+      '</div>' +
+      // Action buttons
+      '<div class="load-actions" onclick="event.stopPropagation()">' +
+        (bestPhone ? '<button class="load-action-btn call-btn" data-phone="' + bestPhone + '" data-broker="' + (l.broker||'').replace(/"/g,'&quot;') + '" onclick="callBroker(this.dataset.phone,this.dataset.broker)"><span class="btn-icon">&#x1F4DE;</span>Call</button>' : '') +
+        '<button class="load-action-btn book-btn" ' +
+          'onclick="showBookConfirmModal(' +
+            '\'' + (l.originCity||'') + ', ' + (l.originState||'') + '\',' +
+            '\'' + (l.destCity||'') + ', ' + (l.destState||'') + '\',' +
+            (l.rate||0) + ',' + (l.miles||0) + ',' +
+            '\'' + (l.broker||'').replace(/'/g,'\\'+'\'' ) + '\',' +
+            '\'' + bestPhone + '\'' +
+          ')">' +
+          '<span class="btn-icon">&#x2713;</span>Book It' +
+        '</button>' +
+        '<button class="load-action-btn skip-btn" onclick="skipLoad(this)"><span class="btn-icon">&#x2715;</span>Skip</button>' +
       '</div>' +
     '</div>';
   }
