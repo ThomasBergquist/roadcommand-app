@@ -299,67 +299,149 @@ async function renderLogbook() {
     if (window._rcUserId && window._supabaseReady) {
       var bRes = await window._supabase.from('booked_loads')
         .select('*').eq('user_id', window._rcUserId)
-        .order('eta_date', { ascending: true });
+        .order('eta_date', { ascending: false });
       if (!bRes.error && bRes.data) bookedLoads = bRes.data;
     }
   } catch(e) {}
 
-  var html = '';
+  var now        = new Date();
+  var thisMonth  = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  var html       = '';
 
   // ── Active load (en route) ──────────────────────────────────────────
   var activeLoad = bookedLoads.find(function(l) { return l.active === true; });
   if (activeLoad) {
-    html += '<div style="font-size:.7rem;color:var(--green);padding:.4rem .8rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F69B; Currently On This Load</div>';
+    html += '<div style="font-size:.7rem;color:var(--green);padding:.4rem 0;text-transform:uppercase;letter-spacing:.06em;">&#x1F69B; Currently On This Load</div>';
     html += buildBookedLoadCard(activeLoad, 'active');
   }
 
   // ── Queued loads ────────────────────────────────────────────────────
   var queued = bookedLoads.filter(function(l) { return !l.active && l.queued; });
   if (queued.length > 0) {
-    html += '<div style="font-size:.7rem;color:#ffd04d;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F4CB; Load Queue (' + queued.length + ')</div>';
+    html += '<div style="font-size:.7rem;color:#ffd04d;padding:.5rem 0 .2rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F4CB; Load Queue (' + queued.length + ')</div>';
     queued.forEach(function(load) { html += buildBookedLoadCard(load, 'queued'); });
   }
 
-  // ── Pending (booked but not active or queued) ───────────────────────
+  // ── Pending (booked but not active or queued) ────────────────────
   var pending = bookedLoads.filter(function(l) { return !l.active && !l.queued; });
   if (pending.length > 0) {
-    html += '<div style="font-size:.7rem;color:#b8c8b8;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F4CB; Booked Loads</div>';
+    html += '<div style="font-size:.7rem;color:#b8c8b8;padding:.5rem 0 .2rem;text-transform:uppercase;letter-spacing:.06em;">&#x1F4CB; Booked Loads</div>';
     pending.forEach(function(load) { html += buildBookedLoadCard(load, 'pending'); });
   }
 
-  // ── Invoice history ─────────────────────────────────────────────────
+  // ── Invoice history — grouped by month ─────────────────────────────
   if (invoices && invoices.length > 0) {
-    html += '<div style="font-size:.7rem;color:#b8c8b8;padding:.5rem .8rem .2rem;text-transform:uppercase;letter-spacing:.06em;border-top:1px solid rgba(255,255,255,.06);margin-top:.5rem;">Invoice History</div>';
+    html += '<div style="border-top:1px solid rgba(255,255,255,.06);margin-top:.8rem;padding-top:.5rem;"></div>';
+
     var sorted = invoices.slice().sort(function(a, b) {
       return new Date(b.invoice_date || b.date || 0) - new Date(a.invoice_date || a.date || 0);
     });
-    sorted.slice(0, 15).forEach(function(inv) {
-      var date   = inv.invoice_date || inv.date || '';
-      var status = inv.status === 'paid'
-        ? '<span style="color:var(--green);font-size:.7rem;">&#x2705; Paid</span>'
-        : inv.status === 'overdue'
-          ? '<span style="color:var(--red);font-size:.7rem;">&#x26A0;&#xFE0F; Overdue</span>'
-          : '<span style="color:#ffd04d;font-size:.7rem;">&#x23F3; Pending</span>';
-      html +=
-        '<div class="log-item" style="padding:.7rem 1rem;">' +
-          '<div class="log-top">' +
-            '<div class="log-route">' + (inv.broker_name || inv.broker || 'Unknown') + '</div>' +
-            '<div class="log-date">' + (date ? new Date(date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—') + '</div>' +
+
+    // Group by month key YYYY-MM
+    var months = {};
+    sorted.forEach(function(inv) {
+      var d = inv.invoice_date || inv.date || '';
+      var key = d ? d.substring(0,7) : 'unknown';
+      if (!months[key]) months[key] = [];
+      months[key].push(inv);
+    });
+
+    var monthKeys = Object.keys(months).sort().reverse();
+
+    monthKeys.forEach(function(key) {
+      var invList   = months[key];
+      var isCurrentMonth = key === thisMonth;
+      var monthLabel = key === 'unknown' ? 'Unknown Date' : (function() {
+        var parts = key.split('-');
+        var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, 1);
+        return d.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+      })();
+
+      // Summary stats for this month
+      var totalRev  = invList.reduce(function(s,i) { return s + (parseFloat(i.amount)||0); }, 0);
+      var paidCount = invList.filter(function(i) { return i.status==='paid'; }).length;
+      var pendCount = invList.filter(function(i) { return i.status!=='paid'; }).length;
+      var monthId   = 'month_' + key.replace('-','_');
+
+      // Current month is expanded by default, past months collapsed
+      var isOpen = isCurrentMonth;
+
+      html += '<div style="margin-bottom:.5rem;">' +
+        // Clickable month header
+        '<div onclick="toggleMonthGroup(\'' + monthId + '\')" style="display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:.7rem 1rem;cursor:pointer;touch-action:manipulation;">' +
+          '<div>' +
+            '<div style="font-weight:bold;font-size:.9rem;">' + monthLabel + '</div>' +
+            '<div style="font-size:.72rem;color:#b8c8b8;margin-top:.2rem;">' +
+              invList.length + ' load' + (invList.length !== 1 ? 's' : '') + ' &middot; $' + totalRev.toLocaleString() + ' gross' +
+              (paidCount > 0 ? ' &middot; <span style="color:var(--green);">' + paidCount + ' paid</span>' : '') +
+              (pendCount > 0 ? ' &middot; <span style="color:#ffd04d;">' + pendCount + ' pending</span>' : '') +
+            '</div>' +
           '</div>' +
-          '<div class="log-stats">' +
-            '<div class="log-stat">Rate: <strong>$' + (parseFloat(inv.amount)||0).toLocaleString() + '</strong></div>' +
-            '<div class="log-stat">Ref: <strong>' + (inv.ref || '—') + '</strong></div>' +
-            '<div class="log-stat">' + status + '</div>' +
+          '<div style="display:flex;align-items:center;gap:.5rem;">' +
+            (isCurrentMonth ? '<span style="font-size:.65rem;background:var(--green-dim);color:var(--green);border:1px solid var(--green-border);padding:.15rem .5rem;border-radius:100px;font-weight:bold;">CURRENT</span>' : '') +
+            '<span id="arrow_' + monthId + '" style="color:#b8c8b8;font-size:.85rem;transition:transform .2s;' + (isOpen ? 'transform:rotate(180deg);' : '') + '">&#x25BC;</span>' +
           '</div>' +
-          '<div style="margin-top:.4rem;">' +
-            '<button data-id="' + inv.id + '" onclick="deleteInvoice(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.2rem .5rem;font-size:.7rem;cursor:pointer;">&#x2715; Delete</button>' +
-          '</div>' +
-        '</div>';
+        '</div>' +
+        // Collapsible load list
+        '<div id="' + monthId + '" style="display:' + (isOpen ? 'block' : 'none') + ';border:1px solid rgba(255,255,255,.08);border-top:none;border-radius:0 0 6px 6px;overflow:hidden;">' +
+          invList.map(function(inv) {
+            var date   = inv.invoice_date || inv.date || '';
+            var status = inv.status === 'paid'
+              ? '<span style="color:var(--green);font-size:.7rem;">&#x2705; Paid</span>'
+              : inv.status === 'overdue'
+                ? '<span style="color:var(--red);font-size:.7rem;">&#x26A0;&#xFE0F; Overdue</span>'
+                : '<span style="color:#ffd04d;font-size:.7rem;">&#x23F3; Pending</span>';
+            var amt    = parseFloat(inv.amount) || 0;
+            var miles  = inv.notes ? (inv.notes.match(/Miles:\s*(\d+)/)||[])[1] : '';
+            var rpm    = miles && amt ? '$' + (amt/parseInt(miles)).toFixed(2) + '/mi' : '';
+            return '<div class="log-item" style="padding:.7rem 1rem;background:var(--surface2);">' +
+              '<div class="log-top">' +
+                '<div class="log-route">' + (inv.ref || inv.broker_name || inv.broker || 'Unknown') + '</div>' +
+                '<div class="log-date">' + (date ? new Date(date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—') + '</div>' +
+              '</div>' +
+              '<div class="log-stats">' +
+                '<div class="log-stat">Rate: <strong>$' + amt.toLocaleString() + '</strong></div>' +
+                (miles ? '<div class="log-stat">Miles: <strong>' + miles + '</strong></div>' : '') +
+                (rpm ? '<div class="log-stat">RPM: <strong>' + rpm + '</strong></div>' : '') +
+                '<div class="log-stat">' + status + '</div>' +
+              '</div>' +
+              '<div style="margin-top:.4rem;display:flex;gap:.4rem;">' +
+                '<button data-id="' + inv.id + '" onclick="updateInvoiceStatus(this.dataset.id)" style="background:none;border:1px solid var(--green-border);color:var(--green);border-radius:4px;padding:.2rem .5rem;font-size:.7rem;cursor:pointer;touch-action:manipulation;">&#x2705; Mark Paid</button>' +
+                '<button data-id="' + inv.id + '" onclick="deleteInvoice(this.dataset.id)" style="background:none;border:1px solid rgba(255,126,126,.3);color:#ff7e7e;border-radius:4px;padding:.2rem .5rem;font-size:.7rem;cursor:pointer;touch-action:manipulation;">&#x2715; Delete</button>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
     });
   }
 
-  if (!html) html = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads booked yet.</div></div>';
+  if (!html) html = '<div class="alert alert-amber"><div class="alert-icon">&#x1F4CB;</div><div>No loads logged yet.</div></div>';
   logList.innerHTML = html;
+}
+
+function toggleMonthGroup(id) {
+  var el    = document.getElementById(id);
+  var arrow = document.getElementById('arrow_' + id);
+  if (!el) return;
+  var isOpen = el.style.display !== 'none';
+  el.style.display    = isOpen ? 'none' : 'block';
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+async function updateInvoiceStatus(id) {
+  var status = 'paid';
+  try {
+    await window._supabase.from('invoices').update({ status: status }).eq('id', id).eq('user_id', window._rcUserId);
+    if (invoices) {
+      var inv = invoices.find(function(i) { return i.id == id; });
+      if (inv) inv.status = status;
+    }
+    if (btn) { btn.textContent = '&#x2705; Paid'; btn.style.color = 'var(--green)'; }
+    renderLogbook();
+    updateDashboardStats();
+    showToast('&#x2705; Invoice marked paid');
+  } catch(e) {}
 }
 
 function buildBookedLoadCard(load, type) {
